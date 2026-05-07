@@ -11,11 +11,13 @@ jobs:
     timeout-minutes: 20
     env:
       ZIG_VERSION: "0.15.2"
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
         with:
           go-version-file: clients/go/go.mod
+          cache: false
       - name: Install Rust
         run: |
           rustup toolchain install stable --profile minimal
