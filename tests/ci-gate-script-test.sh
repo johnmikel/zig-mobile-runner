@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-output="$("$ROOT/scripts/release-gate.sh" --dry-run 2>&1)"
+output="$("$ROOT/scripts/ci-gate.sh" --dry-run 2>&1)"
 
 python3 - "$output" <<'PY'
 import sys
@@ -14,6 +14,7 @@ required = [
     "zig fmt --check build.zig src",
     "bash -n scripts/*.sh tests/*.sh",
     "python3 -m py_compile scripts/*.py",
+    "zig build-exe src/main.zig -target aarch64-macos.15.0 -O Debug -femit-bin=zig-out/bin/zmr",
     "bash tests/benchmark-results-test.sh",
     "bash tests/device-matrix-test.sh",
     "bash tests/android-emulator-script-test.sh",
@@ -23,6 +24,7 @@ required = [
     "bash tests/ios-shim-install-script-test.sh",
     "bash tests/ios-shim-target-helper-test.sh",
     "bash tests/ios-pilot-script-test.sh",
+    "bash tests/release-gate-script-test.sh",
     "bash tests/ci-gate-script-test.sh",
     "bash tests/release-metadata-test.sh",
     "bash tests/release-manifest-test.sh",
@@ -37,7 +39,6 @@ required = [
     "bash tests/public-safety-test.sh",
     "node --test tests/viewer-parser.test.mjs",
     "zig test src/main.zig -target aarch64-macos.15.0",
-    "zig build-exe src/main.zig -target aarch64-macos.15.0 -O Debug -femit-bin=zig-out/bin/zmr",
     "bash tests/version-json-test.sh",
     "bash tests/schemas-json-test.sh",
     "bash tests/devices-json-test.sh",
@@ -54,19 +55,16 @@ required = [
     "./zig-out/bin/zmr doctor --strict --adb ./tests/fake-adb.sh --xcrun ./tests/fake-xcrun.sh",
     "./scripts/demo.sh",
     "./scripts/coverage.sh",
-    "./scripts/build-release.sh",
-    "./scripts/verify-release-artifacts.sh",
-    "./scripts/release-smoke.sh dist/*.tar.gz",
     "npm pack --dry-run",
 ]
 
 for command in required:
     assert command in output, command
 
-assert "External pilot gates not run by default" in output
-assert "./scripts/pilot-gate.sh --android --ios --android-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --ios-shim /path/to/mobile-app/.zmr/ios-shim" in output
-assert "./scripts/run-android-pilot.sh --app-root /path/to/mobile-app --device emulator-5554 --runs 20" in output
-assert "./scripts/run-android-pilot.sh --app-root /path/to/mobile-app --device emulator-5554 --runs 20 --min-pass-rate 100 --max-failures 0 --max-p95-ms 30000" in output
-assert "./scripts/run-ios-pilot.sh --app-root /path/to/mobile-app --app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20" in output
-assert "./scripts/run-ios-pilot.sh --app-root /path/to/mobile-app --app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --max-p95-ms 45000" in output
+for heavy_release_command in [
+    "./scripts/build-release.sh",
+    "./scripts/verify-release-artifacts.sh",
+    "./scripts/release-smoke.sh dist/*.tar.gz",
+]:
+    assert heavy_release_command not in output, heavy_release_command
 PY

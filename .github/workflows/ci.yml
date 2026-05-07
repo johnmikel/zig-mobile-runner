@@ -8,6 +8,7 @@ on:
 jobs:
   test:
     runs-on: macos-15
+    timeout-minutes: 20
     env:
       ZIG_VERSION: "0.15.2"
     steps:
@@ -25,5 +26,5 @@ jobs:
           tar -xf zig.tar.xz
           echo "$PWD/zig-${zig_arch}-macos-${ZIG_VERSION}" >> "$GITHUB_PATH"
           "$PWD/zig-${zig_arch}-macos-${ZIG_VERSION}/zig" version
-      - name: Local release gate
-        run: ./scripts/release-gate.sh
+      - name: Local CI gate
+        run: ./scripts/ci-gate.sh

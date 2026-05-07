@@ -10,11 +10,10 @@ HOST_ZIG_TARGET=""
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/release-gate.sh [--dry-run]
+  scripts/ci-gate.sh [--dry-run]
 
-Runs the local V1 dev-preview release gate. Real Android/iOS pilot runs still
-require app builds and devices, so this script prints those commands as the
-final external gate.
+Runs the fast public CI gate for normal pushes and pull requests. Release
+artifact packaging remains in scripts/release-gate.sh and the tag workflow.
 USAGE
 }
 
@@ -95,7 +94,6 @@ run "node --test tests/npm-package.test.mjs"
 run "bash tests/public-safety-test.sh"
 run "node --test tests/viewer-parser.test.mjs"
 run "zig test src/main.zig -target $HOST_ZIG_TARGET"
-run "zig build-exe src/main.zig -target $HOST_ZIG_TARGET -O Debug -femit-bin=zig-out/bin/zmr"
 run "bash tests/version-json-test.sh"
 run "bash tests/schemas-json-test.sh"
 run "bash tests/devices-json-test.sh"
@@ -112,15 +110,4 @@ run "./zig-out/bin/zmr validate examples/ios-smoke.json"
 run "./zig-out/bin/zmr doctor --strict --adb ./tests/fake-adb.sh --xcrun ./tests/fake-xcrun.sh"
 run "./scripts/demo.sh"
 run "./scripts/coverage.sh"
-run "./scripts/build-release.sh"
-run "./scripts/verify-release-artifacts.sh"
-run "./scripts/release-smoke.sh dist/*.tar.gz"
 run "npm pack --dry-run"
-
-cat <<'EOF'
-
-External pilot gates not run by default:
-+ ./scripts/pilot-gate.sh --android --ios --android-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0
-+ ./scripts/run-android-pilot.sh --app-root /path/to/mobile-app --device emulator-5554 --runs 20 --min-pass-rate 100 --max-failures 0 --max-p95-ms 30000
-+ ./scripts/run-ios-pilot.sh --app-root /path/to/mobile-app --app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --max-p95-ms 45000
-EOF
