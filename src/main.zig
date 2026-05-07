@@ -1299,6 +1299,12 @@ test "pilot scenario examples parse" {
     defer ios_shim_smoke.deinit(allocator);
     try std.testing.expectEqualStrings("com.example.mobiletest", ios_shim_smoke.app_id.?);
     try std.testing.expect(ios_shim_smoke.steps.len > ios_smoke.steps.len);
+    for (ios_shim_smoke.steps) |step| {
+        try std.testing.expect(std.meta.activeTag(step) != .open_link);
+    }
+    try std.testing.expectEqual(@as(std.meta.Tag(scenario.Step), .type_text), std.meta.activeTag(ios_shim_smoke.steps[3]));
+    try std.testing.expect(ios_shim_smoke.steps[3].type_text.selector != null);
+    try std.testing.expectEqualStrings("demo_input", ios_shim_smoke.steps[3].type_text.selector.?.id.?);
 }
 
 test "platform parser accepts supported values" {

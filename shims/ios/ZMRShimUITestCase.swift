@@ -178,7 +178,7 @@ final class ZMRShimUITestCase: XCTestCase {
         guard selectorParts(selector) != nil else {
             return error("selector.unsupported", "unsupported selector: \(selector)")
         }
-        guard let element = resolveElement(selector: selector, app: app) else {
+        guard let element = resolveElement(selector: selector, app: app, preferredTypes: [.button]) else {
             return error("selector.not_found", "selector did not match: \(selector)")
         }
         if !element.isHittable {
@@ -192,14 +192,14 @@ final class ZMRShimUITestCase: XCTestCase {
         guard selectorParts(selector) != nil else {
             return error("selector.unsupported", "unsupported selector: \(selector)")
         }
-        guard let element = resolveElement(selector: selector, app: app) else {
+        guard let element = resolveElement(selector: selector, app: app, preferredTypes: [.textField, .secureTextField, .textView]) else {
             return error("selector.not_found", "selector did not match: \(selector)")
         }
         if !element.isHittable {
             return error("selector.not_hittable", "selector matched a non-hittable element: \(selector)")
         }
         element.tap()
-        element.typeText(text)
+        app.typeText(text)
         return ok()
     }
 
@@ -207,7 +207,7 @@ final class ZMRShimUITestCase: XCTestCase {
         guard selectorParts(selector) != nil else {
             return error("selector.unsupported", "unsupported selector: \(selector)")
         }
-        guard let element = resolveElement(selector: selector, app: app) else {
+        guard let element = resolveElement(selector: selector, app: app, preferredTypes: [.textField, .secureTextField, .textView]) else {
             return error("selector.not_found", "selector did not match: \(selector)")
         }
         if !element.isHittable {
@@ -215,15 +215,25 @@ final class ZMRShimUITestCase: XCTestCase {
         }
         element.tap()
         if count > 0 {
-            element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count))
+            app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count))
         }
         return ok()
     }
 
-    private func resolveElement(selector: String, app: XCUIApplication) -> XCUIElement? {
-        app.descendants(matching: .any).allElementsBoundByIndex.first { element in
+    private func resolveElement(selector: String, app: XCUIApplication, preferredTypes: [XCUIElement.ElementType] = []) -> XCUIElement? {
+        let matchedElements = app.descendants(matching: .any).allElementsBoundByIndex.filter { element in
             matches(selector: selector, element: element)
         }
+        if let preferred = matchedElements.first(where: { preferredTypes.contains($0.elementType) && $0.isHittable }) {
+            return preferred
+        }
+        if let preferred = matchedElements.first(where: { preferredTypes.contains($0.elementType) }) {
+            return preferred
+        }
+        if let hittable = matchedElements.first(where: { $0.isHittable }) {
+            return hittable
+        }
+        return matchedElements.first
     }
 
     private func matches(selector: String, element: XCUIElement) -> Bool {

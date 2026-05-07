@@ -3,7 +3,6 @@
   "appId": "com.example.mobiletest",
   "steps": [
     { "action": "launch" },
-    { "action": "openLink", "url": "exampleapp:///e2e-auth?probe=1" },
     {
       "action": "waitVisible",
       "selector": { "text": "Continue" },
@@ -13,7 +12,11 @@
       "action": "tap",
       "selector": { "resourceId": "continue_button" }
     },
-    { "action": "typeText", "text": "hello" },
+    {
+      "action": "typeText",
+      "selector": { "resourceId": "demo_input" },
+      "text": "hello"
+    },
     { "action": "hideKeyboard" },
     { "action": "snapshot" }
   ]

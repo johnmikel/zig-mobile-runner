@@ -66,6 +66,7 @@ grep -q 'process(requestAt requestFile:' "$TMPDIR/app/.zmr/ZMRShimUITestCase.swi
 grep -q 'ZMR_SHIM_MODE' "$TMPDIR/app/.zmr/ZMRShimUITestCase.swift"
 grep -q 'ZMR_SHIM_SERVER_DIR' "$TMPDIR/app/.zmr/ZMRShimUITestCase.swift"
 grep -q 'resolveElement(selector:' "$TMPDIR/app/.zmr/ZMRShimUITestCase.swift"
+grep -q 'preferredTypes: \[.textField, .secureTextField, .textView\]' "$TMPDIR/app/.zmr/ZMRShimUITestCase.swift"
 grep -q 'matches(selector:' "$TMPDIR/app/.zmr/ZMRShimUITestCase.swift"
 grep -q 'command.selector' "$TMPDIR/app/.zmr/ZMRShimUITestCase.swift"
 grep -q 'selector.unsupported' "$TMPDIR/app/.zmr/ZMRShimUITestCase.swift"
