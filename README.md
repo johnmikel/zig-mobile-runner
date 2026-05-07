@@ -131,6 +131,9 @@ Coverage is gated at 90% with `kcov`:
 ```
 
 Latest local run: `94.16%` line coverage, `5565/5910` lines.
+On GitHub-hosted macOS runners, `coverage.sh` runs the full Zig test binary but
+skips `kcov` by default because `kcov` can hang while tracing child device-tool
+processes. Set `ZMR_FORCE_KCOV=1` to force the same coverage collection there.
 
 Viewer parser tests run with Node:
 
