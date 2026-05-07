@@ -1,0 +1,192 @@
+{
+  "name": "Sample App email login and referral smoke",
+  "appId": "com.example.mobiletest",
+  "steps": [
+    {
+      "action": "stop"
+    },
+    {
+      "action": "clearState"
+    },
+    {
+      "action": "launch"
+    },
+    {
+      "action": "waitAny",
+      "selectors": [
+        { "textContains": "Development servers" },
+        { "textContains": "Downloading 100%" },
+        { "text": "Or sign up via email here" },
+        { "text": "Sign in with email" },
+        { "textContains": "Dashboard" },
+        { "textContains": "Request a feature" },
+        { "textContains": "Earn points" },
+        { "textContains": "Spend points" },
+        { "textContains": "points" }
+      ],
+      "timeoutMs": 60000
+    },
+    {
+      "action": "whenVisible",
+      "selector": { "textContains": "Development servers" },
+      "steps": [
+        {
+          "action": "tap",
+          "selector": { "contentDescContains": "Sample App Test on" },
+          "optional": true
+        },
+        {
+          "action": "tap",
+          "selector": { "contentDesc": "Sample App Test, http://10.0.2.2:8081" },
+          "optional": true
+        },
+        {
+          "action": "tap",
+          "selector": { "text": "http://10.0.2.2:8081" },
+          "optional": true
+        },
+        {
+          "action": "waitNotVisible",
+          "selector": { "textContains": "Development servers" },
+          "timeoutMs": 60000,
+          "optional": true
+        }
+      ]
+    },
+    {
+      "action": "whenVisible",
+      "selector": { "text": "Continue" },
+      "timeoutMs": 120000,
+      "steps": [
+        {
+          "action": "tap",
+          "selector": { "text": "Continue" }
+        },
+        {
+          "action": "whenVisible",
+          "selector": { "textContains": "Connected to:" },
+          "steps": [
+            {
+              "action": "pressBack"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "action": "whenVisible",
+      "selector": { "textContains": "Connected to:" },
+      "timeoutMs": 10000,
+      "steps": [
+        {
+          "action": "pressBack"
+        }
+      ]
+    },
+    {
+      "action": "waitAny",
+      "selectors": [
+        { "id": "email-login-email-input" },
+        { "contentDesc": "Open email sign up" },
+        { "text": "Or sign up via email here" },
+        { "textContains": "Welcome" },
+        { "textContains": "Sample landing" },
+        { "text": "Sign in with email" },
+        { "textContains": "Dashboard" },
+        { "textContains": "Request a feature" },
+        { "textContains": "Earn points" },
+        { "textContains": "Spend points" },
+        { "textContains": "points" }
+      ],
+      "timeoutMs": 60000
+    },
+    {
+      "action": "whenVisible",
+      "selector": { "textContains": "Downloading 100%" },
+      "steps": [
+        {
+          "action": "waitNotVisible",
+          "selector": { "textContains": "Downloading 100%" },
+          "timeoutMs": 180000
+        }
+      ]
+    },
+    {
+      "action": "whenVisible",
+      "selector": { "contentDesc": "Use E2E sign in" },
+      "steps": [
+        {
+          "action": "tap",
+          "selector": { "contentDesc": "Use E2E sign in" }
+        },
+        {
+          "action": "waitAny",
+          "selectors": [
+            { "textContains": "Signing in to your account" },
+            { "textContains": "Requesting test token" },
+            { "textContains": "Bootstrapping session" },
+            { "textContains": "Routing to app" },
+            { "textContains": "Dashboard" },
+            { "textContains": "Request a feature" },
+            { "textContains": "Invite teammates" },
+            { "textContains": "Earn points" },
+            { "textContains": "Spend points" },
+            { "textContains": "points" }
+          ],
+          "timeoutMs": 45000
+        }
+      ]
+    },
+    {
+      "action": "waitAny",
+      "selectors": [
+        { "textContains": "Dashboard" },
+        { "textContains": "Request a feature" },
+        { "textContains": "Invite teammates" },
+        { "textContains": "Earn points" },
+        { "textContains": "Spend points" },
+        { "textContains": "points" }
+      ],
+      "timeoutMs": 90000
+    },
+    {
+      "action": "openLink",
+      "url": "exampleapp:///referrals/invite"
+    },
+    {
+      "action": "waitAny",
+      "selectors": [
+        { "textContains": "Invite a teammate and both earn" },
+        { "textContains": "Share my link" },
+        { "textContains": "Your Referral Code" },
+        { "textContains": "No referrals yet" },
+        { "text": "Retry" },
+        { "textContains": "Request timed out" }
+      ],
+      "timeoutMs": 20000
+    },
+    {
+      "action": "whenVisible",
+      "selector": { "text": "Retry" },
+      "steps": [
+        {
+          "action": "tap",
+          "selector": { "text": "Retry" }
+        },
+        {
+          "action": "waitAny",
+          "selectors": [
+            { "textContains": "Invite a teammate and both earn" },
+            { "textContains": "Share my link" },
+            { "textContains": "Your Referral Code" },
+            { "textContains": "No referrals yet" }
+          ],
+          "timeoutMs": 60000
+        }
+      ]
+    },
+    {
+      "action": "snapshot"
+    }
+  ]
+}

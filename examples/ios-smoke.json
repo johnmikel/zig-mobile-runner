@@ -1,0 +1,9 @@
+{
+  "name": "ZMR iOS simulator smoke demo",
+  "appId": "com.example.mobiletest",
+  "steps": [
+    { "action": "launch" },
+    { "action": "openLink", "url": "exampleapp:///e2e-auth?probe=1" },
+    { "action": "snapshot" }
+  ]
+}

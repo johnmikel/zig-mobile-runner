@@ -1,0 +1,89 @@
+{
+  "name": "Sample App auth probe",
+  "appId": "com.example.mobiletest",
+  "steps": [
+    {
+      "action": "stop"
+    },
+    {
+      "action": "openLink",
+      "url": "exampleapp:///e2e-auth?probe=1"
+    },
+    {
+      "action": "waitAny",
+      "selectors": [
+        {
+          "text": "E2E auth probe"
+        },
+        {
+          "text": "Deep link received:"
+        },
+        {
+          "text": "Development servers"
+        }
+      ],
+      "timeoutMs": 60000
+    },
+    {
+      "action": "whenVisible",
+      "selector": {
+        "text": "Deep link received:"
+      },
+      "steps": [
+        {
+          "action": "tap",
+          "selector": {
+            "contentDescContains": "Sample App Test on"
+          },
+          "optional": true
+        },
+        {
+          "action": "tap",
+          "selector": {
+            "contentDesc": "Sample App Test"
+          },
+          "optional": true
+        }
+      ]
+    },
+    {
+      "action": "whenVisible",
+      "selector": {
+        "text": "Development servers"
+      },
+      "steps": [
+        {
+          "action": "tap",
+          "selector": {
+            "contentDescContains": "Sample App Test on"
+          },
+          "optional": true
+        },
+        {
+          "action": "tap",
+          "selector": {
+            "contentDesc": "Sample App Test, http://10.0.2.2:8081"
+          },
+          "optional": true
+        },
+        {
+          "action": "tap",
+          "selector": {
+            "text": "http://10.0.2.2:8081"
+          },
+          "optional": true
+        }
+      ]
+    },
+    {
+      "action": "waitVisible",
+      "selector": {
+        "text": "E2E auth probe"
+      },
+      "timeoutMs": 120000
+    },
+    {
+      "action": "snapshot"
+    }
+  ]
+}

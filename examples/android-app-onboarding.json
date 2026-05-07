@@ -1,0 +1,12 @@
+{
+  "name": "Android app onboarding smoke",
+  "appId": "com.example.mobiletest",
+  "steps": [
+    { "action": "clearState" },
+    { "action": "launch" },
+    { "action": "waitVisible", "selector": { "textContains": "Welcome" }, "timeoutMs": 15000 },
+    { "action": "tap", "selector": { "textContains": "Get started" } },
+    { "action": "waitAny", "selectors": [{ "textContains": "Home" }, { "textContains": "Sign in" }], "timeoutMs": 15000 },
+    { "action": "snapshot" }
+  ]
+}

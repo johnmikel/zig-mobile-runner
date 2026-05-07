@@ -1,0 +1,83 @@
+export interface ZmrClientOptions {
+  command: string;
+  args?: string[];
+  cwd?: string;
+  env?: Record<string, string | undefined>;
+  stderr?: "inherit" | "ignore" | "pipe";
+}
+
+export interface Selector {
+  id?: string;
+  resourceId?: string;
+  text?: string;
+  textContains?: string;
+  contentDesc?: string;
+  contentDescContains?: string;
+  className?: string;
+}
+
+export interface Viewport {
+  width: number;
+  height: number;
+}
+
+export interface UiNode {
+  stableId: string;
+  className: string;
+  resourceId?: string | null;
+  text?: string | null;
+  contentDesc?: string | null;
+  bounds: { x: number; y: number; width: number; height: number };
+  enabled: boolean;
+  visible: boolean;
+  selected: boolean;
+}
+
+export interface ObservationSnapshot {
+  id: string;
+  timestampMs: number;
+  viewport: Viewport;
+  displayDensityDpi?: number | null;
+  activePackage?: string | null;
+  activeActivity?: string | null;
+  screenshotArtifact?: string | null;
+  treeArtifact?: string | null;
+  focusedNodeId?: string | null;
+  logDelta?: string | null;
+  nodes: UiNode[];
+}
+
+export interface ZmrClient {
+  request<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>;
+  capabilities(): Promise<Record<string, unknown>>;
+  createSession(): Promise<{ sessionId: string }>;
+  closeSession(): Promise<boolean>;
+  launch(): Promise<boolean>;
+  stop(): Promise<boolean>;
+  clearState(): Promise<boolean>;
+  openLink(url: string): Promise<boolean>;
+  snapshot(): Promise<ObservationSnapshot>;
+  tap(selector: Selector): Promise<boolean>;
+  typeText(text: string, options?: { selector?: Selector }): Promise<boolean>;
+  eraseText(options?: { selector?: Selector; maxChars?: number }): Promise<boolean>;
+  hideKeyboard(): Promise<boolean>;
+  swipe(input: { x1: number; y1: number; x2: number; y2: number; durationMs?: number }): Promise<boolean>;
+  pressBack(): Promise<boolean>;
+  scrollUntilVisible(selector: Selector, options?: { direction?: "up" | "down"; timeoutMs?: number }): Promise<boolean>;
+  waitUntil(selector: Selector, options?: { timeoutMs?: number }): Promise<boolean>;
+  waitAny(selectors: Selector[], options?: { timeoutMs?: number }): Promise<{ matchedIndex: number } | false>;
+  waitGone(selector: Selector, options?: { timeoutMs?: number }): Promise<boolean>;
+  assertVisible(selector: Selector, options?: { timeoutMs?: number }): Promise<boolean>;
+  assertNotVisible(selector: Selector, options?: { timeoutMs?: number }): Promise<boolean>;
+  exportTrace(out: string, options?: { redact?: boolean; omitScreenshots?: boolean }): Promise<Record<string, unknown>>;
+  traceEvents(afterSeq?: number, options?: { limit?: number }): Promise<Record<string, unknown>>;
+  close(): Promise<void>;
+}
+
+export class ZmrRpcError extends Error {
+  code?: number;
+  publicCode?: string;
+  data?: unknown;
+}
+
+export function createZmrClient(options: ZmrClientOptions): ZmrClient;

@@ -1,0 +1,520 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+APP_ROOT=""
+SCHEME=""
+TEST_TARGET=""
+APP_TARGET=""
+BUNDLE_ID=""
+TEST_BUNDLE_ID=""
+DEVICE="booted"
+CONFIGURATION="Debug"
+WORKSPACE=""
+PROJECT=""
+DERIVED_DATA_PATH=""
+DEPLOYMENT_TARGET="15.0"
+PATCH_XCODEPROJ=0
+
+usage() {
+  cat <<'USAGE'
+Usage:
+  scripts/install-ios-shim.sh --app-root <dir> --scheme <UITestScheme> --bundle-id <id> [options]
+
+Writes an app-local .zmr/ios-shim command and XCTest source file.
+
+Options:
+  --app-root <dir>       App repository root. Required.
+  --scheme <scheme>      Xcode UI test scheme that includes ZMRShimUITestCase. Required.
+  --bundle-id <id>       App bundle id under test. Required.
+  --app-target <name>    App target name. Enables generated Xcode target helper.
+  --test-target <name>   UI test target name. Default: scheme.
+  --test-bundle-id <id>  UI test bundle id. Default: <bundle-id>.zmr-uitests.
+  --workspace <path>     Workspace path relative to app root.
+  --project <path>       Xcode project path relative to app root.
+  --derived-data-path <path>
+                          Derived data path relative to app root.
+  --device <udid|booted> Simulator destination id. Default: booted.
+  --configuration <name> Xcode build configuration. Default: Debug.
+  --deployment-target <version>
+                          iOS deployment target for generated UI test target. Default: 15.0.
+  --patch-xcodeproj      Run the generated Xcodeproj helper immediately.
+  -h, --help             Show this help.
+
+After running, use .zmr/ensure-ios-shim-target.sh to create/update the UI test
+target when --project or --workspace and --app-target are available, then pass
+--ios-shim ./.zmr/ios-shim to zmr.
+USAGE
+}
+
+die() {
+  echo "error: $*" >&2
+  exit 2
+}
+
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --app-root)
+      APP_ROOT="${2:-}"
+      shift 2
+      ;;
+    --scheme)
+      SCHEME="${2:-}"
+      shift 2
+      ;;
+    --bundle-id)
+      BUNDLE_ID="${2:-}"
+      shift 2
+      ;;
+    --app-target)
+      APP_TARGET="${2:-}"
+      shift 2
+      ;;
+    --test-bundle-id)
+      TEST_BUNDLE_ID="${2:-}"
+      shift 2
+      ;;
+    --workspace)
+      WORKSPACE="${2:-}"
+      shift 2
+      ;;
+    --project)
+      PROJECT="${2:-}"
+      shift 2
+      ;;
+    --derived-data-path)
+      DERIVED_DATA_PATH="${2:-}"
+      shift 2
+      ;;
+    --test-target)
+      TEST_TARGET="${2:-}"
+      shift 2
+      ;;
+    --device)
+      DEVICE="${2:-}"
+      shift 2
+      ;;
+    --configuration)
+      CONFIGURATION="${2:-}"
+      shift 2
+      ;;
+    --deployment-target)
+      DEPLOYMENT_TARGET="${2:-}"
+      shift 2
+      ;;
+    --patch-xcodeproj)
+      PATCH_XCODEPROJ=1
+      shift
+      ;;
+    -h|--help)
+      usage
+      exit 0
+      ;;
+    *)
+      die "unknown argument: $1"
+      ;;
+  esac
+done
+
+[[ -n "$APP_ROOT" ]] || die "--app-root is required"
+[[ -n "$SCHEME" ]] || die "--scheme is required"
+[[ -n "$BUNDLE_ID" ]] || die "--bundle-id is required"
+if [[ -n "$WORKSPACE" && -n "$PROJECT" ]]; then
+  die "--workspace and --project are mutually exclusive"
+fi
+if [[ -z "$TEST_TARGET" ]]; then
+  TEST_TARGET="$SCHEME"
+fi
+if [[ -z "$TEST_BUNDLE_ID" ]]; then
+  TEST_BUNDLE_ID="$BUNDLE_ID.zmr-uitests"
+fi
+if [[ "$PATCH_XCODEPROJ" -eq 1 ]]; then
+  [[ -n "$PROJECT" || -n "$WORKSPACE" ]] || die "--patch-xcodeproj requires --project or --workspace"
+  [[ -n "$APP_TARGET" ]] || die "--patch-xcodeproj requires --app-target"
+fi
+
+mkdir -p "$APP_ROOT"
+APP_ROOT="$(cd "$APP_ROOT" && pwd)"
+mkdir -p "$APP_ROOT/.zmr" "$APP_ROOT/.zmr/shims/ios"
+rm -f "$APP_ROOT/.zmr/ios-shim-state/build-for-testing.ready"
+cp "$ROOT/shims/ios/ZMRShim.swift" "$APP_ROOT/.zmr/shims/ios/ZMRShim.swift"
+cp "$ROOT/shims/ios/ZMRShimUITestCase.swift" "$APP_ROOT/.zmr/ZMRShimUITestCase.swift"
+cp "$ROOT/scripts/ensure-ios-shim-target.rb" "$APP_ROOT/.zmr/ensure-ios-shim-target.rb"
+
+cat > "$APP_ROOT/.zmr/ZMRShimUITests-Info.plist" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>$(DEVELOPMENT_LANGUAGE)</string>
+  <key>CFBundleExecutable</key>
+  <string>$(EXECUTABLE_NAME)</string>
+  <key>CFBundleIdentifier</key>
+  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>$(PRODUCT_NAME)</string>
+  <key>CFBundlePackageType</key>
+  <string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>ZMR_APP_BUNDLE_ID</key>
+  <string>$(ZMR_APP_BUNDLE_ID)</string>
+  <key>ZMR_SHIM_REQUEST_FILE</key>
+  <string>$(ZMR_SHIM_REQUEST_FILE)</string>
+  <key>ZMR_SHIM_RESPONSE_FILE</key>
+  <string>$(ZMR_SHIM_RESPONSE_FILE)</string>
+  <key>ZMR_SHIM_MODE</key>
+  <string>$(ZMR_SHIM_MODE)</string>
+  <key>ZMR_SHIM_SERVER_DIR</key>
+  <string>$(ZMR_SHIM_SERVER_DIR)</string>
+</dict>
+</plist>
+EOF
+
+cat > "$APP_ROOT/.zmr/ios-shim" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$APP_ROOT"
+
+STATE_DIR="$APP_ROOT/.zmr/ios-shim-state"
+SERVER_DIR="\$STATE_DIR/server"
+PID_FILE="\$STATE_DIR/xcodebuild.pid"
+READY_FILE="\$SERVER_DIR/ready"
+BUILD_READY_FILE="\$STATE_DIR/build-for-testing.ready"
+LOG_FILE="\$STATE_DIR/xcodebuild.log"
+STDIN_FILE="\$(mktemp)"
+trap 'rm -f "\$STDIN_FILE"' EXIT
+
+mkdir -p "\$STATE_DIR" "\$SERVER_DIR"
+
+cat > "\$STDIN_FILE"
+
+XCODEBUILD_ARGS=()
+if [[ -n "$WORKSPACE" ]]; then
+  XCODEBUILD_ARGS+=(-workspace "$WORKSPACE")
+elif [[ -n "$PROJECT" ]]; then
+  XCODEBUILD_ARGS+=(-project "$PROJECT")
+fi
+if [[ -n "$DERIVED_DATA_PATH" ]]; then
+  XCODEBUILD_ARGS+=(-derivedDataPath "$DERIVED_DATA_PATH")
+fi
+
+tail_log() {
+  if [[ -f "\$LOG_FILE" ]]; then
+    tail -120 "\$LOG_FILE" >&2
+  fi
+}
+
+resolve_destination() {
+  local destination_id="$DEVICE"
+  if [[ "\$destination_id" == "booted" ]]; then
+    destination_id="\$(xcrun simctl list devices booted | sed -n 's/.*(\([0-9A-Fa-f-][0-9A-Fa-f-]*\)) (Booted).*/\1/p' | head -n 1)"
+  fi
+  if [[ -z "\$destination_id" ]]; then
+    echo "no booted iOS simulator found" >&2
+    exit 2
+  fi
+  printf '%s' "\$destination_id"
+}
+
+is_server_running() {
+  if [[ ! -f "\$PID_FILE" ]]; then
+    return 1
+  fi
+  local pid
+  pid="\$(cat "\$PID_FILE" 2>/dev/null || true)"
+  [[ -n "\$pid" ]] && kill -0 "\$pid" 2>/dev/null
+}
+
+run_oneshot() {
+  local request_file response_file oneshot_log destination_id
+  request_file="\$(mktemp "\$STATE_DIR/request.XXXXXX")"
+  response_file="\$(mktemp "\$STATE_DIR/response.XXXXXX")"
+  oneshot_log="\$(mktemp "\$STATE_DIR/xcodebuild.oneshot.XXXXXX.log")"
+  cp "\$STDIN_FILE" "\$request_file"
+  destination_id="\$(resolve_destination)"
+
+  if ! xcodebuild test \\
+    "\${XCODEBUILD_ARGS[@]}" \\
+    -scheme "$SCHEME" \\
+    -configuration "$CONFIGURATION" \\
+    -destination "platform=iOS Simulator,id=\$destination_id" \\
+    -only-testing:"$TEST_TARGET/ZMRShimUITestCase/testRunZMRCommand" \\
+    ZMR_SHIM_MODE="oneshot" \\
+    ZMR_SHIM_REQUEST_FILE="\$request_file" \\
+    ZMR_SHIM_RESPONSE_FILE="\$response_file" \\
+    ZMR_APP_BUNDLE_ID="$BUNDLE_ID" \\
+    >"\$oneshot_log" 2>&1; then
+    tail -120 "\$oneshot_log" >&2
+    exit 1
+  fi
+
+  cat "\$response_file"
+  printf '\\n'
+}
+
+wait_for_ready() {
+  local deadline
+  deadline=\$((SECONDS + \${ZMR_IOS_SHIM_START_TIMEOUT_SECONDS:-180}))
+  while (( SECONDS < deadline )); do
+    if [[ -f "\$READY_FILE" ]]; then
+      return 0
+    fi
+    if ! is_server_running; then
+      echo "iOS shim server exited before it became ready" >&2
+      tail_log
+      exit 1
+    fi
+    sleep 0.2
+  done
+  echo "timed out waiting for iOS shim server readiness" >&2
+  tail_log
+  exit 1
+}
+
+build_for_testing() {
+  if [[ "\${ZMR_IOS_SHIM_FORCE_REBUILD:-}" != "1" && -f "\$BUILD_READY_FILE" ]]; then
+    return 0
+  fi
+
+  local destination_id build_log
+  destination_id="\$(resolve_destination)"
+  build_log="\$STATE_DIR/xcodebuild.build.log"
+
+  if ! xcodebuild build-for-testing \\
+    "\${XCODEBUILD_ARGS[@]}" \\
+    -scheme "$SCHEME" \\
+    -configuration "$CONFIGURATION" \\
+    -destination "platform=iOS Simulator,id=\$destination_id" \\
+    ZMR_SHIM_MODE="server" \\
+    ZMR_SHIM_SERVER_DIR="\$SERVER_DIR" \\
+    ZMR_APP_BUNDLE_ID="$BUNDLE_ID" \\
+    >"\$build_log" 2>&1; then
+    tail -120 "\$build_log" >&2
+    exit 1
+  fi
+
+  touch "\$BUILD_READY_FILE"
+}
+
+start_server() {
+  if is_server_running; then
+    wait_for_ready
+    return 0
+  fi
+
+  rm -f "\$READY_FILE" "\$SERVER_DIR"/request-*.json "\$SERVER_DIR"/response-*.json "\$SERVER_DIR/stop"
+  : > "\$LOG_FILE"
+  build_for_testing
+
+  local destination_id
+  destination_id="\$(resolve_destination)"
+  nohup xcodebuild test-without-building \\
+    "\${XCODEBUILD_ARGS[@]}" \\
+    -scheme "$SCHEME" \\
+    -configuration "$CONFIGURATION" \\
+    -destination "platform=iOS Simulator,id=\$destination_id" \\
+    -only-testing:"$TEST_TARGET/ZMRShimUITestCase/testRunZMRCommand" \\
+    ZMR_SHIM_MODE="server" \\
+    ZMR_SHIM_SERVER_DIR="\$SERVER_DIR" \\
+    ZMR_APP_BUNDLE_ID="$BUNDLE_ID" \\
+    >"\$LOG_FILE" 2>&1 < /dev/null &
+
+  echo "\$!" > "\$PID_FILE"
+  wait_for_ready
+}
+
+send_request() {
+  start_server
+
+  local REQUEST_ID request_file response_file tmp_request deadline
+  REQUEST_ID="\$(date +%s%N)-\$\$"
+  request_file="\$SERVER_DIR/request-\$REQUEST_ID.json"
+  response_file="\$SERVER_DIR/response-\$REQUEST_ID.json"
+  tmp_request="\$request_file.tmp"
+  cp "\$STDIN_FILE" "\$tmp_request"
+  mv "\$tmp_request" "\$request_file"
+
+  deadline=\$((SECONDS + \${ZMR_IOS_SHIM_RESPONSE_TIMEOUT_SECONDS:-45}))
+  while (( SECONDS < deadline )); do
+    if [[ -f "\$response_file" ]]; then
+      cat "\$response_file"
+      printf '\\n'
+      rm -f "\$response_file"
+      return 0
+    fi
+    if ! is_server_running; then
+      echo "iOS shim server exited while waiting for response \$REQUEST_ID" >&2
+      tail_log
+      exit 1
+    fi
+    sleep 0.05
+  done
+
+  echo "timed out waiting for iOS shim response \$REQUEST_ID" >&2
+  tail_log
+  exit 1
+}
+
+if [[ "\${ZMR_IOS_SHIM_ONESHOT:-}" == "1" ]]; then
+  run_oneshot
+else
+  send_request
+fi
+EOF
+
+chmod +x "$APP_ROOT/.zmr/ios-shim"
+
+shell_quote() {
+  printf '%q' "$1"
+}
+
+cat > "$APP_ROOT/.zmr/ensure-ios-shim-target.sh" <<EOF
+#!/usr/bin/env bash
+set -euo pipefail
+
+APP_ROOT=$(shell_quote "$APP_ROOT")
+PROJECT=$(shell_quote "$PROJECT")
+WORKSPACE=$(shell_quote "$WORKSPACE")
+APP_TARGET=$(shell_quote "$APP_TARGET")
+TEST_TARGET=$(shell_quote "$TEST_TARGET")
+SCHEME=$(shell_quote "$SCHEME")
+BUNDLE_ID=$(shell_quote "$BUNDLE_ID")
+TEST_BUNDLE_ID=$(shell_quote "$TEST_BUNDLE_ID")
+DEPLOYMENT_TARGET=$(shell_quote "$DEPLOYMENT_TARGET")
+
+cd "\$APP_ROOT"
+
+if [[ -z "\$APP_TARGET" ]]; then
+  echo "error: rerun install-ios-shim.sh with --app-target to enable Xcode target patching" >&2
+  exit 2
+fi
+
+if [[ -z "\$PROJECT" ]]; then
+  if [[ -z "\$WORKSPACE" ]]; then
+    echo "error: rerun install-ios-shim.sh with --project or --workspace to enable Xcode target patching" >&2
+    exit 2
+  fi
+  PROJECT="\$(ruby -rrexml/document -rpathname -e '
+    app_root = Pathname.new(ARGV[0]).expand_path
+    workspace = app_root.join(ARGV[1]).expand_path
+    app_target = ARGV[2].to_s
+    bundle_id = ARGV[3].to_s
+    data = workspace.join("contents.xcworkspacedata")
+    abort "error: workspace metadata not found at #{data}" unless data.file?
+    doc = REXML::Document.new(data.read)
+    projects = []
+    doc.elements.each("//FileRef") do |element|
+      location = element.attributes["location"].to_s
+      next unless location.end_with?(".xcodeproj")
+      project_path = location.sub(/\A(?:group|container|self):/, "")
+      project = Pathname.new(project_path)
+      project = workspace.dirname.join(project).expand_path unless project.absolute?
+      projects << project
+    end
+    projects.uniq!
+    abort "error: workspace #{ARGV[1]} does not reference an .xcodeproj; rerun with --project" if projects.empty?
+    if projects.length > 1
+      begin
+        require "xcodeproj"
+      rescue LoadError
+        abort "error: workspace #{ARGV[1]} references multiple .xcodeproj files; install the xcodeproj gem or rerun with --project"
+      end
+      projects = projects.select do |project_path|
+        begin
+          Xcodeproj::Project.open(project_path.to_s).targets.any? { |target| target.name == app_target }
+        rescue StandardError
+          false
+        end
+      end
+      abort "error: workspace #{ARGV[1]} references multiple .xcodeproj files, and none contain target #{app_target}; rerun with --project" if projects.empty?
+      if projects.length > 1 && !bundle_id.empty?
+        bundle_matches = projects.select do |project_path|
+          begin
+            Xcodeproj::Project.open(project_path.to_s).targets.any? do |target|
+              target.name == app_target &&
+                target.build_configurations.any? do |configuration|
+                  configuration.build_settings["PRODUCT_BUNDLE_IDENTIFIER"].to_s == bundle_id
+                end
+            end
+          rescue StandardError
+            false
+          end
+        end
+        projects = bundle_matches unless bundle_matches.empty?
+      end
+      abort "error: workspace #{ARGV[1]} references multiple .xcodeproj files containing target #{app_target}; bundle id #{bundle_id} did not disambiguate; rerun with --project" if projects.length > 1
+    end
+    puts projects.first.relative_path_from(app_root).to_s
+  ' "\$APP_ROOT" "\$WORKSPACE" "\$APP_TARGET" "\$BUNDLE_ID")"
+fi
+
+ruby "\$APP_ROOT/.zmr/ensure-ios-shim-target.rb" \\
+  --project "\$PROJECT" \\
+  --app-target "\$APP_TARGET" \\
+  --test-target "\$TEST_TARGET" \\
+  --scheme "\$SCHEME" \\
+  --bundle-id "\$BUNDLE_ID" \\
+  --test-bundle-id "\$TEST_BUNDLE_ID" \\
+  --deployment-target "\$DEPLOYMENT_TARGET" \\
+  --source ".zmr/ZMRShimUITestCase.swift" \\
+  --source ".zmr/shims/ios/ZMRShim.swift" \\
+  --info-plist ".zmr/ZMRShimUITests-Info.plist"
+EOF
+
+chmod +x "$APP_ROOT/.zmr/ensure-ios-shim-target.sh"
+
+if [[ "$PATCH_XCODEPROJ" -eq 1 ]]; then
+  "$APP_ROOT/.zmr/ensure-ios-shim-target.sh"
+fi
+
+cat > "$APP_ROOT/.zmr/ios-shim.README.md" <<EOF
+# ZMR iOS Shim
+
+Generated for scheme \`$SCHEME\`, UI test target \`$TEST_TARGET\`, and bundle id \`$BUNDLE_ID\`.
+
+When the app has an Xcode project or workspace, run:
+
+\`\`\`bash
+.zmr/ensure-ios-shim-target.sh
+\`\`\`
+
+The helper uses the Ruby \`xcodeproj\` gem to create/update the UI test target,
+add the shim sources, set the test bundle Info.plist, and write a shared scheme.
+For workspaces, it resolves the project automatically when there is one project,
+or when exactly one project contains \`--app-target\`, or when \`--bundle-id\`
+disambiguates matching app targets. Rerun the installer with \`--project\` for
+still-ambiguous workspaces. Install the gem with
+\`gem install xcodeproj\` or your app's Bundler setup.
+
+If you do not want ZMR to patch the Xcode project, add these files to the app's
+UI test target manually:
+
+- \`.zmr/ZMRShimUITestCase.swift\`
+- \`.zmr/shims/ios/ZMRShim.swift\`
+- \`.zmr/ZMRShimUITests-Info.plist\`
+
+Run ZMR with:
+
+\`\`\`bash
+zmr run .zmr/ios-smoke.json --platform ios --ios-shim ./.zmr/ios-shim
+\`\`\`
+
+The command caches \`build-for-testing\` output under \`.zmr/ios-shim-state/\`
+and uses \`test-without-building\` for selector commands. Set
+\`ZMR_IOS_SHIM_FORCE_REBUILD=1\` after app-side target changes, or
+\`ZMR_IOS_SHIM_ONESHOT=1\` to force a cold XCTest run for debugging Xcode target
+wiring.
+EOF
+
+echo "wrote $APP_ROOT/.zmr/ios-shim"
+echo "wrote $APP_ROOT/.zmr/ZMRShimUITestCase.swift"
+echo "wrote $APP_ROOT/.zmr/shims/ios/ZMRShim.swift"
+echo "wrote $APP_ROOT/.zmr/ZMRShimUITests-Info.plist"
+echo "wrote $APP_ROOT/.zmr/ensure-ios-shim-target.sh"

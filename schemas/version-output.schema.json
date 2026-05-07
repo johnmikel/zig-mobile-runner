@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/version-output.schema.json",
+  "title": "ZMR Version Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "version",
+    "protocolVersion",
+    "minimumCompatibleProtocolVersion",
+    "stability",
+    "breakingChangePolicy"
+  ],
+  "properties": {
+    "name": { "const": "zmr" },
+    "version": { "type": "string", "minLength": 1 },
+    "protocolVersion": { "type": "string", "minLength": 1 },
+    "minimumCompatibleProtocolVersion": { "type": "string", "minLength": 1 },
+    "stability": { "type": "string", "minLength": 1 },
+    "breakingChangePolicy": { "type": "string", "minLength": 1 }
+  }
+}

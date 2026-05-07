@@ -1,0 +1,12 @@
+{
+  "name": "Android referral deep link smoke",
+  "appId": "com.example.mobiletest",
+  "steps": [
+    { "action": "clearState" },
+    { "action": "openLink", "url": "exampleapp://invite?code=DEMO-CODE" },
+    { "action": "waitVisible", "selector": { "textContains": "Invite" }, "timeoutMs": 15000 },
+    { "action": "scrollUntilVisible", "selector": { "id": "invite-card" }, "direction": "down", "timeoutMs": 10000 },
+    { "action": "assertVisible", "selector": { "id": "invite-card" } },
+    { "action": "snapshot" }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/schemas-output.schema.json",
+  "title": "ZMR Schemas Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "count", "schemas"],
+  "properties": {
+    "ok": { "const": true },
+    "count": { "type": "integer", "minimum": 0 },
+    "schemas": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "path", "id", "description"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "path": { "type": "string", "minLength": 1 },
+          "id": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,64 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  release:
+    runs-on: macos-15
+    permissions:
+      attestations: write
+      contents: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Zig
+        run: |
+          brew install zig kcov
+          gem install xcodeproj
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+      - name: Local release gate
+        run: |
+          ZMR_VERSION="${GITHUB_REF_NAME#v}" \
+          ZMR_RELEASE_BASE_URL="https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}" \
+          ./scripts/release-gate.sh
+      - name: Build npm package
+        run: |
+          npm version --no-git-tag-version "${GITHUB_REF_NAME#v}"
+          ZMR_VERSION="${GITHUB_REF_NAME#v}" npm run pack:npm
+      - name: Attest release artifacts
+        uses: actions/attest-build-provenance@v2
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/zig-mobile-runner-*.tgz
+            dist/SBOM.spdx.json
+            dist/THIRD_PARTY_NOTICES.md
+            dist/RELEASE_MANIFEST.json
+            dist/homebrew/zmr.rb
+            dist/SHA256SUMS
+      - name: Upload GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/*.tar.gz
+            dist/zig-mobile-runner-*.tgz
+            dist/SBOM.spdx.json
+            dist/THIRD_PARTY_NOTICES.md
+            dist/RELEASE_MANIFEST.json
+            dist/homebrew/zmr.rb
+            dist/SHA256SUMS
+      - name: Publish npm package
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "NPM_TOKEN not set; skipping npm publish"
+            exit 0
+          fi
+          npm publish dist/zig-mobile-runner-*.tgz --provenance --access public

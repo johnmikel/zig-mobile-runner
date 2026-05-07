@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/action-result.schema.json",
+  "title": "ZMR ActionResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "elapsedMs", "action"],
+  "properties": {
+    "status": {
+      "enum": ["ok", "not_found", "timeout", "device_error", "protocol_error"]
+    },
+    "elapsedMs": { "type": "integer", "minimum": 0 },
+    "action": { "type": "string" },
+    "target": { "type": ["string", "null"] },
+    "beforeSnapshotId": { "type": ["string", "null"] },
+    "afterSnapshotId": { "type": ["string", "null"] },
+    "error": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["code", "message"],
+      "properties": {
+        "code": { "type": "string" },
+        "message": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,0 +1,63 @@
+const std = @import("std");
+
+pub const PublicError = struct {
+    code: []const u8,
+    message: []const u8,
+};
+
+pub fn classify(err: anyerror) PublicError {
+    return switch (err) {
+        error.MissingScenarioPath => .{ .code = "cli.missing_scenario", .message = "missing scenario path" },
+        error.MissingDeviceSerial => .{ .code = "cli.missing_device", .message = "missing device serial" },
+        error.MissingTraceDir => .{ .code = "cli.missing_trace_dir", .message = "missing trace directory" },
+        error.MissingAppId => .{ .code = "cli.missing_app_id", .message = "missing app id" },
+        error.MissingAdbPath => .{ .code = "cli.missing_adb_path", .message = "missing adb path" },
+        error.MissingXcrunPath => .{ .code = "cli.missing_xcrun_path", .message = "missing xcrun path" },
+        error.MissingZigPath => .{ .code = "cli.missing_zig_path", .message = "missing zig path" },
+        error.MissingPlatform => .{ .code = "cli.missing_platform", .message = "missing platform" },
+        error.UnknownCommand => .{ .code = "cli.unknown_command", .message = "unknown command" },
+        error.UnknownFlag => .{ .code = "cli.unknown_flag", .message = "unknown flag" },
+        error.MissingParam => .{ .code = "cli.missing_param", .message = "missing parameter" },
+        error.FileNotFound => .{ .code = "scenario.file_not_found", .message = "scenario file was not found" },
+        error.UnsupportedPlatform => .{ .code = "cli.unsupported_platform", .message = "unsupported platform" },
+        error.UnsupportedTransport => .{ .code = "cli.unsupported_transport", .message = "unsupported transport" },
+        error.ScenarioMustBeObject,
+        error.ScenarioMissingSteps,
+        error.ScenarioStepsMustBeArray,
+        error.StepMustBeObject,
+        error.StepMissingAction,
+        error.StepActionMustBeString,
+        error.UnknownAction,
+        error.UnknownScenarioAction,
+        error.UnknownScrollDirection,
+        error.StepMissingUrl,
+        error.StepMissingText,
+        error.StepMissingX1,
+        error.StepMissingY1,
+        error.StepMissingX2,
+        error.StepMissingY2,
+        => .{ .code = "scenario.invalid", .message = "scenario is invalid" },
+        error.SelectorMustNotBeEmpty,
+        error.MissingSelector,
+        error.StepMissingSelector,
+        error.MissingSelectors,
+        error.StepMissingSelectors,
+        error.SelectorsMustBeArray,
+        error.SelectorsMustNotBeEmpty,
+        => .{ .code = "selector.invalid", .message = "selector is invalid" },
+        error.WaitTimeout => .{ .code = "runner.wait_timeout", .message = "wait timed out" },
+        error.AssertionFailed => .{ .code = "runner.assertion_failed", .message = "assertion failed" },
+        error.SelectorNotFound => .{ .code = "runner.selector_not_found", .message = "selector not found" },
+        error.CommandFailed => .{ .code = "device.command_failed", .message = "device command failed" },
+        error.IosXCTestShimRequired => .{ .code = "ios.xctest_shim_required", .message = "iOS selector interaction requires the XCTest shim" },
+        else => .{ .code = "internal.error", .message = @errorName(err) },
+    };
+}
+
+test "classifies public error codes" {
+    try std.testing.expectEqualStrings("scenario.invalid", classify(error.ScenarioMissingSteps).code);
+    try std.testing.expectEqualStrings("runner.wait_timeout", classify(error.WaitTimeout).code);
+    try std.testing.expectEqualStrings("ios.xctest_shim_required", classify(error.IosXCTestShimRequired).code);
+    try std.testing.expectEqualStrings("cli.unknown_command", classify(error.UnknownCommand).code);
+    try std.testing.expectEqualStrings("internal.error", classify(error.OutOfMemory).code);
+}

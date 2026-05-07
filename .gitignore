@@ -1,0 +1,12 @@
+.zig-cache/
+zig-cache/
+zig-out/
+dist/
+traces/
+prebuilds/
+node_modules/
+*.tgz
+__pycache__/
+*.pyc
+*.log
+.DS_Store

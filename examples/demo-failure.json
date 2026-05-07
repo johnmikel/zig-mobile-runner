@@ -1,0 +1,12 @@
+{
+  "name": "ZMR fake failure explanation demo",
+  "appId": "com.example.mobiletest",
+  "steps": [
+    { "action": "launch" },
+    {
+      "action": "waitVisible",
+      "selector": { "text": "Never appears" },
+      "timeoutMs": 0
+    }
+  ]
+}

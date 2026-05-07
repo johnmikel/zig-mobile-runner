@@ -1,0 +1,69 @@
+{
+  "name": "zig-mobile-runner",
+  "version": "0.1.0-dev",
+  "description": "Agent-native mobile app test runner powered by Zig.",
+  "main": "npm/index.mjs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/zig-mobile-runner/zig-mobile-runner.git"
+  },
+  "bugs": {
+    "url": "https://github.com/zig-mobile-runner/zig-mobile-runner/issues"
+  },
+  "homepage": "https://github.com/zig-mobile-runner/zig-mobile-runner#readme",
+  "bin": {
+    "zmr": "npm/zmr.mjs",
+    "zmr-init": "npm/init-app.mjs",
+    "zmr-wizard": "npm/wizard.mjs",
+    "zmr-benchmark": "scripts/benchmark.sh",
+    "zmr-device-matrix": "scripts/device-matrix.sh",
+    "zmr-pilot-gate": "scripts/pilot-gate.sh",
+    "zmr-install-android-shim": "scripts/install-android-shim.sh",
+    "zmr-install-ios-shim": "scripts/install-ios-shim.sh"
+  },
+  "files": [
+    "npm/",
+    "clients/typescript/",
+    "clients/python/README.md",
+    "clients/python/zmr_client.py",
+    "clients/python/examples/",
+    "prebuilds/",
+    "src/",
+    "examples/",
+    "schemas/",
+    "shims/",
+    "viewer/",
+    "docs/",
+    "scripts/",
+    "!scripts/__pycache__/",
+    "!scripts/**/*.pyc",
+    "build.zig",
+    "build.zig.zon",
+    "README.md",
+    "LICENSE",
+    "SECURITY.md",
+    "CONTRIBUTING.md",
+    "CHANGELOG.md"
+  ],
+  "scripts": {
+    "postinstall": "node npm/postinstall.mjs",
+    "build:zmr": "node npm/build-zmr.mjs",
+    "pack:npm": "bash scripts/build-npm-package.sh",
+    "zmr:demo": "node npm/zmr.mjs validate examples/demo-fake.json",
+    "test": "node --test tests/viewer-parser.test.mjs tests/npm-package.test.mjs tests/typescript-client.test.mjs && python3 -W error -m unittest tests/python_client_test.py"
+  },
+  "keywords": [
+    "mobile-testing",
+    "android",
+    "ios",
+    "adb",
+    "simctl",
+    "ai-agents",
+    "test-runner",
+    "zig"
+  ],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  }
+}

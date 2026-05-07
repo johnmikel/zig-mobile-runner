@@ -1,0 +1,19 @@
+{
+  "name": "ZMR Android shim selector demo",
+  "appId": "com.example.mobiletest",
+  "steps": [
+    { "action": "launch" },
+    {
+      "action": "waitVisible",
+      "selector": { "text": "Continue" },
+      "timeoutMs": 1000
+    },
+    {
+      "action": "tap",
+      "selector": { "resourceId": "continue_button" }
+    },
+    { "action": "typeText", "text": "hello" },
+    { "action": "hideKeyboard" },
+    { "action": "snapshot" }
+  ]
+}

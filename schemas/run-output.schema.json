@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/run-output.schema.json",
+  "title": "ZMR Run Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "status"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "status": { "enum": ["passed", "failed"] },
+    "scenario": { "type": "string", "minLength": 1 },
+    "appId": { "type": "string", "minLength": 1 },
+    "traceDir": { "type": "string", "minLength": 1 },
+    "eventsPath": { "type": "string", "minLength": 1 },
+    "artifactsDir": { "type": "string", "minLength": 1 },
+    "durationMs": { "type": "integer", "minimum": 0 },
+    "eventCount": { "type": "integer", "minimum": 0 },
+    "snapshotCount": { "type": "integer", "minimum": 0 },
+    "failedStepIndex": { "type": "integer", "minimum": 0 },
+    "error": { "type": "string", "minLength": 1 },
+    "reportPath": { "type": "string", "minLength": 1 }
+  }
+}

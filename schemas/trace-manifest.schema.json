@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/trace-manifest.schema.json",
+  "title": "ZMR Trace Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "runnerVersion",
+    "protocolVersion",
+    "scenarioName",
+    "appId",
+    "status",
+    "startedAtMs",
+    "endedAtMs",
+    "durationMs",
+    "failedStepIndex",
+    "error",
+    "eventsPath",
+    "artifactsDir",
+    "eventCount",
+    "snapshotCount",
+    "reportPath"
+  ],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "runnerVersion": { "type": "string", "minLength": 1 },
+    "protocolVersion": { "type": "string", "minLength": 1 },
+    "scenarioName": { "type": "string", "minLength": 1 },
+    "appId": { "type": ["string", "null"] },
+    "status": { "enum": ["running", "passed", "failed"] },
+    "startedAtMs": { "type": "integer" },
+    "endedAtMs": { "type": ["integer", "null"] },
+    "durationMs": { "type": ["integer", "null"], "minimum": 0 },
+    "failedStepIndex": { "type": ["integer", "null"], "minimum": 0 },
+    "error": { "type": ["string", "null"] },
+    "eventsPath": { "const": "events.jsonl" },
+    "artifactsDir": { "const": "artifacts" },
+    "eventCount": { "type": "integer", "minimum": 0 },
+    "snapshotCount": { "type": "integer", "minimum": 0 },
+    "reportPath": { "type": ["string", "null"] },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["enabled", "screenshots", "screenRecordings", "textArtifacts", "screenshotsOmitted", "screenshotsRedacted", "screenRecordingsOmitted"],
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "screenshots": { "enum": ["included", "omitted", "placeholder"] },
+        "screenRecordings": { "enum": ["included", "omitted"] },
+        "textArtifacts": { "enum": ["raw", "scrubbed"] },
+        "screenshotsOmitted": { "type": "boolean" },
+        "screenshotsRedacted": { "type": "boolean" },
+        "screenRecordingsOmitted": { "type": "boolean" }
+      }
+    }
+  }
+}

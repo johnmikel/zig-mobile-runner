@@ -1,0 +1,126 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ZMR Trace Viewer</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <h1>ZMR Trace Viewer</h1>
+        <p id="statusText">No trace loaded</p>
+      </div>
+      <label class="file-button">
+        <input id="bundleInput" type="file" accept=".zmrtrace,.tar,application/x-tar" />
+        Open Bundle
+      </label>
+    </header>
+
+    <main class="app-shell">
+      <section class="summary-band" aria-label="Trace summary">
+        <div>
+          <span class="label">Scenario</span>
+          <strong id="scenarioName">-</strong>
+        </div>
+        <div>
+          <span class="label">Status</span>
+          <strong id="runStatus" class="status neutral">-</strong>
+        </div>
+        <div>
+          <span class="label">Duration</span>
+          <strong id="duration">-</strong>
+        </div>
+        <div>
+          <span class="label">Events</span>
+          <strong id="eventCount">-</strong>
+        </div>
+        <div>
+          <span class="label">Snapshots</span>
+          <strong id="snapshotCount">-</strong>
+        </div>
+      </section>
+
+      <section id="emptyState" class="empty-state">
+        <div class="drop-target" id="dropTarget">
+          <div class="drop-icon">ZMR</div>
+          <h2>Drop a .zmrtrace bundle</h2>
+          <p>Trace bundles contain the manifest, timeline, screenshots, UI trees, and snapshot JSON.</p>
+        </div>
+      </section>
+
+      <section id="viewerGrid" class="viewer-grid hidden" aria-label="Trace details">
+        <aside class="timeline-panel">
+          <div class="panel-heading">
+            <h2>Timeline</h2>
+            <input id="eventFilter" type="search" placeholder="Filter events" autocomplete="off" />
+          </div>
+          <div id="replayPanel" class="replay-panel hidden" aria-label="Snapshot replay">
+            <div class="replay-controls">
+              <button id="replayPrev" type="button" title="Previous frame" aria-label="Previous frame">‹</button>
+              <button id="replayPlay" type="button" title="Play" aria-label="Play">▶</button>
+              <button id="replayNext" type="button" title="Next frame" aria-label="Next frame">›</button>
+              <span id="replayPosition">0 / 0</span>
+            </div>
+            <input id="replaySlider" type="range" min="0" max="0" value="0" aria-label="Replay frame" />
+            <div class="replay-meta">
+              <span id="replayFrameKind">-</span>
+              <span id="replayFrameTime">-</span>
+            </div>
+          </div>
+          <ol id="eventList" class="event-list"></ol>
+        </aside>
+
+        <section class="detail-panel">
+          <div class="panel-heading detail-heading">
+            <div>
+              <h2 id="detailTitle">Event Detail</h2>
+              <p id="detailSubtitle">Select an event</p>
+            </div>
+          </div>
+          <div class="detail-grid">
+            <div class="artifact-preview">
+              <div class="preview-header">
+                <span>Screenshot</span>
+                <a id="screenshotLink" href="#" target="_blank" rel="noreferrer" class="hidden">Open</a>
+              </div>
+              <div id="screenshotMount" class="screenshot-mount">
+                <span>No screenshot selected</span>
+              </div>
+            </div>
+            <div class="tree-preview">
+              <div class="preview-header">
+                <span>UI Tree</span>
+                <span id="nodeCount">0 nodes</span>
+              </div>
+              <ol id="nodeList" class="node-list"></ol>
+              <pre id="selectedNodeJson">{}</pre>
+            </div>
+            <div class="snapshot-preview">
+              <div class="preview-header">
+                <span>Snapshot JSON</span>
+                <a id="treeLink" href="#" target="_blank" rel="noreferrer" class="hidden">Open Tree</a>
+              </div>
+              <pre id="snapshotJson">{}</pre>
+            </div>
+          </div>
+          <div class="payload-block">
+            <h3>Payload</h3>
+            <pre id="payloadJson">{}</pre>
+          </div>
+        </section>
+
+        <aside class="artifact-panel">
+          <div class="panel-heading">
+            <h2>Artifacts</h2>
+          </div>
+          <ul id="artifactList" class="artifact-list"></ul>
+        </aside>
+      </section>
+    </main>
+
+    <script src="./parser.js"></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

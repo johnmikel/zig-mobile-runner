@@ -1,0 +1,75 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/zmr-config.schema.json",
+  "title": "ZMR App Config",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "appId": { "type": "string", "minLength": 1 },
+    "android": { "$ref": "#/$defs/platformConfig" },
+    "ios": { "$ref": "#/$defs/platformConfig" },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "screenshots": { "type": "boolean", "default": true },
+        "hierarchy": { "type": "boolean", "default": true },
+        "logs": { "type": "boolean", "default": true },
+        "screenRecording": { "type": "boolean", "default": false }
+      }
+    },
+    "redaction": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "denylistText": { "$ref": "#/$defs/stringList" },
+        "allowlistText": { "$ref": "#/$defs/stringList" },
+        "denylistResourceIds": { "$ref": "#/$defs/stringList" },
+        "allowlistResourceIds": { "$ref": "#/$defs/stringList" }
+      }
+    },
+    "tools": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "adbPath": { "type": "string", "minLength": 1 },
+        "emulatorPath": { "type": "string", "minLength": 1 },
+        "avdmanagerPath": { "type": "string", "minLength": 1 },
+        "androidShimPath": { "type": "string", "minLength": 1 },
+        "xcrunPath": { "type": "string", "minLength": 1 },
+        "iosShimPath": { "type": "string", "minLength": 1 },
+        "zigPath": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scripts": {
+      "type": "object",
+      "additionalProperties": { "type": "string", "minLength": 1 }
+    }
+  },
+  "$defs": {
+    "stringList": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "platformConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "defaultDevice": { "type": "string", "minLength": 1 },
+        "smokeScenario": { "type": "string", "minLength": 1 },
+        "traceDir": { "type": "string", "minLength": 1 },
+        "avdName": { "type": "string", "minLength": 1 },
+        "restoreSnapshot": { "type": "string", "minLength": 1 },
+        "createAvdIfMissing": { "type": "boolean", "default": false },
+        "avdSystemImage": { "type": "string", "minLength": 1 },
+        "avdDeviceProfile": { "type": "string", "minLength": 1 },
+        "resetBeforeRun": { "type": "boolean", "default": false },
+        "waitReady": { "type": "boolean", "default": false }
+      }
+    }
+  }
+}

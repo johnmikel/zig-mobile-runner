@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ZMR="$ROOT/zig-out/bin/zmr"
+
+OUTPUT="$("$ZMR" schemas --json)"
+grep -q '"ok":true' <<< "$OUTPUT"
+grep -q '"count":17' <<< "$OUTPUT"
+grep -q '"name":"scenario"' <<< "$OUTPUT"
+grep -q '"path":"schemas/scenario.schema.json"' <<< "$OUTPUT"
+grep -q '"id":"https://zmr.dev/schemas/scenario.schema.json"' <<< "$OUTPUT"
+grep -q '"name":"zmr-config"' <<< "$OUTPUT"
+grep -q '"name":"doctor-output"' <<< "$OUTPUT"
+grep -q '"name":"devices-output"' <<< "$OUTPUT"
+grep -q '"name":"validate-output"' <<< "$OUTPUT"
+grep -q '"name":"version-output"' <<< "$OUTPUT"
+grep -q '"name":"explain-output"' <<< "$OUTPUT"
+grep -q '"name":"run-output"' <<< "$OUTPUT"
+grep -q '"name":"import-output"' <<< "$OUTPUT"
+grep -q '"name":"release-manifest"' <<< "$OUTPUT"
+grep -q '"path":"schemas/release-manifest.schema.json"' <<< "$OUTPUT"
+grep -q '"name":"schemas-output"' <<< "$OUTPUT"

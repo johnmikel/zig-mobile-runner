@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/import-output.schema.json",
+  "title": "ZMR Import Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "format", "source", "out", "name", "appId", "stepCount", "next"],
+  "properties": {
+    "ok": { "const": true },
+    "format": { "enum": ["flow-yaml"] },
+    "source": { "type": "string", "minLength": 1 },
+    "out": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "appId": { "type": ["string", "null"] },
+    "stepCount": { "type": "integer", "minimum": 0 },
+    "next": { "type": "string", "minLength": 1 }
+  }
+}

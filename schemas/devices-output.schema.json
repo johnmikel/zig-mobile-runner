@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/devices-output.schema.json",
+  "title": "ZMR Devices Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["platform", "count", "devices"],
+  "properties": {
+    "platform": { "enum": ["android", "ios"] },
+    "count": { "type": "integer", "minimum": 0 },
+    "devices": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["serial", "state"],
+        "properties": {
+          "serial": { "type": "string", "minLength": 1 },
+          "state": { "type": "string", "minLength": 1 }
+        }
+      }
+    }
+  }
+}

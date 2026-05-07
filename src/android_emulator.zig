@@ -1,0 +1,202 @@
+const std = @import("std");
+const command = @import("command.zig");
+
+const default_timeout_ms = 15_000;
+
+pub const PreflightOptions = struct {
+    adb_path: []const u8 = "adb",
+    emulator_path: []const u8 = "emulator",
+    avdmanager_path: []const u8 = "avdmanager",
+    device_serial: ?[]const u8 = null,
+    avd_name: ?[]const u8 = null,
+    restore_snapshot: ?[]const u8 = null,
+    create_avd_if_missing: bool = false,
+    avd_system_image: ?[]const u8 = null,
+    avd_device_profile: ?[]const u8 = null,
+    reset_before_run: bool = false,
+    wait_ready: bool = false,
+    event_log_path: ?[]const u8 = null,
+};
+
+pub fn hasWork(options: PreflightOptions) bool {
+    return options.reset_before_run or options.wait_ready or options.create_avd_if_missing or options.avd_name != null or options.restore_snapshot != null;
+}
+
+pub fn runPreflight(allocator: std.mem.Allocator, options: PreflightOptions) !void {
+    if (!hasWork(options)) return;
+
+    if ((options.reset_before_run or options.restore_snapshot != null or options.create_avd_if_missing or options.avd_name != null) and options.avd_name == null) {
+        return error.MissingAndroidAvdName;
+    }
+    if (options.create_avd_if_missing and options.avd_system_image == null) {
+        return error.MissingAndroidAvdSystemImage;
+    }
+
+    if (options.create_avd_if_missing) {
+        try createAvdIfMissing(allocator, options, options.avd_name.?);
+    }
+
+    if (options.reset_before_run) {
+        const reset = runAdb(allocator, options, &.{ "emu", "kill" }) catch null;
+        if (reset) |result| result.deinit(allocator);
+    }
+
+    if (options.avd_name) |avd| {
+        try startEmulator(allocator, options, avd);
+    }
+
+    if (options.wait_ready) {
+        try waitReady(allocator, options);
+    }
+}
+
+fn createAvdIfMissing(allocator: std.mem.Allocator, options: PreflightOptions, avd: []const u8) !void {
+    var list = try runEmulator(allocator, options, &.{"-list-avds"});
+    defer list.deinit(allocator);
+    try list.ensureSuccess();
+    if (avdListContains(list.stdout, avd)) return;
+
+    var argv = std.ArrayList([]const u8).empty;
+    defer argv.deinit(allocator);
+    try argv.appendSlice(allocator, &.{ options.avdmanager_path, "create", "avd", "--name", avd, "--package", options.avd_system_image.? });
+    if (options.avd_device_profile) |profile| {
+        try argv.appendSlice(allocator, &.{ "--device", profile });
+    }
+    try argv.append(allocator, "--force");
+    try recordCommand(allocator, options.event_log_path, argv.items);
+    var result = try command.runWithInputTimeout(allocator, argv.items, "no\n", 1024 * 1024, default_timeout_ms);
+    defer result.deinit(allocator);
+    try result.ensureSuccess();
+}
+
+fn avdListContains(output: []const u8, avd: []const u8) bool {
+    var lines = std.mem.splitScalar(u8, output, '\n');
+    while (lines.next()) |raw_line| {
+        const line = std.mem.trim(u8, raw_line, " \t\r\n");
+        if (std.mem.eql(u8, line, avd)) return true;
+    }
+    return false;
+}
+
+fn runEmulator(allocator: std.mem.Allocator, options: PreflightOptions, extra: []const []const u8) !command.ExecResult {
+    var argv = std.ArrayList([]const u8).empty;
+    defer argv.deinit(allocator);
+    try argv.append(allocator, options.emulator_path);
+    try argv.appendSlice(allocator, extra);
+    try recordCommand(allocator, options.event_log_path, argv.items);
+    return try command.runWithTimeout(allocator, argv.items, 1024 * 1024, default_timeout_ms);
+}
+
+fn startEmulator(allocator: std.mem.Allocator, options: PreflightOptions, avd: []const u8) !void {
+    var argv = std.ArrayList([]const u8).empty;
+    defer argv.deinit(allocator);
+    try argv.append(allocator, options.emulator_path);
+    try argv.appendSlice(allocator, &.{ "-avd", avd });
+    if (options.restore_snapshot) |snapshot| {
+        try argv.appendSlice(allocator, &.{ "-snapshot", snapshot });
+    } else {
+        try argv.append(allocator, "-no-snapshot-load");
+    }
+    try argv.appendSlice(allocator, &.{ "-netdelay", "none", "-netspeed", "full" });
+    try recordCommand(allocator, options.event_log_path, argv.items);
+
+    var child = std.process.Child.init(argv.items, allocator);
+    child.stdin_behavior = .Ignore;
+    child.stdout_behavior = .Ignore;
+    child.stderr_behavior = .Ignore;
+    try child.spawn();
+}
+
+fn waitReady(allocator: std.mem.Allocator, options: PreflightOptions) !void {
+    var wait_result = try runAdb(allocator, options, &.{"wait-for-device"});
+    defer wait_result.deinit(allocator);
+    try wait_result.ensureSuccess();
+
+    for (0..120) |_| {
+        var prop = try runAdb(allocator, options, &.{ "shell", "getprop", "sys.boot_completed" });
+        defer prop.deinit(allocator);
+        try prop.ensureSuccess();
+        const value = std.mem.trim(u8, prop.stdout, " \t\r\n");
+        if (std.mem.eql(u8, value, "1")) return;
+        std.Thread.sleep(2 * std.time.ns_per_s);
+    }
+    return error.AndroidEmulatorBootTimedOut;
+}
+
+fn runAdb(allocator: std.mem.Allocator, options: PreflightOptions, extra: []const []const u8) !command.ExecResult {
+    var argv = std.ArrayList([]const u8).empty;
+    defer argv.deinit(allocator);
+    try argv.append(allocator, options.adb_path);
+    if (options.device_serial) |serial| {
+        try argv.appendSlice(allocator, &.{ "-s", serial });
+    }
+    try argv.appendSlice(allocator, extra);
+    try recordCommand(allocator, options.event_log_path, argv.items);
+    return try command.runWithTimeout(allocator, argv.items, 1024 * 1024, default_timeout_ms);
+}
+
+fn recordCommand(allocator: std.mem.Allocator, maybe_path: ?[]const u8, argv: []const []const u8) !void {
+    const path = maybe_path orelse return;
+    var file = std.fs.cwd().openFile(path, .{ .mode = .write_only }) catch |err| switch (err) {
+        error.FileNotFound => try std.fs.cwd().createFile(path, .{ .truncate = true }),
+        else => return err,
+    };
+    defer file.close();
+    try file.seekFromEnd(0);
+    var line = std.ArrayList(u8).empty;
+    defer line.deinit(allocator);
+    for (argv, 0..) |arg, index| {
+        if (index > 0) try line.append(allocator, ' ');
+        try line.appendSlice(allocator, arg);
+    }
+    try line.append(allocator, '\n');
+    try file.writeAll(line.items);
+}
+
+test "android emulator preflight resets boots from snapshot and waits ready" {
+    const allocator = std.testing.allocator;
+    const log_path = "zig-cache/test-android-emulator-preflight.log";
+    std.fs.cwd().deleteFile(log_path) catch {};
+    defer std.fs.cwd().deleteFile(log_path) catch {};
+
+    try runPreflight(allocator, .{
+        .adb_path = "./tests/fake-adb.sh",
+        .emulator_path = "./tests/fake-emulator.sh",
+        .device_serial = "fake-android-1",
+        .avd_name = "Small_Phone",
+        .restore_snapshot = "zmr-clean",
+        .reset_before_run = true,
+        .wait_ready = true,
+        .event_log_path = log_path,
+    });
+
+    const log = try std.fs.cwd().readFileAlloc(allocator, log_path, 1024 * 1024);
+    defer allocator.free(log);
+    try std.testing.expect(std.mem.indexOf(u8, log, "./tests/fake-adb.sh -s fake-android-1 emu kill\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, log, "./tests/fake-emulator.sh -avd Small_Phone -snapshot zmr-clean -netdelay none -netspeed full\n") != null);
+}
+
+test "android emulator preflight creates missing avd before boot" {
+    const allocator = std.testing.allocator;
+    const log_path = "zig-cache/test-android-emulator-create.log";
+    std.fs.cwd().deleteFile(log_path) catch {};
+    defer std.fs.cwd().deleteFile(log_path) catch {};
+
+    try runPreflight(allocator, .{
+        .adb_path = "./tests/fake-adb.sh",
+        .emulator_path = "./tests/fake-emulator.sh",
+        .avdmanager_path = "./tests/fake-avdmanager.sh",
+        .device_serial = "fake-android-1",
+        .avd_name = "Small_Phone",
+        .create_avd_if_missing = true,
+        .avd_system_image = "system-images;android-35;google_apis;arm64-v8a",
+        .avd_device_profile = "pixel_6",
+        .event_log_path = log_path,
+    });
+
+    const log = try std.fs.cwd().readFileAlloc(allocator, log_path, 1024 * 1024);
+    defer allocator.free(log);
+    try std.testing.expect(std.mem.indexOf(u8, log, "./tests/fake-emulator.sh -list-avds\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, log, "./tests/fake-avdmanager.sh create avd --name Small_Phone --package system-images;android-35;google_apis;arm64-v8a --device pixel_6 --force\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, log, "./tests/fake-emulator.sh -avd Small_Phone -no-snapshot-load -netdelay none -netspeed full\n") != null);
+}

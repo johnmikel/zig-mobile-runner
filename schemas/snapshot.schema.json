@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/snapshot.schema.json",
+  "title": "ZMR ObservationSnapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "timestampMs", "viewport", "nodes"],
+  "properties": {
+    "id": { "type": "string" },
+    "timestampMs": { "type": "integer" },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 0 },
+        "height": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "displayDensityDpi": { "type": ["integer", "null"], "minimum": 0 },
+    "activePackage": { "type": ["string", "null"] },
+    "activeActivity": { "type": ["string", "null"] },
+    "screenshotArtifact": { "type": ["string", "null"] },
+    "treeArtifact": { "type": ["string", "null"] },
+    "focusedNodeId": { "type": ["string", "null"] },
+    "logDelta": { "type": ["string", "null"] },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/uiNode" }
+    }
+  },
+  "$defs": {
+    "uiNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["stableId", "className", "bounds", "enabled", "visible", "selected"],
+      "properties": {
+        "stableId": { "type": "string" },
+        "className": { "type": "string" },
+        "resourceId": { "type": ["string", "null"] },
+        "text": { "type": ["string", "null"] },
+        "contentDesc": { "type": ["string", "null"] },
+        "bounds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "width", "height"],
+          "properties": {
+            "x": { "type": "integer" },
+            "y": { "type": "integer" },
+            "width": { "type": "integer", "minimum": 0 },
+            "height": { "type": "integer", "minimum": 0 }
+          }
+        },
+        "enabled": { "type": "boolean" },
+        "visible": { "type": "boolean" },
+        "selected": { "type": "boolean" }
+      }
+    }
+  }
+}

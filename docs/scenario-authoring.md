@@ -1,0 +1,74 @@
+# Scenario Authoring
+
+ZMR scenarios are plain JSON so agents can generate and mutate them without a
+second DSL. Keep scenarios explicit, short, and biased toward stable selectors.
+
+## Selector Strategy
+
+Prefer selectors in this order:
+
+1. `id` or `resourceId` for app-owned controls.
+2. `contentDesc` for intentional accessibility labels.
+3. Exact `text` for stable product copy.
+4. `textContains` only for headings, errors, or partial copy that is expected to
+   vary.
+
+Avoid selecting by text that includes user data, timestamps, counts, prices, or
+network-provided content. If a selector is hard to make stable, add an app-owned
+test id or accessibility identifier instead of widening the selector until it
+matches unrelated nodes.
+
+## Waits And Assertions
+
+Use a wait before actions that depend on navigation, network, or app state:
+
+```json
+{ "action": "waitVisible", "selector": { "id": "email-login-submit-button" }, "timeoutMs": 15000 }
+```
+
+Use assertions for product expectations, not for synchronization that is already
+covered by a wait. Prefer `waitAny` when either of two legitimate states can
+appear, such as an already-authenticated dashboard or a sign-in prompt.
+
+## Optional And Recovery Steps
+
+Use `"optional": true` only for dismissals or recovery actions that are not part
+of the required product behavior:
+
+```json
+{ "action": "tap", "selector": { "textContains": "Not now" }, "optional": true }
+```
+
+Optional steps still emit trace events, so failures remain inspectable without
+making the whole flow flaky.
+
+## Importing Existing Flows
+
+Use the importer as a one-time migration helper when evaluating ZMR against an
+existing mobile-flow YAML suite:
+
+```bash
+zmr import flow-yaml flows/login.yaml --out .zmr/login-smoke.json --json
+zmr validate .zmr/login-smoke.json
+```
+
+The importer supports the common subset needed for smoke scenarios:
+`launchApp`, `stopApp`, `clearState`, `tapOn`, `inputText`, `eraseText`,
+`hideKeyboard`, `assertVisible`, `assertNotVisible`, `openLink`, `back`,
+`scrollUntilVisible`, `takeScreenshot`, and simple wait commands. Review the
+generated JSON before committing it; native `.zmr/*.json` scenarios remain the
+runtime contract for agents and CI.
+
+## Example Templates
+
+The example directory includes templates for common app flows:
+
+- `examples/android-app-auth-probe.json`
+- `examples/android-app-login-smoke.json`
+- `examples/android-app-onboarding.json`
+- `examples/android-app-referral-deep-link.json`
+- `examples/android-app-error-state.json`
+
+Run `zmr validate --json <scenario.json>` before touching a device. Invalid
+scenarios report `fieldPath`, `line`, and `column` when ZMR can identify the
+source location.

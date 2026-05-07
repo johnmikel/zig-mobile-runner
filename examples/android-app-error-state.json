@@ -1,0 +1,12 @@
+{
+  "name": "Android app error-state smoke",
+  "appId": "com.example.mobiletest",
+  "steps": [
+    { "action": "launch" },
+    { "action": "openLink", "url": "exampleapp://error-demo?mode=offline" },
+    { "action": "waitAny", "selectors": [{ "textContains": "Try again" }, { "textContains": "offline" }, { "textContains": "Something went wrong" }], "timeoutMs": 15000 },
+    { "action": "snapshot" },
+    { "action": "tap", "selector": { "textContains": "Try again" }, "optional": true },
+    { "action": "waitNotVisible", "selector": { "textContains": "Loading" }, "timeoutMs": 10000 }
+  ]
+}

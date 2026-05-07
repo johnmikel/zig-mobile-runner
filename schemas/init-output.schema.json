@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/init-output.schema.json",
+  "title": "ZMR Init Output",
+  "oneOf": [
+    { "$ref": "#/$defs/appInit" },
+    { "$ref": "#/$defs/scenarioInit" }
+  ],
+  "$defs": {
+    "appInit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "mode", "dir", "appId", "created", "next"],
+      "properties": {
+        "ok": { "const": true },
+        "mode": { "const": "app" },
+        "dir": { "type": "string", "minLength": 1 },
+        "appId": { "type": "string", "minLength": 1 },
+        "created": {
+          "type": "array",
+          "minItems": 3,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "next": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scenarioInit": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "mode", "appId", "created", "next"],
+      "properties": {
+        "ok": { "const": true },
+        "mode": { "const": "scenario" },
+        "appId": { "type": "string", "minLength": 1 },
+        "created": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "next": { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

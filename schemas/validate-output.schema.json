@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/validate-output.schema.json",
+  "title": "ZMR Validate Output",
+  "oneOf": [
+    { "$ref": "#/$defs/validScenario" },
+    { "$ref": "#/$defs/invalidScenario" }
+  ],
+  "$defs": {
+    "validScenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "path", "name", "stepCount"],
+      "properties": {
+        "ok": { "const": true },
+        "path": { "type": "string", "minLength": 1 },
+        "name": { "type": "string", "minLength": 1 },
+        "stepCount": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "invalidScenario": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["ok", "path", "errorCode", "message"],
+      "properties": {
+        "ok": { "const": false },
+        "path": { "type": "string", "minLength": 1 },
+        "errorCode": { "type": "string", "minLength": 1 },
+        "message": { "type": "string", "minLength": 1 },
+        "fieldPath": { "type": "string", "minLength": 1 },
+        "line": { "type": "integer", "minimum": 1 },
+        "column": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

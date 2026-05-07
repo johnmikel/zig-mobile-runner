@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/trace-event.schema.json",
+  "title": "ZMR Trace Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["seq", "timestampMs", "kind", "payload"],
+  "properties": {
+    "seq": { "type": "integer", "minimum": 1 },
+    "timestampMs": { "type": "integer" },
+    "kind": { "type": "string", "minLength": 1 },
+    "payload": {}
+  }
+}

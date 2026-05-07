@@ -1,0 +1,14 @@
+{
+  "name": "ZMR fake Android auth probe demo",
+  "appId": "com.example.mobiletest",
+  "steps": [
+    { "action": "launch" },
+    { "action": "openLink", "url": "exampleapp://e2e-auth?probe=1" },
+    {
+      "action": "waitVisible",
+      "selector": { "text": "E2E auth probe" },
+      "timeoutMs": 1000
+    },
+    { "action": "snapshot" }
+  ]
+}

@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/explain-output.schema.json",
+  "title": "ZMR Explain Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "scenario", "status"],
+  "properties": {
+    "ok": { "const": true },
+    "scenario": { "type": "string" },
+    "status": { "type": "string", "minLength": 1 },
+    "appId": { "type": "string", "minLength": 1 },
+    "durationMs": { "type": "integer", "minimum": 0 },
+    "eventCount": { "type": "integer", "minimum": 0 },
+    "snapshotCount": { "type": "integer", "minimum": 0 },
+    "failedStepIndex": { "type": "integer", "minimum": 0 },
+    "error": { "type": "string", "minLength": 1 },
+    "diagnostic": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "minLength": 1 },
+        "snapshotId": { "type": "string", "minLength": 1 },
+        "activePackage": { "type": "string", "minLength": 1 },
+        "activeActivity": { "type": "string", "minLength": 1 },
+        "visibleTexts": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "nearestTextMatches": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "lastEvent": { "type": "string", "minLength": 1 }
+  }
+}

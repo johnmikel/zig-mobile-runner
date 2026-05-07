@@ -1,0 +1,8 @@
+{"jsonrpc":"2.0","id":1,"method":"runner.capabilities","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"device.list","params":{}}
+{"jsonrpc":"2.0","id":3,"method":"session.create","params":{}}
+{"jsonrpc":"2.0","id":4,"method":"app.launch","params":{}}
+{"jsonrpc":"2.0","id":5,"method":"app.openLink","params":{"url":"exampleapp://fixture"}}
+{"jsonrpc":"2.0","id":6,"method":"app.clearState","params":{}}
+{"jsonrpc":"2.0","id":7,"method":"trace.export","params":{}}
+{"jsonrpc":"2.0","id":8,"method":"session.close","params":{}}
