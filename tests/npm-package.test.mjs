@@ -18,6 +18,7 @@ test("package exposes zmr bin and public files for npm publishing", () => {
   assert.match(pkg.bugs.url, /^https:\/\/github\.com\/johnmikel\/zig-mobile-runner\/issues$/);
   assert.equal(pkg.bin.zmr, "npm/zmr.mjs");
   assert.equal(pkg.bin["zmr-benchmark"], "scripts/benchmark.sh");
+  assert.equal(pkg.bin["zmr-benchmark-command"], "scripts/benchmark-command.sh");
   assert.equal(pkg.bin["zmr-compare-benchmarks"], "scripts/compare-benchmarks.py");
   assert.equal(pkg.bin["zmr-device-matrix"], "scripts/device-matrix.sh");
   assert.equal(pkg.bin["zmr-pilot-gate"], "scripts/pilot-gate.sh");
@@ -314,6 +315,7 @@ test("packed npm package installs in a temp app and drives zmr through .zmr", ()
     const tarList = spawnSync("tar", ["-tf", path.join(tmp, tarball)], { encoding: "utf8" });
     assert.equal(tarList.status, 0, tarList.stderr);
     assert.match(tarList.stdout, /package\/scripts\/benchmark_gate\.py/);
+    assert.match(tarList.stdout, /package\/scripts\/benchmark-command\.sh/);
     assert.match(tarList.stdout, /package\/scripts\/generate-release-manifest\.mjs/);
     assert.match(tarList.stdout, /package\/scripts\/verify-release-artifacts\.sh/);
     assert.match(tarList.stdout, /package\/scripts\/sign-macos-release\.sh/);

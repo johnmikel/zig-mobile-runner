@@ -630,6 +630,27 @@ When threshold flags are present, `scripts/benchmark_gate.py` exits non-zero if
 the recorded results miss the configured pass-rate, failure-count, mean, or p95
 limits.
 
+Collect baseline rows from any local runner command:
+
+```bash
+zmr-benchmark-command \
+  --tool runner-a \
+  --runs 20 \
+  --trace-root traces/runner-a-login \
+  --results traces/bench-comparison/results.jsonl \
+  -- runner-a test .runner-a/login.yaml
+```
+
+Then compare the combined rows:
+
+```bash
+zmr-compare-benchmarks \
+  --results traces/bench-comparison/results.jsonl \
+  --candidate zmr \
+  --baseline runner-a \
+  --out traces/bench-comparison/comparison.md
+```
+
 The Android pilot wrapper can run both pilot scenarios repeatedly and produce benchmark reports:
 
 ```bash
@@ -698,6 +719,8 @@ This repository includes:
 - Release artifact checksum verifier for archives, SBOM, notices, and Homebrew formula.
 - npm package wrapper with `zmr`, `zmr-init`, and a small Node API.
 - `zmr-benchmark` npm bin for repeated-run reliability gates in app repos.
+- `zmr-benchmark-command` npm bin for timing app-local baseline commands such
+  as existing mobile test runners.
 - `zmr-compare-benchmarks` npm bin for generic candidate-vs-baseline
   benchmark reports.
 - `zmr-device-matrix` npm bin for local Android/iOS matrix smoke gates.

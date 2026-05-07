@@ -12,6 +12,8 @@ The package exposes:
 - `zmr-init`: app-local scenario scaffolder.
 - `zmr-wizard`: guided setup and dependency checker.
 - `zmr-benchmark`: repeated-run wrapper with pass-rate and duration gates.
+- `zmr-benchmark-command`: repeated-run wrapper for app-local baseline commands
+  so existing runner flows can be compared without custom glue.
 - `zmr-compare-benchmarks`: generic comparison report for ZMR and app-local
   baseline benchmark rows.
 - `zmr-device-matrix`: local multi-device Android/iOS matrix runner with

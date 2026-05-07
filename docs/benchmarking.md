@@ -107,6 +107,31 @@ Use `zmr-compare-benchmarks` when a private app repo has benchmark rows from
 ZMR and another local runner. The public ZMR repo keeps this generic: rows are
 grouped by the `tool` field and no external runner is hardcoded.
 
+To collect rows from an existing command-line runner, wrap it with
+`zmr-benchmark-command`. This keeps benchmark collection tool-agnostic while
+still capturing per-run stdout/stderr logs:
+
+```bash
+zmr-benchmark-command \
+  --tool runner-a \
+  --runs 20 \
+  --trace-root traces/runner-a-login \
+  --results traces/bench-comparison/results.jsonl \
+  -- runner-a test .runner-a/login.yaml
+```
+
+For another runner or command, only change `--tool` and the command after
+`--`:
+
+```bash
+zmr-benchmark-command \
+  --tool runner-b \
+  --runs 20 \
+  --trace-root traces/runner-b-login \
+  --results traces/bench-comparison/results.jsonl \
+  -- npm run e2e:ios
+```
+
 ```bash
 zmr-compare-benchmarks \
   --results traces/bench-comparison/results.jsonl \

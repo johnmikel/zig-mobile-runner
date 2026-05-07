@@ -223,3 +223,61 @@ PATH="$TMPDIR/path-bin:$PATH" "$ROOT/scripts/benchmark.sh" \
   --min-pass-rate 100 \
   --max-failures 0 > "$TMPDIR/bench-path-bin.out"
 grep -q 'passRate=100.00%' "$TMPDIR/bench-path-bin.out"
+
+cat > "$TMPDIR/fake-baseline.sh" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+printf 'baseline ok\n'
+SH
+chmod +x "$TMPDIR/fake-baseline.sh"
+
+"$ROOT/scripts/benchmark-command.sh" \
+  --tool runner-a \
+  --runs 2 \
+  --trace-root "$TMPDIR/runner-a-bench" \
+  --results "$TMPDIR/combined-results.jsonl" \
+  --replace \
+  --min-pass-rate 100 \
+  --max-failures 0 \
+  -- "$TMPDIR/fake-baseline.sh" > "$TMPDIR/runner-a-bench.out"
+grep -q 'runner-a: runs=2 failures=0' "$TMPDIR/runner-a-bench.out"
+grep -q 'runner-a: runs=2 passRate=100.00% failures=0' "$TMPDIR/runner-a-bench.out"
+test -f "$TMPDIR/runner-a-bench/runner-a-1/stdout.log"
+grep -q 'baseline ok' "$TMPDIR/runner-a-bench/runner-a-1/stdout.log"
+
+python3 - "$TMPDIR/combined-results.jsonl" "$TMPDIR/runner-a-bench" <<'PY'
+import json
+import sys
+
+rows = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]
+assert [row["tool"] for row in rows] == ["runner-a", "runner-a"]
+assert all(row["status"] == "ok" for row in rows)
+assert rows[0]["traceDir"] == f"{sys.argv[2]}/runner-a-1"
+PY
+
+cat >> "$TMPDIR/combined-results.jsonl" <<'JSONL'
+{"tool":"zmr","run":1,"status":"ok","durationMs":10,"traceStatus":"passed","traceDir":"zmr-1"}
+JSONL
+"$ROOT/scripts/compare-benchmarks.py" \
+  --results "$TMPDIR/combined-results.jsonl" \
+  --candidate zmr \
+  --baseline runner-a \
+  --format markdown > "$TMPDIR/combined-compare.md"
+grep -q '| runner-a | 2 | 100.00%' "$TMPDIR/combined-compare.md"
+
+cat > "$TMPDIR/fake-baseline-fail.sh" <<'SH'
+#!/usr/bin/env bash
+exit 7
+SH
+chmod +x "$TMPDIR/fake-baseline-fail.sh"
+if "$ROOT/scripts/benchmark-command.sh" \
+  --tool runner-b \
+  --runs 1 \
+  --trace-root "$TMPDIR/runner-b-bench" \
+  --min-pass-rate 100 \
+  --max-failures 0 \
+  -- "$TMPDIR/fake-baseline-fail.sh" > "$TMPDIR/runner-b-bench.out" 2>&1; then
+  echo "benchmark-command.sh should fail when gate rejects baseline results" >&2
+  exit 1
+fi
+grep -q 'runner-b: runs=1 passRate=0.00% failures=1' "$TMPDIR/runner-b-bench.out"
