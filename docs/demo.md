@@ -152,6 +152,16 @@ Run repeated benchmark passes:
 To generate a small public demo app with the ZMR XCTest shim already installed:
 
 ```bash
+npx zmr-demo-ios --out /tmp/zmr-ios-demo --device booted
+```
+
+That command creates the demo app, builds it, installs it on the requested
+simulator, runs the plain iOS smoke and selector-grade shim smoke, then writes
+reports and redacted `.zmrtrace` bundles.
+
+To inspect or customize the generated app before running the pilot manually:
+
+```bash
 npx zmr-create-ios-demo-app --out /tmp/zmr-ios-demo
 cd /tmp/zmr-ios-demo
 xcodebuild -project ios/ZMRDemo.xcodeproj -scheme ZMRDemo -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build

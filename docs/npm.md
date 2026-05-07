@@ -22,6 +22,8 @@ The package exposes:
   source files.
 - `zmr-create-ios-demo-app`: creates a generic SwiftUI simulator app with
   `.zmr/` scenarios and the iOS shim already installed for public demos.
+- `zmr-demo-ios`: creates, builds, and runs the generated iOS simulator demo
+  through the real iOS pilot wrapper.
 - `import { runZmr, spawnZmr, resolveBinary } from "zig-mobile-runner"` for Node scripts.
 
 ## App Setup
@@ -97,6 +99,14 @@ hierarchy and selector actions.
 ## iOS Demo App
 
 For a clean public iOS demo that does not depend on a private app:
+
+```bash
+npx zmr-demo-ios --out /tmp/zmr-ios-demo --device booted
+```
+
+That command creates the demo app, builds it with Xcode, runs the iOS pilot, and
+writes trace reports plus redacted bundles. To inspect or customize the app
+before running the pilot manually:
 
 ```bash
 npx zmr-create-ios-demo-app --out /tmp/zmr-ios-demo

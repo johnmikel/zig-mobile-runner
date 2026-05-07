@@ -148,6 +148,14 @@ The Android wrapper expects the default APK path under the app root. Override it
 For a generic public demo app with the shim already installed:
 
 ```bash
+npx zmr-demo-ios --out /tmp/zmr-ios-demo --device booted
+```
+
+That command creates the demo app, builds it, runs the iOS pilot, and writes
+redacted trace bundles. To inspect or customize the generated app before
+running the pilot manually:
+
+```bash
 npx zmr-create-ios-demo-app --out /tmp/zmr-ios-demo
 cd /tmp/zmr-ios-demo
 xcodebuild -project ios/ZMRDemo.xcodeproj -scheme ZMRDemo -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build

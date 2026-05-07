@@ -35,16 +35,22 @@ To create a real generic iOS simulator demo app with the XCTest shim already
 installed:
 
 ```bash
+npx zmr-demo-ios --out /tmp/zmr-ios-demo --device booted
+```
+
+That command creates the app, builds a simulator `.app`, runs the iOS pilot, and
+writes redacted traces. To inspect or customize the generated app manually:
+
+```bash
 npx zmr-create-ios-demo-app --out /tmp/zmr-ios-demo
 cd /tmp/zmr-ios-demo
 xcodebuild -project ios/ZMRDemo.xcodeproj -scheme ZMRDemo -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build
 ```
 
-Boot a simulator, then run the selector-grade demo from the ZMR repo:
+Then boot a simulator and run the selector-grade pilot from the ZMR repo:
 
 ```bash
-cd /path/to/zig-mobile-runner
-scripts/run-ios-pilot.sh \
+/path/to/zig-mobile-runner/scripts/run-ios-pilot.sh \
   --app-root /tmp/zmr-ios-demo \
   --app-path /tmp/zmr-ios-demo/DerivedData/Build/Products/Debug-iphonesimulator/ZMRDemo.app \
   --app-id com.example.mobiletest \

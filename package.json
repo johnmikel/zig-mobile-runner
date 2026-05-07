@@ -20,7 +20,8 @@
     "zmr-pilot-gate": "scripts/pilot-gate.sh",
     "zmr-install-android-shim": "scripts/install-android-shim.sh",
     "zmr-install-ios-shim": "scripts/install-ios-shim.sh",
-    "zmr-create-ios-demo-app": "scripts/create-ios-demo-app.sh"
+    "zmr-create-ios-demo-app": "scripts/create-ios-demo-app.sh",
+    "zmr-demo-ios": "scripts/demo-ios-real.sh"
   },
   "files": [
     "npm/",
