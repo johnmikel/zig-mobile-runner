@@ -1,4 +1,5 @@
 const std = @import("std");
+const selectors = @import("selector.zig");
 const trace = @import("trace.zig");
 const types = @import("types.zig");
 
@@ -105,6 +106,46 @@ pub fn parseOkResponse(content: []const u8) !void {
     if (!std.mem.eql(u8, status, "ok")) return error.IosShimResponseNotOk;
 }
 
+pub fn selectorString(allocator: std.mem.Allocator, wanted: selectors.Selector) !?[]u8 {
+    var count: usize = 0;
+    var prefix: []const u8 = "";
+    var value: []const u8 = "";
+
+    if (wanted.id) |actual| {
+        count += 1;
+        prefix = "resourceId=";
+        value = actual;
+    }
+    if (wanted.text) |actual| {
+        count += 1;
+        prefix = "text=";
+        value = actual;
+    }
+    if (wanted.text_contains) |actual| {
+        count += 1;
+        prefix = "textContains=";
+        value = actual;
+    }
+    if (wanted.content_desc) |actual| {
+        count += 1;
+        prefix = "identifier=";
+        value = actual;
+    }
+    if (wanted.content_desc_contains) |actual| {
+        count += 1;
+        prefix = "identifierContains=";
+        value = actual;
+    }
+    if (wanted.class_name) |actual| {
+        count += 1;
+        prefix = "type=";
+        value = actual;
+    }
+
+    if (count != 1) return null;
+    return try std.fmt.allocPrint(allocator, "{s}{s}", .{ prefix, value });
+}
+
 fn commandName(kind: CommandKind) []const u8 {
     return switch (kind) {
         .snapshot => "snapshot",
@@ -153,6 +194,30 @@ test "ios shim command json is stable" {
         .y = 40,
     });
     try std.testing.expectEqualStrings("{\"cmd\":\"tap\",\"selector\":\"text=Continue\",\"x\":20,\"y\":40}\n", out.items);
+}
+
+test "ios shim selector strings map public selectors to XCTest fields" {
+    const public_selector = @import("selector.zig");
+    const allocator = std.testing.allocator;
+
+    const text_selector = try selectorString(allocator, .{ .text = "Continue" });
+    defer if (text_selector) |value| allocator.free(value);
+    try std.testing.expectEqualStrings("text=Continue", text_selector.?);
+
+    const resource_selector = try selectorString(allocator, .{ .id = "email" });
+    defer if (resource_selector) |value| allocator.free(value);
+    try std.testing.expectEqualStrings("resourceId=email", resource_selector.?);
+
+    const desc_selector = try selectorString(allocator, .{ .content_desc_contains = "Log" });
+    defer if (desc_selector) |value| allocator.free(value);
+    try std.testing.expectEqualStrings("identifierContains=Log", desc_selector.?);
+
+    const class_selector = try selectorString(allocator, .{ .class_name = "XCUIElementTypeButton" });
+    defer if (class_selector) |value| allocator.free(value);
+    try std.testing.expectEqualStrings("type=XCUIElementTypeButton", class_selector.?);
+
+    const compound_selector = try selectorString(allocator, public_selector.Selector{ .text = "Continue", .id = "continue_button" });
+    try std.testing.expect(compound_selector == null);
 }
 
 test "ios shim snapshot response maps xctest elements into ui nodes" {

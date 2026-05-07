@@ -80,12 +80,12 @@ pub fn executeStep(
         },
         .tap => |wanted| try tapSelector(device, wanted, writer, options),
         .type_text => |input| {
-            if (input.selector) |wanted| try tapSelector(device, wanted, writer, options);
+            if (input.selector) |wanted| return try typeTextSelector(device, wanted, input.text, writer, options);
             try device.typeText(input.text);
             try settleDevice(device, options);
         },
         .erase_text => |input| {
-            if (input.selector) |wanted| try tapSelector(device, wanted, writer, options);
+            if (input.selector) |wanted| return try eraseTextSelector(device, wanted, input.max_chars, writer, options);
             try device.eraseText(input.max_chars);
             if (writer) |tw| {
                 const payload = try std.fmt.allocPrint(tw.allocator, "{{\"maxChars\":{d}}}", .{input.max_chars});
@@ -166,6 +166,8 @@ pub fn tapSelector(
     writer: ?*trace.TraceWriter,
     options: RunOptions,
 ) !void {
+    if (try tryNativeTapSelector(device, wanted, writer, options)) return;
+
     const deadline = std.time.milliTimestamp() + @as(i64, @intCast(options.action_timeout_ms));
     var attempts: u32 = 0;
     while (true) {
@@ -199,6 +201,93 @@ pub fn tapSelector(
         }
         try sleepMs(options.poll_ms);
     }
+}
+
+pub fn typeTextSelector(
+    device: anytype,
+    wanted: selector.Selector,
+    text: []const u8,
+    writer: ?*trace.TraceWriter,
+    options: RunOptions,
+) !void {
+    if (try tryNativeTypeTextSelector(device, wanted, text, writer, options)) return;
+    try tapSelector(device, wanted, writer, options);
+    try device.typeText(text);
+    try settleDevice(device, options);
+}
+
+pub fn eraseTextSelector(
+    device: anytype,
+    wanted: selector.Selector,
+    max_chars: u32,
+    writer: ?*trace.TraceWriter,
+    options: RunOptions,
+) !void {
+    if (try tryNativeEraseTextSelector(device, wanted, max_chars, writer, options)) return;
+    try tapSelector(device, wanted, writer, options);
+    try device.eraseText(max_chars);
+    if (writer) |tw| {
+        const payload = try std.fmt.allocPrint(tw.allocator, "{{\"maxChars\":{d}}}", .{max_chars});
+        defer tw.allocator.free(payload);
+        try tw.recordEvent("ui.eraseText", payload);
+    }
+    try settleDevice(device, options);
+}
+
+fn tryNativeTapSelector(
+    device: anytype,
+    wanted: selector.Selector,
+    writer: ?*trace.TraceWriter,
+    options: RunOptions,
+) !bool {
+    if (!@hasDecl(@TypeOf(device.*), "tapBySelector")) return false;
+    if (!try device.tapBySelector(wanted)) return false;
+    if (writer) |tw| try recordNativeSelectorAction(tw, "ui.tap", wanted, null);
+    try settleDevice(device, options);
+    return true;
+}
+
+fn tryNativeTypeTextSelector(
+    device: anytype,
+    wanted: selector.Selector,
+    text: []const u8,
+    writer: ?*trace.TraceWriter,
+    options: RunOptions,
+) !bool {
+    if (!@hasDecl(@TypeOf(device.*), "typeTextBySelector")) return false;
+    if (!try device.typeTextBySelector(wanted, text)) return false;
+    if (writer) |tw| try recordNativeSelectorAction(tw, "ui.type", wanted, null);
+    try settleDevice(device, options);
+    return true;
+}
+
+fn tryNativeEraseTextSelector(
+    device: anytype,
+    wanted: selector.Selector,
+    max_chars: u32,
+    writer: ?*trace.TraceWriter,
+    options: RunOptions,
+) !bool {
+    if (!@hasDecl(@TypeOf(device.*), "eraseTextBySelector")) return false;
+    if (!try device.eraseTextBySelector(wanted, max_chars)) return false;
+    if (writer) |tw| try recordNativeSelectorAction(tw, "ui.eraseText", wanted, max_chars);
+    try settleDevice(device, options);
+    return true;
+}
+
+fn recordNativeSelectorAction(
+    tw: *trace.TraceWriter,
+    kind: []const u8,
+    wanted: selector.Selector,
+    max_chars: ?u32,
+) !void {
+    var payload = std.ArrayList(u8).empty;
+    defer payload.deinit(tw.allocator);
+    try payload.writer(tw.allocator).writeAll("{\"status\":\"ok\",\"strategy\":\"nativeSelector\",\"selector\":");
+    try trace.writeSelectorJson(payload.writer(tw.allocator), wanted);
+    if (max_chars) |value| try payload.writer(tw.allocator).print(",\"maxChars\":{d}", .{value});
+    try payload.writer(tw.allocator).writeAll("}");
+    try tw.recordEvent(kind, payload.items);
 }
 
 fn findActionable(snap: types.ObservationSnapshot, wanted: selector.Selector) ?types.UiNode {
@@ -736,6 +825,132 @@ test "tap retries through transient empty snapshots" {
     try tapSelector(&fake, .{ .text = "Tap Target" }, null, .{ .settle_ms = 0, .poll_ms = 0, .action_timeout_ms = 100 });
 
     try std.testing.expectEqual(@as(usize, 1), fake.taps);
+}
+
+test "runner uses native selector actions when a device exposes them" {
+    const allocator = std.testing.allocator;
+
+    const NativeSelectorDevice = struct {
+        allocator: std.mem.Allocator,
+        native_taps: usize = 0,
+        native_types: usize = 0,
+        native_erases: usize = 0,
+        fallback_taps: usize = 0,
+        fallback_types: usize = 0,
+        fallback_erases: usize = 0,
+        snapshots: usize = 0,
+        settles: usize = 0,
+
+        pub fn install(self: *@This(), path: []const u8) !void {
+            _ = self;
+            _ = path;
+        }
+
+        pub fn launch(self: *@This()) !void {
+            _ = self;
+        }
+
+        pub fn stop(self: *@This()) !void {
+            _ = self;
+        }
+
+        pub fn clearState(self: *@This()) !void {
+            _ = self;
+        }
+
+        pub fn openLink(self: *@This(), url: []const u8) !void {
+            _ = self;
+            _ = url;
+        }
+
+        pub fn tapBySelector(self: *@This(), wanted: selector.Selector) !bool {
+            try std.testing.expectEqualStrings("Continue", wanted.text.?);
+            self.native_taps += 1;
+            return true;
+        }
+
+        pub fn typeTextBySelector(self: *@This(), wanted: selector.Selector, text: []const u8) !bool {
+            try std.testing.expectEqualStrings("Email", wanted.text.?);
+            try std.testing.expectEqualStrings("agent@example.com", text);
+            self.native_types += 1;
+            return true;
+        }
+
+        pub fn eraseTextBySelector(self: *@This(), wanted: selector.Selector, max_chars: u32) !bool {
+            try std.testing.expectEqualStrings("Email", wanted.text.?);
+            try std.testing.expectEqual(@as(u32, 5), max_chars);
+            self.native_erases += 1;
+            return true;
+        }
+
+        pub fn tap(self: *@This(), x: i32, y: i32) !void {
+            _ = x;
+            _ = y;
+            self.fallback_taps += 1;
+        }
+
+        pub fn typeText(self: *@This(), text: []const u8) !void {
+            _ = text;
+            self.fallback_types += 1;
+        }
+
+        pub fn eraseText(self: *@This(), max_chars: u32) !void {
+            _ = max_chars;
+            self.fallback_erases += 1;
+        }
+
+        pub fn hideKeyboard(self: *@This()) !void {
+            _ = self;
+        }
+
+        pub fn swipe(self: *@This(), x1: i32, y1: i32, x2: i32, y2: i32, duration_ms: u32) !void {
+            _ = self;
+            _ = x1;
+            _ = y1;
+            _ = x2;
+            _ = y2;
+            _ = duration_ms;
+        }
+
+        pub fn pressBack(self: *@This()) !void {
+            _ = self;
+        }
+
+        pub fn settle(self: *@This(), timeout_ms: u64) !void {
+            _ = timeout_ms;
+            self.settles += 1;
+        }
+
+        pub fn snapshot(self: *@This(), writer: anytype) !types.ObservationSnapshot {
+            _ = writer;
+            self.snapshots += 1;
+            return error.UnexpectedSnapshotFallback;
+        }
+    };
+
+    var device = NativeSelectorDevice{ .allocator = allocator };
+    const script_json =
+        \\{
+        \\  "name": "native selector flow",
+        \\  "steps": [
+        \\    {"action": "tap", "selector": {"text": "Continue"}},
+        \\    {"action": "typeText", "selector": {"text": "Email"}, "text": "agent@example.com"},
+        \\    {"action": "eraseText", "selector": {"text": "Email"}, "maxChars": 5}
+        \\  ]
+        \\}
+    ;
+    const script = try scenario.parseSlice(allocator, script_json);
+    defer script.deinit(allocator);
+
+    try runScenario(allocator, &device, script, null, .{ .settle_ms = 0, .poll_ms = 0 });
+
+    try std.testing.expectEqual(@as(usize, 1), device.native_taps);
+    try std.testing.expectEqual(@as(usize, 1), device.native_types);
+    try std.testing.expectEqual(@as(usize, 1), device.native_erases);
+    try std.testing.expectEqual(@as(usize, 0), device.fallback_taps);
+    try std.testing.expectEqual(@as(usize, 0), device.fallback_types);
+    try std.testing.expectEqual(@as(usize, 0), device.fallback_erases);
+    try std.testing.expectEqual(@as(usize, 0), device.snapshots);
 }
 
 test "runner executes agent flow primitives and records trace events" {

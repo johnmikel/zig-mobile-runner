@@ -21,8 +21,13 @@ Current status:
   slower one-command XCTest fallback for debugging.
 - The existing iOS adapter still uses `xcrun simctl` for install, launch,
   terminate, open link, screenshots, and logs.
-- Fully automated Xcode project mutation is still out of scope; users add the
-  generated Swift files to their UI test target.
+- `.zmr/ensure-ios-shim-target.sh` can create or update the UI test target for
+  common Xcode project/workspace layouts through the Ruby `xcodeproj` gem.
+  Users can still add the generated Swift files manually when their project
+  layout needs custom handling.
+- ZMR uses the shim as a native selector fast path for single-field tap, type,
+  and erase-text actions. Compound selectors stay on the portable Zig
+  observe-and-match path.
 
 V1 target:
 

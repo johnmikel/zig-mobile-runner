@@ -1,6 +1,7 @@
 const std = @import("std");
 const command = @import("command.zig");
 const ios_shim = @import("ios_shim.zig");
+const selector = @import("selector.zig");
 const trace = @import("trace.zig");
 const types = @import("types.zig");
 
@@ -93,12 +94,24 @@ pub const IosDevice = struct {
         try self.runShimAction(.{ .kind = .tap, .x = x, .y = y });
     }
 
+    pub fn tapBySelector(self: *IosDevice, wanted: selector.Selector) !bool {
+        return try self.runShimSelectorAction(.{ .kind = .tap }, wanted);
+    }
+
     pub fn typeText(self: *IosDevice, text: []const u8) !void {
         try self.runShimAction(.{ .kind = .type_text, .text = text });
     }
 
+    pub fn typeTextBySelector(self: *IosDevice, wanted: selector.Selector, text: []const u8) !bool {
+        return try self.runShimSelectorAction(.{ .kind = .type_text, .text = text }, wanted);
+    }
+
     pub fn eraseText(self: *IosDevice, max_chars: u32) !void {
         try self.runShimAction(.{ .kind = .erase_text, .max_chars = max_chars });
+    }
+
+    pub fn eraseTextBySelector(self: *IosDevice, wanted: selector.Selector, max_chars: u32) !bool {
+        return try self.runShimSelectorAction(.{ .kind = .erase_text, .max_chars = max_chars }, wanted);
     }
 
     pub fn hideKeyboard(self: *IosDevice) !void {
@@ -198,6 +211,17 @@ pub const IosDevice = struct {
         const response = try self.runShim(shim_command);
         defer self.allocator.free(response);
         try ios_shim.parseOkResponse(response);
+    }
+
+    fn runShimSelectorAction(self: *IosDevice, shim_command: ios_shim.Command, wanted: selector.Selector) !bool {
+        if (self.shim_path == null) return false;
+        const shim_selector = try ios_shim.selectorString(self.allocator, wanted) orelse return false;
+        defer self.allocator.free(shim_selector);
+
+        var command_with_selector = shim_command;
+        command_with_selector.selector = shim_selector;
+        try self.runShimAction(command_with_selector);
+        return true;
     }
 
     fn runShim(self: *IosDevice, shim_command: ios_shim.Command) ![]u8 {
@@ -441,6 +465,10 @@ test "ios xctest shim supplies hierarchy and handles selector actions" {
     try device.tap(60, 42);
     try device.typeText("hello");
     try device.eraseText(5);
+    try std.testing.expect(try device.tapBySelector(.{ .text = "Continue" }));
+    try std.testing.expect(try device.typeTextBySelector(.{ .id = "continue_button" }, "hello"));
+    try std.testing.expect(try device.eraseTextBySelector(.{ .content_desc_contains = "continue" }, 5));
+    try std.testing.expect(!try device.tapBySelector(.{ .text = "Continue", .id = "continue_button" }));
     try device.hideKeyboard();
     try device.swipe(1, 2, 3, 4, 5);
     try device.pressBack();

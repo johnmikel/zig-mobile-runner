@@ -64,6 +64,10 @@ create/update the UI test target and shared scheme. `--workspace` resolves the
 referenced project automatically when there is one project, or when exactly one
 project contains `--app-target`, or when `--bundle-id` disambiguates matching
 app targets; pass `--project` only for still-ambiguous workspaces.
+When the shim is configured, ZMR sends single-field `tap`, `typeText`, and
+`eraseText` selectors directly to XCTest instead of always resolving to
+coordinates through an extra Zig snapshot. Compound selectors still use the
+portable snapshot-matching fallback so behavior stays strict.
 
 Then add scripts such as:
 
@@ -435,6 +439,12 @@ After mutating actions, the runner asks the active device adapter to settle
 instead of sleeping unconditionally. Native Android/iOS shims can wait for app
 idle through their platform automation APIs; shell-only adapters keep a bounded
 sleep fallback.
+
+For native selector-capable adapters, `tap`, selector-scoped `typeText`, and
+selector-scoped `eraseText` can execute as one platform command. On iOS this is
+the XCTest shim fast path for single-field selectors such as `text`,
+`textContains`, `resourceId`, `contentDesc`, and `className`; compound
+selectors keep the portable observe-and-match path.
 
 Use `zmr explain <trace-dir>` for a concise terminal summary of a failed run. Add `--json` for the same triage data in a stable agent-readable object. It includes scenario status, failed step, error, last diagnostic event, snapshot id, active app context, visible text, and nearest text matches.
 

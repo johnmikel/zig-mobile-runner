@@ -197,7 +197,7 @@ zmr serve --transport tcp --port 8765 --device emulator-5554 --app-id com.exampl
 zmr serve --transport stdio --platform ios --device <sim-udid> --app-id com.example.mobiletest --trace-dir traces/ios-agent-session
 ```
 
-`runner.capabilities` reports `platforms: ["android","ios"]` and `iosPreview: true`. Android is the full V1 target. iOS supports simulator discovery, install, launch, stop, clear-state-by-uninstall, deep links, screenshots, logs, and snapshots through `simctl`. iOS `app.clearState` is a best-effort `simctl uninstall <device> <bundle-id>`; if the app is already missing, the simulator is treated as clean. Selector-grade `ui.*` methods on iOS require a configured XCTest/XCUIAutomation shim command; without one they return `IosXCTestShimRequired`.
+`runner.capabilities` reports `platforms: ["android","ios"]` and `iosPreview: true`. Android is the full V1 target. iOS supports simulator discovery, install, launch, stop, clear-state-by-uninstall, deep links, screenshots, logs, and snapshots through `simctl`. iOS `app.clearState` is a best-effort `simctl uninstall <device> <bundle-id>`; if the app is already missing, the simulator is treated as clean. Selector-grade `ui.*` methods on iOS require a configured XCTest/XCUIAutomation shim command; without one they return `IosXCTestShimRequired`. With the shim configured, single-field `ui.tap`, selector-scoped `ui.type`, and selector-scoped `ui.eraseText` can execute directly through XCTest; compound selectors continue to use the portable snapshot-matching fallback.
 
 ## Core Methods
 

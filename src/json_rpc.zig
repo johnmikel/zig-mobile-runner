@@ -228,7 +228,9 @@ fn dispatchMethod(
         if (paramField(params, "selector")) |selector_value| {
             const wanted = try selector.parseFromJson(allocator, selector_value);
             defer wanted.deinit(allocator);
-            try runner.tapSelector(device, wanted, live_trace, .{});
+            try runner.typeTextSelector(device, wanted, text, live_trace, .{});
+            try writeResultRaw(writer, id, "true");
+            return;
         }
         try device.typeText(text);
         if (live_trace) |tw| try recordRpcSimplePayload(tw, "ui.type", "text", text);
@@ -236,12 +238,14 @@ fn dispatchMethod(
         return;
     }
     if (std.mem.eql(u8, method, "ui.eraseText")) {
+        const max_chars = @as(u32, @intCast(try optionalParamU64(params, "maxChars", 80)));
         if (paramField(params, "selector")) |selector_value| {
             const wanted = try selector.parseFromJson(allocator, selector_value);
             defer wanted.deinit(allocator);
-            try runner.tapSelector(device, wanted, live_trace, .{});
+            try runner.eraseTextSelector(device, wanted, max_chars, live_trace, .{});
+            try writeResultRaw(writer, id, "true");
+            return;
         }
-        const max_chars = @as(u32, @intCast(try optionalParamU64(params, "maxChars", 80)));
         try device.eraseText(max_chars);
         if (live_trace) |tw| {
             const payload = try std.fmt.allocPrint(tw.allocator, "{{\"maxChars\":{d}}}", .{max_chars});
