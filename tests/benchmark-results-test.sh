@@ -109,6 +109,46 @@ grep -q 'failures=1' "$TMPDIR/bench-fail.out"
 ZMR_BIN="$TMPDIR/fake-zmr" "$ROOT/scripts/benchmark.sh" --zmr "$TMPDIR/scenario.json" --device fake-device --runs 2 --trace-root "$TMPDIR/bench-pass" --min-pass-rate 50 --max-failures 1 > "$TMPDIR/bench-pass.out"
 grep -q 'passRate=50.00%' "$TMPDIR/bench-pass.out"
 
+cat > "$TMPDIR/compare-results.jsonl" <<'JSONL'
+{"tool":"zmr","run":1,"status":"ok","durationMs":800,"traceStatus":"passed","traceDir":"zmr-1"}
+{"tool":"zmr","run":2,"status":"ok","durationMs":1000,"traceStatus":"passed","traceDir":"zmr-2"}
+{"tool":"baseline","run":1,"status":"ok","durationMs":1600,"traceStatus":"passed","traceDir":"baseline-1"}
+{"tool":"baseline","run":2,"status":"failed","durationMs":2000,"traceStatus":"failed","traceDir":"baseline-2"}
+JSONL
+
+"$ROOT/scripts/compare-benchmarks.py" \
+  --results "$TMPDIR/compare-results.jsonl" \
+  --candidate zmr \
+  --baseline baseline \
+  --format json > "$TMPDIR/compare.json"
+python3 - "$TMPDIR/compare.json" <<'PY'
+import json
+import sys
+
+data = json.load(open(sys.argv[1], encoding="utf-8"))
+assert data["candidate"]["tool"] == "zmr"
+assert data["candidate"]["passRate"] == 100.0
+assert data["baseline"]["failures"] == 1
+assert data["meanSpeedup"] > 1.9
+assert data["meanDeltaPct"] < 0
+PY
+
+"$ROOT/scripts/compare-benchmarks.py" \
+  --results "$TMPDIR/compare-results.jsonl" \
+  --candidate zmr \
+  --baseline baseline \
+  --format markdown \
+  --out "$TMPDIR/compare.md"
+grep -q '# Benchmark Comparison' "$TMPDIR/compare.md"
+grep -q 'Mean speedup' "$TMPDIR/compare.md"
+grep -q 'candidate vs baseline' "$TMPDIR/compare.md"
+
+if "$ROOT/scripts/compare-benchmarks.py" --results "$TMPDIR/compare-results.jsonl" --baseline missing > "$TMPDIR/compare-missing.out" 2>&1; then
+  echo "compare-benchmarks.py should fail when a requested baseline is missing" >&2
+  exit 1
+fi
+grep -q 'missing benchmark rows for: missing' "$TMPDIR/compare-missing.out"
+
 cat > "$TMPDIR/fake-zmr-ios" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail

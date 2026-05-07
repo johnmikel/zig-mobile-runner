@@ -695,6 +695,8 @@ This repository includes:
 - Release artifact checksum verifier for archives, SBOM, notices, and Homebrew formula.
 - npm package wrapper with `zmr`, `zmr-init`, and a small Node API.
 - `zmr-benchmark` npm bin for repeated-run reliability gates in app repos.
+- `zmr-compare-benchmarks` npm bin for generic candidate-vs-baseline
+  benchmark reports.
 - `zmr-device-matrix` npm bin for local Android/iOS matrix smoke gates.
 - `zmr-pilot-gate` npm bin for the external Android+iOS pre-release pilot gate.
 - Fake-device demo for credential-free evaluation.

@@ -23,6 +23,8 @@ For the maintainer-facing GitHub upload and npm publication sequence, see
 - Fake Android/iOS demo shims and `scripts/demo.sh`.
 - Real Android pilot wrapper with redacted trace export: `scripts/run-android-pilot.sh`.
 - Real iOS simulator smoke wrapper with redacted trace export: `scripts/run-ios-pilot.sh`.
+- Generic candidate-vs-baseline benchmark comparison:
+  `scripts/compare-benchmarks.py` / `zmr-compare-benchmarks`.
 - Local device-matrix runner with `matrix.jsonl` and `summary.json` outputs:
   `scripts/device-matrix.sh` / `zmr-device-matrix`.
 - Deterministic trace event stream and snapshot artifacts.

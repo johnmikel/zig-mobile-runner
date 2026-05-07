@@ -18,6 +18,7 @@ test("package exposes zmr bin and public files for npm publishing", () => {
   assert.match(pkg.bugs.url, /^https:\/\/github\.com\/johnmikel\/zig-mobile-runner\/issues$/);
   assert.equal(pkg.bin.zmr, "npm/zmr.mjs");
   assert.equal(pkg.bin["zmr-benchmark"], "scripts/benchmark.sh");
+  assert.equal(pkg.bin["zmr-compare-benchmarks"], "scripts/compare-benchmarks.py");
   assert.equal(pkg.bin["zmr-device-matrix"], "scripts/device-matrix.sh");
   assert.equal(pkg.bin["zmr-pilot-gate"], "scripts/pilot-gate.sh");
   assert.equal(pkg.bin["zmr-install-android-shim"], "scripts/install-android-shim.sh");

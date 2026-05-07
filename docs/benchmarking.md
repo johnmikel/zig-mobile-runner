@@ -101,6 +101,25 @@ Benchmark reports include:
 
 Before making public performance claims, run the same scenario repeatedly on a clean emulator image and include the raw `results.jsonl` plus the redacted trace bundle for any failure.
 
+## Compare Against A Baseline
+
+Use `zmr-compare-benchmarks` when a private app repo has benchmark rows from
+ZMR and another local runner. The public ZMR repo keeps this generic: rows are
+grouped by the `tool` field and no external runner is hardcoded.
+
+```bash
+zmr-compare-benchmarks \
+  --results traces/bench-comparison/results.jsonl \
+  --candidate zmr \
+  --baseline baseline \
+  --format markdown \
+  --out traces/bench-comparison/comparison.md
+```
+
+The report includes pass rate, failure count, mean duration, p95 duration, mean
+speedup, and p95 speedup. Only compare runs collected on the same host, device
+state, app build, and scenario.
+
 ## Device Matrix
 
 Use `zmr-device-matrix` when CI needs to run one or more scenarios across
