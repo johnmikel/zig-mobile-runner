@@ -22,6 +22,10 @@ class PythonClientTest(unittest.TestCase):
             capabilities = client.capabilities()
             self.assertEqual(capabilities["protocolVersion"], "2026-04-28")
             self.assertIn("observe.snapshot", capabilities["methods"])
+            self.assertFalse(capabilities["iosPreview"])
+            self.assertEqual(capabilities["platformSupport"]["ios"]["status"], "supported")
+            self.assertEqual(capabilities["platformSupport"]["ios"]["deviceTypes"], ["simulator"])
+            self.assertFalse(capabilities["platformSupport"]["ios"]["physicalDevices"])
 
             session = client.create_session()
             self.assertEqual(session["sessionId"], "default")

@@ -16,6 +16,10 @@ test("typescript reference client drives a stdio JSON-RPC session", async () => 
     const capabilities = await client.capabilities();
     assert.equal(capabilities.protocolVersion, "2026-04-28");
     assert.ok(capabilities.methods.includes("observe.snapshot"));
+    assert.equal(capabilities.iosPreview, false);
+    assert.equal(capabilities.platformSupport.ios.status, "supported");
+    assert.deepEqual(capabilities.platformSupport.ios.deviceTypes, ["simulator"]);
+    assert.equal(capabilities.platformSupport.ios.physicalDevices, false);
 
     const session = await client.createSession();
     assert.equal(session.sessionId, "default");

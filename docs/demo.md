@@ -200,8 +200,8 @@ For each run it writes:
 
 The iOS demo covers simulator install, launch/open-link, screenshot capture,
 log capture, trace export, and viewer inspection. With `--ios-shim`, it also
-runs `examples/ios-shim-smoke.json`, which exercises launch, openLink,
-waitVisible, tap, typeText, hideKeyboard, and snapshot through the generated
+runs `examples/ios-shim-smoke.json`, which exercises launch, waitVisible, tap,
+selector-scoped typeText, hideKeyboard, and snapshot through the generated
 XCTest/XCUIAutomation shim command.
 
 `clearState` on iOS is best-effort app uninstall by bundle id. Repeating it is

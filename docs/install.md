@@ -164,7 +164,7 @@ See [app-integration.md](app-integration.md) for the expected app-side test surf
 ## iOS Requirements
 
 - Xcode command line tools with `xcrun` on `PATH`.
-- A booted simulator for real iOS preview runs.
+- A booted simulator for real iOS runs.
 - A simulator `.app` installed before launch/open-link smoke scenarios.
 - Optional app-provided XCTest/XCUIAutomation shim command for hierarchy and
   selector actions. Pass it with `--ios-shim <path>` or set

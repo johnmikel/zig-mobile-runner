@@ -1,15 +1,16 @@
 # Zig Mobile Runner
 
-Local, agent-native mobile test automation for Android first, with iOS simulator support in preview.
+Local, agent-native mobile test automation for Android and iOS simulators.
 
 ZMR is a local mobile test runner designed for AI agents. It exposes typed device actions and structured observations instead of asking agents to scrape CLI output.
 
-V1 uses Zig for orchestration, subprocess/device control, JSON-RPC, scenario execution, selector matching, wait/assertion logic, and trace generation. Android control uses ADB plus UI Automator hierarchy dumps. iOS simulator preview support uses `xcrun simctl` for lifecycle, deep links, screenshots, logs, and device discovery, with an optional local XCTest shim command for hierarchy and selector actions.
+V1 uses Zig for orchestration, subprocess/device control, JSON-RPC, scenario execution, selector matching, wait/assertion logic, and trace generation. Android control uses ADB plus UI Automator hierarchy dumps. iOS simulator support uses `xcrun simctl` for lifecycle, deep links, screenshots, logs, and device discovery, with a local XCTest shim command for hierarchy and selector actions.
 
 ## Status
 
-- Android is the primary supported platform.
-- iOS simulator support is a preview. Lifecycle and snapshots work through `simctl`; selector-driven interaction is available when an XCTest/XCUIAutomation shim command is configured.
+- Android is supported for emulators and connected devices.
+- iOS simulators are supported. Lifecycle and snapshots work through `simctl`; selector-driven interaction uses the app-local XCTest/XCUIAutomation shim.
+- Physical iOS devices are not in the current support matrix.
 - Local runner only.
 - AI stays outside the runner.
 - JSON-RPC v1 is newline-delimited over stdio or localhost TCP.
@@ -18,7 +19,7 @@ V1 uses Zig for orchestration, subprocess/device control, JSON-RPC, scenario exe
 - Tested and pinned for the dev-preview release with Zig `0.15.2`.
 - Zig `0.16.x` migration is a compatibility milestone because its stdlib APIs changed across filesystem, process, writer, and time surfaces used by ZMR.
 
-This is a V1 dev preview: usable locally, covered by unit/fake-device tests, and validated against the Android pilot. It is not yet a hosted service or a broad-device certification.
+This is a V1 dev preview: usable locally, covered by unit/fake-device tests, and validated against Android plus iOS simulator pilots. It is not yet a hosted service or a broad-device certification.
 
 ## Quick Start
 
@@ -657,7 +658,7 @@ events, snapshots, reports, and redacted exports.
 ## Architecture
 
 - `src/android.zig`: ADB-backed Android adapter.
-- `src/ios.zig`: `xcrun simctl` backed iOS simulator preview adapter.
+- `src/ios.zig`: `xcrun simctl` backed iOS simulator adapter.
 - `src/uiautomator.zig`: UI Automator XML parsing into `UiNode` values.
 - `src/runner.zig`: scenario execution, selector actions, waits, assertions.
 - `src/json_rpc.zig`: newline-delimited JSON-RPC 2.0 server.

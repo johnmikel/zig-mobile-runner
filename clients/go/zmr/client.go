@@ -49,12 +49,21 @@ type rpcResponse struct {
 }
 
 type Capabilities struct {
-	Name            string   `json:"name"`
-	Version         string   `json:"version"`
-	ProtocolVersion string   `json:"protocolVersion"`
-	Platforms       []string `json:"platforms"`
-	Transports      []string `json:"transports"`
-	Methods         []string `json:"methods"`
+	Name            string                     `json:"name"`
+	Version         string                     `json:"version"`
+	ProtocolVersion string                     `json:"protocolVersion"`
+	Platforms       []string                   `json:"platforms"`
+	PlatformSupport map[string]PlatformSupport `json:"platformSupport"`
+	IosPreview      bool                       `json:"iosPreview"`
+	Transports      []string                   `json:"transports"`
+	Methods         []string                   `json:"methods"`
+}
+
+type PlatformSupport struct {
+	Status          string   `json:"status"`
+	DeviceTypes     []string `json:"deviceTypes"`
+	Automation      []string `json:"automation"`
+	PhysicalDevices bool     `json:"physicalDevices,omitempty"`
 }
 
 type Session struct {
@@ -62,12 +71,12 @@ type Session struct {
 }
 
 type Snapshot struct {
-	ID            string                 `json:"id"`
-	TimestampMS   int64                  `json:"timestampMs"`
-	Viewport      map[string]interface{} `json:"viewport"`
-	ActivePackage string                 `json:"activePackage"`
-	ActiveActivity string                `json:"activeActivity"`
-	Nodes         []Node                 `json:"nodes"`
+	ID             string                 `json:"id"`
+	TimestampMS    int64                  `json:"timestampMs"`
+	Viewport       map[string]interface{} `json:"viewport"`
+	ActivePackage  string                 `json:"activePackage"`
+	ActiveActivity string                 `json:"activeActivity"`
+	Nodes          []Node                 `json:"nodes"`
 }
 
 type Node struct {

@@ -83,6 +83,15 @@ grep -q 'Version Output Contract' "$ROOT/docs/protocol.md"
 grep -q 'version-output.schema.json' "$ROOT/README.md"
 grep -q 'version-output.schema.json' "$ROOT/docs/protocol.md"
 grep -q 'version-output.schema.json' "$ROOT/schemas/README.md"
+grep -q 'platformSupport.ios.status: "supported"' "$ROOT/docs/protocol.md"
+grep -q '"iosPreview":false' "$ROOT/docs/protocol-fixtures/core-session.responses.jsonl"
+grep -q 'iOS simulators are supported' "$ROOT/README.md"
+grep -q 'Physical iOS devices are not in the current support matrix' "$ROOT/README.md"
+grep -q 'Physical iOS device automation' "$ROOT/docs/shipping.md"
+if grep -q 'iOS simulator support is a preview' "$ROOT/README.md" "$ROOT/docs/install.md" "$ROOT/docs/shipping.md" "$ROOT/docs/protocol.md"; then
+  echo "iOS simulator support should not be documented as preview" >&2
+  exit 1
+fi
 grep -q '"protocolVersion"' "$ROOT/schemas/version-output.schema.json"
 grep -q '"minimumCompatibleProtocolVersion"' "$ROOT/schemas/version-output.schema.json"
 grep -q '"breakingChangePolicy"' "$ROOT/schemas/version-output.schema.json"

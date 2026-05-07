@@ -6,7 +6,7 @@
 
 **Product Thesis:** ZMR should feel like Playwright for mobile agents: fast typed control, rich observations, deterministic traces, and reliable isolation. It should beat shell-driven mobile automation by moving orchestration, waits, retries, traces, and protocol handling into a small Zig core while delegating platform-specific state and interaction to focused native adapters.
 
-**Current State:** `0.1.0-dev` local dev preview. Android pilot flows exist. iOS simulator lifecycle/snapshot preview exists with a smoke wrapper. Coverage gate is above 90%. Demo traces can be generated without an emulator.
+**Current State:** `0.1.0-dev` local dev preview. Android pilot flows exist. iOS simulator lifecycle, snapshot, and selector actions are supported through `simctl` plus the XCTest shim. Coverage gate is above 90%. Demo traces can be generated without an emulator.
 
 ---
 
@@ -90,7 +90,7 @@ Acceptance:
 
 ### Track C: iOS Production Adapter
 
-Purpose: turn the current iOS simulator preview into a real agent-grade adapter.
+Purpose: keep the iOS simulator adapter at agent-grade quality and expand the supported surface deliberately.
 
 Ship criteria:
 - iOS supports structured hierarchy, selector matching, tap, type, swipe, press home/back-equivalent navigation, launch, stop, clear state, deep link, screenshot, logs, and snapshots.
@@ -239,7 +239,7 @@ Acceptance:
 
 Scope:
 - Current Android runner.
-- iOS simulator lifecycle/snapshot preview with `scripts/run-ios-pilot.sh`.
+- iOS simulator lifecycle/snapshot/selector support with `scripts/run-ios-pilot.sh`.
 - Fake demo.
 - Public Android and iOS pilot wrappers.
 - Release archives and docs.

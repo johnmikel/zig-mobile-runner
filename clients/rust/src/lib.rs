@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use std::collections::HashMap;
 use std::fmt;
 use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
@@ -77,8 +78,22 @@ pub struct Capabilities {
     #[serde(rename = "protocolVersion")]
     pub protocol_version: String,
     pub platforms: Vec<String>,
+    #[serde(rename = "platformSupport", default)]
+    pub platform_support: HashMap<String, PlatformSupport>,
+    #[serde(rename = "iosPreview", default)]
+    pub ios_preview: bool,
     pub transports: Vec<String>,
     pub methods: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct PlatformSupport {
+    pub status: String,
+    #[serde(rename = "deviceTypes")]
+    pub device_types: Vec<String>,
+    pub automation: Vec<String>,
+    #[serde(rename = "physicalDevices", default)]
+    pub physical_devices: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -161,7 +176,11 @@ impl Client {
         })
     }
 
-    pub fn request<T: for<'de> Deserialize<'de>>(&mut self, method: &str, params: Value) -> Result<T, Error> {
+    pub fn request<T: for<'de> Deserialize<'de>>(
+        &mut self,
+        method: &str,
+        params: Value,
+    ) -> Result<T, Error> {
         let id = self.next_id;
         self.next_id += 1;
         let request = json!({
@@ -210,11 +229,23 @@ impl Client {
         self.request("wait.until", params)
     }
 
-    pub fn export_trace(&mut self, out: &str, redact: bool, omit_screenshots: bool) -> Result<TraceExport, Error> {
-        self.request("trace.export", json!({ "out": out, "redact": redact, "omitScreenshots": omit_screenshots }))
+    pub fn export_trace(
+        &mut self,
+        out: &str,
+        redact: bool,
+        omit_screenshots: bool,
+    ) -> Result<TraceExport, Error> {
+        self.request(
+            "trace.export",
+            json!({ "out": out, "redact": redact, "omitScreenshots": omit_screenshots }),
+        )
     }
 
-    pub fn trace_events(&mut self, after_seq: i64, limit: Option<i64>) -> Result<TraceEvents, Error> {
+    pub fn trace_events(
+        &mut self,
+        after_seq: i64,
+        limit: Option<i64>,
+    ) -> Result<TraceEvents, Error> {
         let mut params = json!({ "afterSeq": after_seq });
         if let Some(limit) = limit {
             params["limit"] = json!(limit);

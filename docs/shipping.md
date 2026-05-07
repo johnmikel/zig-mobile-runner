@@ -16,7 +16,9 @@ For the maintainer-facing GitHub upload and npm publication sequence, see
   `trace.export` bundles.
 - Live `trace.events` cursor polling for long-running agent sessions.
 - Android ADB/UI Automator adapter.
-- iOS simulator preview adapter through `xcrun simctl` for lifecycle, deep links, screenshots, logs, and snapshots.
+- iOS simulator adapter through `xcrun simctl` for lifecycle, deep links,
+  screenshots, logs, and snapshots, with XCTest shim support for hierarchy and
+  selector-grade actions.
 - Fake-device test harness for emulator-free protocol and runner tests.
 - Fake Android/iOS demo shims and `scripts/demo.sh`.
 - Real Android pilot wrapper with redacted trace export: `scripts/run-android-pilot.sh`.
@@ -109,6 +111,8 @@ Run the pilot gates before publishing reliability or performance claims.
 - Automatic iOS workspace resolution when multiple workspace projects contain
   the same requested app target and bundle id. In that case, callers must pass
   `--project`.
+- Physical iOS device automation. The supported iOS target for this release is
+  local simulators.
 - Pixel-level screenshot or video masking. Redacted bundles at present replace
   PNG screenshots with placeholder frames or omit screenshots entirely, and
   omit screen recordings instead of attempting visual masking.

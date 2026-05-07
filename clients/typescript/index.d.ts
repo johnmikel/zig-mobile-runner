@@ -47,9 +47,27 @@ export interface ObservationSnapshot {
   nodes: UiNode[];
 }
 
+export interface PlatformSupport {
+  status: "supported" | "preview" | "unsupported" | string;
+  deviceTypes: string[];
+  automation: string[];
+  physicalDevices?: boolean;
+}
+
+export interface Capabilities {
+  name: string;
+  version: string;
+  protocolVersion: string;
+  platforms: string[];
+  platformSupport?: Record<string, PlatformSupport>;
+  iosPreview?: boolean;
+  transports: string[];
+  methods: string[];
+}
+
 export interface ZmrClient {
   request<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>;
-  capabilities(): Promise<Record<string, unknown>>;
+  capabilities(): Promise<Capabilities>;
   createSession(): Promise<{ sessionId: string }>;
   closeSession(): Promise<boolean>;
   launch(): Promise<boolean>;

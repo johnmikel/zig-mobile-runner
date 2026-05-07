@@ -136,7 +136,7 @@ fn dispatchMethod(
     live_trace: ?*trace.TraceWriter,
 ) !void {
     if (std.mem.eql(u8, method, "runner.capabilities")) {
-        try writeResultRaw(writer, id, "{\"name\":\"zmr\",\"version\":\"" ++ version.runner_version ++ "\",\"protocolVersion\":\"" ++ version.protocol_version ++ "\",\"protocol\":{\"version\":\"" ++ version.protocol_version ++ "\",\"minimumCompatibleVersion\":\"" ++ version.protocol_min_compatible_version ++ "\",\"stability\":\"" ++ version.protocol_stability ++ "\",\"breakingChangePolicy\":\"" ++ version.protocol_breaking_change_policy ++ "\"},\"platforms\":[\"android\",\"ios\"],\"iosPreview\":true,\"transports\":[\"stdio\",\"tcp\"],\"methods\":[\"runner.capabilities\",\"device.list\",\"session.create\",\"session.close\",\"app.install\",\"app.launch\",\"app.stop\",\"app.openLink\",\"app.clearState\",\"observe.snapshot\",\"ui.tap\",\"ui.type\",\"ui.eraseText\",\"ui.hideKeyboard\",\"ui.swipe\",\"ui.pressBack\",\"ui.scrollUntilVisible\",\"wait.until\",\"wait.any\",\"wait.gone\",\"assert.visible\",\"assert.notVisible\",\"trace.events\",\"trace.export\"]}");
+        try writeResultRaw(writer, id, "{\"name\":\"zmr\",\"version\":\"" ++ version.runner_version ++ "\",\"protocolVersion\":\"" ++ version.protocol_version ++ "\",\"protocol\":{\"version\":\"" ++ version.protocol_version ++ "\",\"minimumCompatibleVersion\":\"" ++ version.protocol_min_compatible_version ++ "\",\"stability\":\"" ++ version.protocol_stability ++ "\",\"breakingChangePolicy\":\"" ++ version.protocol_breaking_change_policy ++ "\"},\"platforms\":[\"android\",\"ios\"],\"platformSupport\":{\"android\":{\"status\":\"supported\",\"deviceTypes\":[\"emulator\",\"physical\"],\"automation\":[\"adb\",\"uiautomator\",\"android-shim\"]},\"ios\":{\"status\":\"supported\",\"deviceTypes\":[\"simulator\"],\"automation\":[\"simctl\",\"xctest-shim\"],\"physicalDevices\":false}},\"iosPreview\":false,\"transports\":[\"stdio\",\"tcp\"],\"methods\":[\"runner.capabilities\",\"device.list\",\"session.create\",\"session.close\",\"app.install\",\"app.launch\",\"app.stop\",\"app.openLink\",\"app.clearState\",\"observe.snapshot\",\"ui.tap\",\"ui.type\",\"ui.eraseText\",\"ui.hideKeyboard\",\"ui.swipe\",\"ui.pressBack\",\"ui.scrollUntilVisible\",\"wait.until\",\"wait.any\",\"wait.gone\",\"assert.visible\",\"assert.notVisible\",\"trace.events\",\"trace.export\"]}");
         return;
     }
     if (std.mem.eql(u8, method, "device.list")) {
@@ -654,7 +654,9 @@ test "json rpc dispatches core action wait assertion and trace methods" {
     try std.testing.expect(std.mem.indexOf(u8, out.items, "\"protocolVersion\":\"2026-04-28\"") != null);
     try std.testing.expect(std.mem.indexOf(u8, out.items, "\"protocol\":{\"version\":\"2026-04-28\",\"minimumCompatibleVersion\":\"2026-04-28\",\"stability\":\"dev-preview\",\"breakingChangePolicy\":\"version-and-changelog\"}") != null);
     try std.testing.expect(std.mem.indexOf(u8, out.items, "\"platforms\":[\"android\",\"ios\"]") != null);
-    try std.testing.expect(std.mem.indexOf(u8, out.items, "\"iosPreview\":true") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "\"platformSupport\":{\"android\":{\"status\":\"supported\"") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "\"ios\":{\"status\":\"supported\",\"deviceTypes\":[\"simulator\"],\"automation\":[\"simctl\",\"xctest-shim\"],\"physicalDevices\":false}") != null);
+    try std.testing.expect(std.mem.indexOf(u8, out.items, "\"iosPreview\":false") != null);
     try std.testing.expect(std.mem.indexOf(u8, out.items, "\"serial\":\"fake-device-1\"") != null);
     try std.testing.expect(std.mem.indexOf(u8, out.items, "\"sessionId\":\"default\"") != null);
     try std.testing.expect(std.mem.indexOf(u8, out.items, "\"text\":\"Observed\"") != null);

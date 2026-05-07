@@ -32,6 +32,13 @@ func TestClientDrivesFakeSession(t *testing.T) {
 	if capabilities.ProtocolVersion != "2026-04-28" {
 		t.Fatalf("protocol version = %q", capabilities.ProtocolVersion)
 	}
+	if capabilities.IosPreview {
+		t.Fatal("iOS should be reported as supported, not preview")
+	}
+	iosSupport := capabilities.PlatformSupport["ios"]
+	if iosSupport.Status != "supported" || len(iosSupport.DeviceTypes) != 1 || iosSupport.DeviceTypes[0] != "simulator" || iosSupport.PhysicalDevices {
+		t.Fatalf("unexpected iOS platform support: %+v", iosSupport)
+	}
 
 	session, err := client.CreateSession(ctx)
 	if err != nil {

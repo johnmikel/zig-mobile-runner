@@ -20,6 +20,11 @@ rl.on("line", (line) => {
         breakingChangePolicy: "version-and-changelog",
       },
       platforms: ["android", "ios"],
+      platformSupport: {
+        android: { status: "supported", deviceTypes: ["emulator", "physical"], automation: ["adb", "uiautomator", "android-shim"] },
+        ios: { status: "supported", deviceTypes: ["simulator"], automation: ["simctl", "xctest-shim"], physicalDevices: false },
+      },
+      iosPreview: false,
       transports: ["stdio", "tcp"],
       methods: ["runner.capabilities", "session.create", "app.openLink", "observe.snapshot", "wait.until", "trace.events", "trace.export"],
     };
