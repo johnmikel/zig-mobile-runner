@@ -117,7 +117,11 @@ pub fn main() void {
 }
 
 fn mainInner() !void {
-    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    const GeneralAllocator = if (@hasDecl(std.heap, "GeneralPurposeAllocator"))
+        std.heap.GeneralPurposeAllocator
+    else
+        std.heap.DebugAllocator;
+    var gpa = GeneralAllocator(.{}){};
     defer _ = gpa.deinit();
     const allocator = gpa.allocator();
 

@@ -8,11 +8,22 @@ on:
 jobs:
   test:
     runs-on: macos-15
+    env:
+      ZIG_VERSION: "0.15.2"
     steps:
       - uses: actions/checkout@v4
       - name: Install tools
         run: |
-          brew install zig kcov
+          brew install kcov
           gem install xcodeproj
+          case "$(uname -m)" in
+            arm64) zig_arch="aarch64" ;;
+            x86_64) zig_arch="x86_64" ;;
+            *) echo "unsupported macOS architecture: $(uname -m)" >&2; exit 1 ;;
+          esac
+          curl -L -o zig.tar.xz "https://ziglang.org/download/${ZIG_VERSION}/zig-${zig_arch}-macos-${ZIG_VERSION}.tar.xz"
+          tar -xf zig.tar.xz
+          echo "$PWD/zig-${zig_arch}-macos-${ZIG_VERSION}" >> "$GITHUB_PATH"
+          "$PWD/zig-${zig_arch}-macos-${ZIG_VERSION}/zig" version
       - name: Local release gate
         run: ./scripts/release-gate.sh

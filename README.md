@@ -15,7 +15,8 @@ V1 uses Zig for orchestration, subprocess/device control, JSON-RPC, scenario exe
 - JSON-RPC v1 is newline-delimited over stdio or localhost TCP.
 - Runner version: `0.1.0-dev`.
 - Protocol version: `2026-04-28`.
-- Tested locally with Zig `0.15.2`. The intended line is Zig `0.16.x`, but this machine at present has `0.15.2`.
+- Tested and pinned for the dev-preview release with Zig `0.15.2`.
+- Zig `0.16.x` migration is a compatibility milestone because its stdlib APIs changed across filesystem, process, writer, and time surfaces used by ZMR.
 
 This is a V1 dev preview: usable locally, covered by unit/fake-device tests, and validated against the Android pilot. It is not yet a hosted service or a broad-device certification.
 
