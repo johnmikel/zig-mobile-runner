@@ -61,6 +61,13 @@ Example:
 ZMR auto-discovers `.zmr/config.json` from the current working directory.
 Pass `--config <path>` to load a different file.
 
+Relative scenario, trace, and shim paths from config resolve against the app
+root. For the standard `.zmr/config.json` location, the app root is the parent
+directory of `.zmr/`, even when `--config` is an absolute path and ZMR is
+invoked from another checkout. Relative optional tool commands such as
+`tools.adbPath` are resolved the same way when they look like paths; bare
+commands such as `adb`, `xcrun`, or `zig` stay as PATH lookups.
+
 Explicit CLI flags always win:
 
 - `--app-id` overrides `appId`

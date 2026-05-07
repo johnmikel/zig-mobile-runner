@@ -6,6 +6,8 @@ ZMR="$ROOT/zig-out/bin/zmr"
 PASS_TRACE="$ROOT/traces/test-run-json-pass"
 FAIL_TRACE="$ROOT/traces/test-run-json-fail"
 OMIT_BUNDLE="$ROOT/traces/test-run-json-omit-screenshots.zmrtrace"
+TMPDIR="$(mktemp -d)"
+trap 'rm -rf "$TMPDIR"' EXIT
 
 rm -rf "$PASS_TRACE" "$FAIL_TRACE"
 rm -f "$OMIT_BUNDLE"
@@ -51,3 +53,19 @@ grep -q '"status":"failed"' <<< "$FAIL_OUTPUT"
 grep -q '"failedStepIndex":1' <<< "$FAIL_OUTPUT"
 grep -q '"error":"WaitTimeout"' <<< "$FAIL_OUTPUT"
 grep -q '"traceDir":' <<< "$FAIL_OUTPUT"
+
+APP_ROOT="$TMPDIR/app"
+mkdir -p "$APP_ROOT/.zmr"
+printf '{\n  "name": "Config relative run smoke",\n  "appId": "com.example.mobiletest",\n  "steps": [{ "action": "snapshot" }]\n}\n' > "$APP_ROOT/.zmr/android-smoke.json"
+printf '{\n  "schemaVersion": 1,\n  "appId": "com.example.mobiletest",\n  "android": {\n    "smokeScenario": ".zmr/android-smoke.json",\n    "traceDir": "traces/zmr-android"\n  }\n}\n' > "$APP_ROOT/.zmr/config.json"
+
+CONFIG_OUTPUT="$("$ZMR" run \
+  --config "$APP_ROOT/.zmr/config.json" \
+  --device fake-android-1 \
+  --adb "$ROOT/tests/fake-adb.sh" \
+  --json)"
+
+grep -q '"ok":true' <<< "$CONFIG_OUTPUT"
+grep -q '"scenario":"Config relative run smoke"' <<< "$CONFIG_OUTPUT"
+grep -q "$APP_ROOT/traces/zmr-android" <<< "$CONFIG_OUTPUT"
+test -f "$APP_ROOT/traces/zmr-android/trace.json"

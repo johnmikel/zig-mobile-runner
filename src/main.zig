@@ -329,6 +329,11 @@ fn cmdDoctor(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void
     const actual_config_path = config_path orelse default_config_path;
     var config_check: ?doctor.Check = null;
     defer if (config_check) |check| check.deinit(allocator);
+    var owned_option_paths = std.ArrayList([]const u8).empty;
+    defer {
+        for (owned_option_paths.items) |path| allocator.free(path);
+        owned_option_paths.deinit(allocator);
+    }
 
     var loaded_config = loadConfigIfPresent(allocator, config_path) catch |err| blk: {
         const field_path = try config.errorFieldPathForFile(allocator, actual_config_path, err);
@@ -338,14 +343,26 @@ fn cmdDoctor(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void
     };
     defer if (loaded_config) |*cfg| cfg.deinit(allocator);
     if (loaded_config) |cfg| {
+        const config_root = try configRootForPath(allocator, actual_config_path);
+        defer allocator.free(config_root);
         if (explicit_config) config_check = try doctor.checkConfigLoaded(allocator, actual_config_path);
-        if (std.mem.eql(u8, options.adb_path, "adb")) options.adb_path = cfg.tools.adb_path orelse options.adb_path;
-        options.android_shim_path = options.android_shim_path orelse cfg.tools.android_shim_path;
-        options.android_smoke_scenario = cfg.android.smoke_scenario;
-        if (std.mem.eql(u8, options.xcrun_path, "xcrun")) options.xcrun_path = cfg.tools.xcrun_path orelse options.xcrun_path;
-        options.ios_shim_path = options.ios_shim_path orelse cfg.tools.ios_shim_path;
-        options.ios_smoke_scenario = cfg.ios.smoke_scenario;
-        if (std.mem.eql(u8, options.zig_path, "zig")) options.zig_path = cfg.tools.zig_path orelse options.zig_path;
+        if (std.mem.eql(u8, options.adb_path, "adb")) {
+            if (cfg.tools.adb_path) |path| options.adb_path = try ownConfigCommandPath(allocator, &owned_option_paths, config_root, path);
+        }
+        if (options.android_shim_path == null) {
+            if (cfg.tools.android_shim_path) |path| options.android_shim_path = try ownConfigFilePath(allocator, &owned_option_paths, config_root, path);
+        }
+        if (cfg.android.smoke_scenario) |path| options.android_smoke_scenario = try ownConfigFilePath(allocator, &owned_option_paths, config_root, path);
+        if (std.mem.eql(u8, options.xcrun_path, "xcrun")) {
+            if (cfg.tools.xcrun_path) |path| options.xcrun_path = try ownConfigCommandPath(allocator, &owned_option_paths, config_root, path);
+        }
+        if (options.ios_shim_path == null) {
+            if (cfg.tools.ios_shim_path) |path| options.ios_shim_path = try ownConfigFilePath(allocator, &owned_option_paths, config_root, path);
+        }
+        if (cfg.ios.smoke_scenario) |path| options.ios_smoke_scenario = try ownConfigFilePath(allocator, &owned_option_paths, config_root, path);
+        if (std.mem.eql(u8, options.zig_path, "zig")) {
+            if (cfg.tools.zig_path) |path| options.zig_path = try ownConfigCommandPath(allocator, &owned_option_paths, config_root, path);
+        }
     }
 
     const checks = try doctor.run(allocator, options);
@@ -616,26 +633,51 @@ fn cmdRun(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
         }
     }
 
+    const actual_config_path = config_path orelse default_config_path;
+    var owned_config_paths = std.ArrayList([]const u8).empty;
+    defer {
+        for (owned_config_paths.items) |path| allocator.free(path);
+        owned_config_paths.deinit(allocator);
+    }
+    var config_root: ?[]const u8 = null;
+    defer if (config_root) |root| allocator.free(root);
+
     var loaded_config = try loadConfigIfPresent(allocator, config_path);
     defer if (loaded_config) |*cfg| cfg.deinit(allocator);
     if (loaded_config) |cfg| {
+        config_root = try configRootForPath(allocator, actual_config_path);
         if (!adb_path_set) {
-            if (cfg.tools.adb_path) |path| adb_path = path;
+            if (cfg.tools.adb_path) |path| adb_path = try ownConfigCommandPath(allocator, &owned_config_paths, config_root.?, path);
         }
         if (!emulator_path_set) {
-            if (cfg.tools.emulator_path) |path| emulator_path = path;
+            if (cfg.tools.emulator_path) |path| emulator_path = try ownConfigCommandPath(allocator, &owned_config_paths, config_root.?, path);
         }
         if (!avdmanager_path_set) {
-            if (cfg.tools.avdmanager_path) |path| avdmanager_path = path;
+            if (cfg.tools.avdmanager_path) |path| avdmanager_path = try ownConfigCommandPath(allocator, &owned_config_paths, config_root.?, path);
         }
         if (!xcrun_path_set) {
-            if (cfg.tools.xcrun_path) |path| xcrun_path = path;
+            if (cfg.tools.xcrun_path) |path| xcrun_path = try ownConfigCommandPath(allocator, &owned_config_paths, config_root.?, path);
         }
     }
     const resolved = if (loaded_config) |cfg| resolveRunOptions(raw, cfg) else resolveRunOptions(raw, null);
     var capture = if (loaded_config) |cfg| traceCaptureOptions(cfg) else trace.CaptureOptions{};
     if (raw.screen_recording) |enabled| capture.capture_screen_recording = enabled;
-    const scenario_path = resolved.scenario_path orelse return error.MissingScenarioPath;
+    const scenario_path = if (raw.scenario_path == null and config_root != null and resolved.scenario_path != null)
+        try ownConfigFilePath(allocator, &owned_config_paths, config_root.?, resolved.scenario_path.?)
+    else
+        resolved.scenario_path orelse return error.MissingScenarioPath;
+    const trace_dir = if (raw.trace_dir == null and config_root != null and resolved.trace_dir != null)
+        try ownConfigFilePath(allocator, &owned_config_paths, config_root.?, resolved.trace_dir.?)
+    else
+        resolved.trace_dir;
+    const android_shim_path = if (raw.android_shim_path == null and config_root != null and resolved.android_shim_path != null)
+        try ownConfigFilePath(allocator, &owned_config_paths, config_root.?, resolved.android_shim_path.?)
+    else
+        resolved.android_shim_path;
+    const ios_shim_path = if (raw.ios_shim_path == null and config_root != null and resolved.ios_shim_path != null)
+        try ownConfigFilePath(allocator, &owned_config_paths, config_root.?, resolved.ios_shim_path.?)
+    else
+        resolved.ios_shim_path;
 
     const script = try scenario.parseFile(allocator, scenario_path);
     defer script.deinit(allocator);
@@ -647,14 +689,14 @@ fn cmdRun(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
                 if (androidPreflightOptions(resolved, adb_path, emulator_path, avdmanager_path)) |preflight| {
                     try android_emulator.runPreflight(allocator, preflight);
                 }
-                var device = try android.AndroidDevice.initWithShim(allocator, adb_path, resolved.serial, app_id, resolved.android_shim_path);
+                var device = try android.AndroidDevice.initWithShim(allocator, adb_path, resolved.serial, app_id, android_shim_path);
                 defer device.deinit();
-                runAndroidWithTrace(allocator, &device, script, resolved.trace_dir, capture) catch |err| break :blk err;
+                runAndroidWithTrace(allocator, &device, script, trace_dir, capture) catch |err| break :blk err;
             },
             .ios => {
-                var device = try ios.IosDevice.initWithShim(allocator, xcrun_path, resolved.serial, app_id, resolved.ios_shim_path);
+                var device = try ios.IosDevice.initWithShim(allocator, xcrun_path, resolved.serial, app_id, ios_shim_path);
                 defer device.deinit();
-                runWithTrace(allocator, &device, script, resolved.trace_dir, capture) catch |err| break :blk err;
+                runWithTrace(allocator, &device, script, trace_dir, capture) catch |err| break :blk err;
             },
         }
         break :blk null;
@@ -663,7 +705,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
     if (json) try writeRunSummaryJson(
         allocator,
         std.fs.File.stdout().deprecatedWriter(),
-        resolved.trace_dir,
+        trace_dir,
         script.name,
         app_id,
         run_error,
@@ -910,21 +952,51 @@ fn cmdServe(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
         }
     }
 
+    const actual_config_path = config_path orelse default_config_path;
+    var owned_config_paths = std.ArrayList([]const u8).empty;
+    defer {
+        for (owned_config_paths.items) |path| allocator.free(path);
+        owned_config_paths.deinit(allocator);
+    }
+    var config_root: ?[]const u8 = null;
+    defer if (config_root) |root| allocator.free(root);
+
     var loaded_config = try loadConfigIfPresent(allocator, config_path);
     defer if (loaded_config) |*cfg| cfg.deinit(allocator);
+    if (loaded_config) |cfg| {
+        config_root = try configRootForPath(allocator, actual_config_path);
+        if (std.mem.eql(u8, adb_path, "adb")) {
+            if (cfg.tools.adb_path) |path| adb_path = try ownConfigCommandPath(allocator, &owned_config_paths, config_root.?, path);
+        }
+        if (std.mem.eql(u8, xcrun_path, "xcrun")) {
+            if (cfg.tools.xcrun_path) |path| xcrun_path = try ownConfigCommandPath(allocator, &owned_config_paths, config_root.?, path);
+        }
+    }
     const resolved = if (loaded_config) |cfg| resolveServeOptions(raw, cfg) else resolveServeOptions(raw, null);
     const capture = if (loaded_config) |cfg| traceCaptureOptions(cfg) else trace.CaptureOptions{};
+    const trace_dir = if (raw.trace_dir == null and config_root != null and resolved.trace_dir != null)
+        try ownConfigFilePath(allocator, &owned_config_paths, config_root.?, resolved.trace_dir.?)
+    else
+        resolved.trace_dir;
+    const android_shim_path = if (raw.android_shim_path == null and config_root != null and resolved.android_shim_path != null)
+        try ownConfigFilePath(allocator, &owned_config_paths, config_root.?, resolved.android_shim_path.?)
+    else
+        resolved.android_shim_path;
+    const ios_shim_path = if (raw.ios_shim_path == null and config_root != null and resolved.ios_shim_path != null)
+        try ownConfigFilePath(allocator, &owned_config_paths, config_root.?, resolved.ios_shim_path.?)
+    else
+        resolved.ios_shim_path;
 
     switch (resolved.platform) {
         .android => {
-            var device = try android.AndroidDevice.initWithShim(allocator, adb_path, resolved.serial, resolved.app_id, resolved.android_shim_path);
+            var device = try android.AndroidDevice.initWithShim(allocator, adb_path, resolved.serial, resolved.app_id, android_shim_path);
             defer device.deinit();
-            try serveWithDevice(allocator, &device, transport, port, resolved.trace_dir, resolved.app_id, capture);
+            try serveWithDevice(allocator, &device, transport, port, trace_dir, resolved.app_id, capture);
         },
         .ios => {
-            var device = try ios.IosDevice.initWithShim(allocator, xcrun_path, resolved.serial, resolved.app_id, resolved.ios_shim_path);
+            var device = try ios.IosDevice.initWithShim(allocator, xcrun_path, resolved.serial, resolved.app_id, ios_shim_path);
             defer device.deinit();
-            try serveWithDevice(allocator, &device, transport, port, resolved.trace_dir, resolved.app_id, capture);
+            try serveWithDevice(allocator, &device, transport, port, trace_dir, resolved.app_id, capture);
         },
     }
 }
@@ -968,6 +1040,42 @@ fn loadConfigIfPresent(allocator: std.mem.Allocator, explicit_path: ?[]const u8)
         else => return err,
     };
     return try config.parseFile(allocator, default_config_path);
+}
+
+fn configRootForPath(allocator: std.mem.Allocator, path: []const u8) ![]const u8 {
+    const parent = std.fs.path.dirname(path) orelse ".";
+    if (std.mem.eql(u8, std.fs.path.basename(parent), ".zmr")) {
+        return try allocator.dupe(u8, std.fs.path.dirname(parent) orelse ".");
+    }
+    return try allocator.dupe(u8, ".");
+}
+
+fn ownConfigFilePath(
+    allocator: std.mem.Allocator,
+    owned_paths: *std.ArrayList([]const u8),
+    config_root: []const u8,
+    path: []const u8,
+) ![]const u8 {
+    const resolved = if (std.fs.path.isAbsolute(path))
+        try allocator.dupe(u8, path)
+    else
+        try std.fs.path.join(allocator, &.{ config_root, path });
+    try owned_paths.append(allocator, resolved);
+    return resolved;
+}
+
+fn ownConfigCommandPath(
+    allocator: std.mem.Allocator,
+    owned_paths: *std.ArrayList([]const u8),
+    config_root: []const u8,
+    path: []const u8,
+) ![]const u8 {
+    if (!std.fs.path.isAbsolute(path) and std.mem.indexOfScalar(u8, path, std.fs.path.sep) == null and !std.mem.startsWith(u8, path, ".")) {
+        const owned = try allocator.dupe(u8, path);
+        try owned_paths.append(allocator, owned);
+        return owned;
+    }
+    return try ownConfigFilePath(allocator, owned_paths, config_root, path);
 }
 
 fn resolveRunOptions(raw: RawRunOptions, cfg: ?config.Config) ResolvedRunOptions {
