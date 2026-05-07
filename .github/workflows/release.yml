@@ -11,14 +11,13 @@ jobs:
     timeout-minutes: 45
     env:
       ZIG_VERSION: "0.15.2"
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
     permissions:
       attestations: write
       contents: write
       id-token: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-go@v6
         with:
           go-version-file: clients/go/go.mod
           cache: false
@@ -41,7 +40,7 @@ jobs:
           tar -xf zig.tar.xz
           echo "$PWD/zig-${zig_arch}-macos-${ZIG_VERSION}" >> "$GITHUB_PATH"
           "$PWD/zig-${zig_arch}-macos-${ZIG_VERSION}/zig" version
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: "20"
           registry-url: "https://registry.npmjs.org"
