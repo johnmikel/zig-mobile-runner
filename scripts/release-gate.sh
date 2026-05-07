@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 DRY_RUN=0
+HOST_ZIG_TARGET=""
 
 usage() {
   cat <<'USAGE'
@@ -25,6 +26,26 @@ run() {
   fi
 }
 
+detect_host_zig_target() {
+  case "$(uname -s)-$(uname -m)" in
+    Darwin-arm64)
+      printf '%s\n' "aarch64-macos.15.0"
+      ;;
+    Darwin-x86_64)
+      printf '%s\n' "x86_64-macos.15.0"
+      ;;
+    Linux-aarch64|Linux-arm64)
+      printf '%s\n' "aarch64-linux-gnu"
+      ;;
+    Linux-x86_64)
+      printf '%s\n' "x86_64-linux-gnu"
+      ;;
+    *)
+      printf '%s\n' "aarch64-macos.15.0"
+      ;;
+  esac
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dry-run)
@@ -43,9 +64,13 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+HOST_ZIG_TARGET="$(detect_host_zig_target)"
+
 run "zig fmt --check build.zig src"
 run "bash -n scripts/*.sh tests/*.sh"
 run "python3 -m py_compile scripts/*.py"
+run "mkdir -p zig-out/bin"
+run "zig build-exe src/main.zig -target $HOST_ZIG_TARGET -O Debug -femit-bin=zig-out/bin/zmr"
 run "bash tests/benchmark-results-test.sh"
 run "bash tests/device-matrix-test.sh"
 run "bash tests/android-emulator-script-test.sh"
@@ -68,9 +93,8 @@ run "bash tests/demo-script-test.sh"
 run "node --test tests/npm-package.test.mjs"
 run "bash tests/public-safety-test.sh"
 run "node --test tests/viewer-parser.test.mjs"
-run "zig test src/main.zig -target aarch64-macos.15.0"
-run "mkdir -p zig-out/bin"
-run "zig build-exe src/main.zig -target aarch64-macos.15.0 -O Debug -femit-bin=zig-out/bin/zmr"
+run "zig test src/main.zig -target $HOST_ZIG_TARGET"
+run "zig build-exe src/main.zig -target $HOST_ZIG_TARGET -O Debug -femit-bin=zig-out/bin/zmr"
 run "bash tests/version-json-test.sh"
 run "bash tests/schemas-json-test.sh"
 run "bash tests/devices-json-test.sh"
