@@ -20,6 +20,8 @@ The package exposes:
   shim command and source file.
 - `zmr-install-ios-shim`: writes the app-local iOS XCTest shim command and
   source files.
+- `zmr-create-ios-demo-app`: creates a generic SwiftUI simulator app with
+  `.zmr/` scenarios and the iOS shim already installed for public demos.
 - `import { runZmr, spawnZmr, resolveBinary } from "zig-mobile-runner"` for Node scripts.
 
 ## App Setup
@@ -91,6 +93,27 @@ zmr doctor --strict --json --config .zmr/config.json
 Omit `--android-shim` or `--ios-shim` for shell/screenshot-only smoke runs.
 Include them when the app repo provides native shim commands for faster
 hierarchy and selector actions.
+
+## iOS Demo App
+
+For a clean public iOS demo that does not depend on a private app:
+
+```bash
+npx zmr-create-ios-demo-app --out /tmp/zmr-ios-demo
+cd /tmp/zmr-ios-demo
+xcodebuild -project ios/ZMRDemo.xcodeproj -scheme ZMRDemo -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build
+```
+
+Then boot a simulator and run the pilot wrapper from a ZMR checkout:
+
+```bash
+scripts/run-ios-pilot.sh \
+  --app-root /tmp/zmr-ios-demo \
+  --app-path /tmp/zmr-ios-demo/DerivedData/Build/Products/Debug-iphonesimulator/ZMRDemo.app \
+  --app-id com.example.mobiletest \
+  --device booted \
+  --ios-shim /tmp/zmr-ios-demo/.zmr/ios-shim
+```
 
 To scaffold the Android shim command into an app repo:
 

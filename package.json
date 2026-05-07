@@ -19,7 +19,8 @@
     "zmr-device-matrix": "scripts/device-matrix.sh",
     "zmr-pilot-gate": "scripts/pilot-gate.sh",
     "zmr-install-android-shim": "scripts/install-android-shim.sh",
-    "zmr-install-ios-shim": "scripts/install-ios-shim.sh"
+    "zmr-install-ios-shim": "scripts/install-ios-shim.sh",
+    "zmr-create-ios-demo-app": "scripts/create-ios-demo-app.sh"
   },
   "files": [
     "npm/",

@@ -22,6 +22,7 @@ test("package exposes zmr bin and public files for npm publishing", () => {
   assert.equal(pkg.bin["zmr-pilot-gate"], "scripts/pilot-gate.sh");
   assert.equal(pkg.bin["zmr-install-android-shim"], "scripts/install-android-shim.sh");
   assert.equal(pkg.bin["zmr-install-ios-shim"], "scripts/install-ios-shim.sh");
+  assert.equal(pkg.bin["zmr-create-ios-demo-app"], "scripts/create-ios-demo-app.sh");
   assert.equal(pkg.main, "npm/index.mjs");
   assert.ok(pkg.files.includes("npm/"));
   assert.ok(pkg.files.includes("clients/typescript/"));

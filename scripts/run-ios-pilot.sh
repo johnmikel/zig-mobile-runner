@@ -77,6 +77,43 @@ run() {
   fi
 }
 
+is_retryable_simctl_text() {
+  local text="$1"
+  [[ "$text" == *"CoreSimulatorService connection became invalid"* ]] ||
+    [[ "$text" == *"Failed to initialize simulator device set"* ]] ||
+    [[ "$text" == *"simdiskimaged"* ]] ||
+    [[ "$text" == *"Connection refused"* ]]
+}
+
+run_simctl_install() {
+  echo "+ $(quote_cmd "$XCRUN" simctl install "$DEVICE" "$APP_PATH")"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    return 0
+  fi
+
+  local attempt status err_file err_text
+  err_file="$(mktemp)"
+  for attempt in 1 2 3 4 5 6; do
+    : > "$err_file"
+    set +e
+    "$XCRUN" simctl install "$DEVICE" "$APP_PATH" 2>"$err_file"
+    status=$?
+    set -e
+    if [[ "$status" -eq 0 ]]; then
+      rm -f "$err_file"
+      return 0
+    fi
+    err_text="$(cat "$err_file")"
+    if [[ "$attempt" == "6" ]] || ! is_retryable_simctl_text "$err_text"; then
+      cat "$err_file" >&2
+      rm -f "$err_file"
+      return "$status"
+    fi
+    echo "warning: simctl install hit a transient CoreSimulator error; retrying ($attempt/6)" >&2
+    sleep 0.5
+  done
+}
+
 preflight_ios_device() {
   if [[ "$DRY_RUN" -eq 1 ]]; then
     return 0
@@ -86,6 +123,13 @@ preflight_ios_device() {
   devices_json="$("$ZMR_BIN" devices --json --platform ios --xcrun "$XCRUN" 2>/dev/null || true)"
   if [[ "$DEVICE" == "booted" ]]; then
     if [[ "$devices_json" == *'"count":0'* || -z "$devices_json" ]]; then
+      if simctl_has_booted_device ""; then
+        return 0
+      fi
+      if [[ -z "$devices_json" ]]; then
+        echo "warning: could not verify booted iOS simulator during preflight; continuing to simctl install" >&2
+        return 0
+      fi
       echo "error: no booted iOS simulator found" >&2
       echo "errorCode: setup.ios.no_booted_simulators" >&2
       echo "hint: boot a simulator, then run zmr doctor --json --xcrun $(printf '%q' "$XCRUN")." >&2
@@ -96,12 +140,38 @@ preflight_ios_device() {
   fi
 
   if [[ "$devices_json" != *'"serial":"'"$DEVICE"'"'* ]]; then
+    if simctl_has_booted_device "$DEVICE"; then
+      return 0
+    fi
+    if [[ -z "$devices_json" ]]; then
+      echo "warning: could not verify iOS simulator during preflight; continuing to simctl install" >&2
+      return 0
+    fi
     echo "error: iOS simulator not found or not booted: $DEVICE" >&2
     echo "errorCode: setup.ios.no_booted_simulators" >&2
     echo "hint: boot the requested simulator, then run zmr doctor --json --xcrun $(printf '%q' "$XCRUN")." >&2
     "$ZMR_BIN" doctor --json --xcrun "$XCRUN" >&2 || true
     exit 2
   fi
+}
+
+simctl_has_booted_device() {
+  local wanted="${1:-}"
+  local booted_text
+  local attempt
+  for attempt in 1 2 3 4 5 6; do
+    booted_text="$("$XCRUN" simctl list devices booted 2>/dev/null || true)"
+    if [[ -n "$booted_text" ]]; then
+      if [[ -z "$wanted" && "$booted_text" == *"(Booted)"* ]]; then
+        return 0
+      fi
+      if [[ -n "$wanted" && "$booted_text" == *"$wanted"* && "$booted_text" == *"(Booted)"* ]]; then
+        return 0
+      fi
+    fi
+    sleep 0.5
+  done
+  return 1
 }
 
 while [[ $# -gt 0 ]]; do
@@ -209,7 +279,7 @@ if [[ -n "$IOS_SHIM" ]]; then
   run "$ZMR_BIN" validate examples/ios-shim-smoke.json
 fi
 preflight_ios_device
-run "$XCRUN" simctl install "$DEVICE" "$APP_PATH"
+run_simctl_install
 
 if [[ "$RUNS" -eq 1 ]]; then
   TRACE_DIR="$TRACE_ROOT/ios-smoke"

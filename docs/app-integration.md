@@ -145,6 +145,25 @@ The Android wrapper expects the default APK path under the app root. Override it
 
 ## iOS Demo Command
 
+For a generic public demo app with the shim already installed:
+
+```bash
+npx zmr-create-ios-demo-app --out /tmp/zmr-ios-demo
+cd /tmp/zmr-ios-demo
+xcodebuild -project ios/ZMRDemo.xcodeproj -scheme ZMRDemo -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build
+```
+
+Then boot a simulator and run:
+
+```bash
+/path/to/zig-mobile-runner/scripts/run-ios-pilot.sh \
+  --app-root /tmp/zmr-ios-demo \
+  --app-path /tmp/zmr-ios-demo/DerivedData/Build/Products/Debug-iphonesimulator/ZMRDemo.app \
+  --app-id com.example.mobiletest \
+  --device booted \
+  --ios-shim /tmp/zmr-ios-demo/.zmr/ios-shim
+```
+
 Build the app for an iOS simulator, boot a simulator, then run:
 
 ```bash

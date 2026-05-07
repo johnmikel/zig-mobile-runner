@@ -31,6 +31,27 @@ cd zig-mobile-runner
 The demo needs no emulator, app, or credentials. It builds `zmr`, runs fake Android/iOS scenarios, exports trace bundles, and points you at the static trace viewer.
 It also runs the TypeScript and Python reference clients against fake stdio ZMR servers.
 
+To create a real generic iOS simulator demo app with the XCTest shim already
+installed:
+
+```bash
+npx zmr-create-ios-demo-app --out /tmp/zmr-ios-demo
+cd /tmp/zmr-ios-demo
+xcodebuild -project ios/ZMRDemo.xcodeproj -scheme ZMRDemo -destination 'generic/platform=iOS Simulator' -derivedDataPath DerivedData build
+```
+
+Boot a simulator, then run the selector-grade demo from the ZMR repo:
+
+```bash
+cd /path/to/zig-mobile-runner
+scripts/run-ios-pilot.sh \
+  --app-root /tmp/zmr-ios-demo \
+  --app-path /tmp/zmr-ios-demo/DerivedData/Build/Products/Debug-iphonesimulator/ZMRDemo.app \
+  --app-id com.example.mobiletest \
+  --device booted \
+  --ios-shim /tmp/zmr-ios-demo/.zmr/ios-shim
+```
+
 ## Install In An App Repo
 
 Use the npm package when you want ZMR inside a mobile app codebase:

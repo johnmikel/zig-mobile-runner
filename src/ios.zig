@@ -7,6 +7,8 @@ const types = @import("types.zig");
 
 const default_max_output = 32 * 1024 * 1024;
 const shim_timeout_ms = 180_000;
+const simctl_retry_attempts = 6;
+const simctl_retry_delay_ms = 500;
 
 pub const IosDevice = struct {
     allocator: std.mem.Allocator,
@@ -242,12 +244,7 @@ pub const IosDevice = struct {
     }
 
     fn runSimctl(self: *IosDevice, extra: []const []const u8, max_output_bytes: usize) !command.ExecResult {
-        var argv = std.ArrayList([]const u8).empty;
-        defer argv.deinit(self.allocator);
-        try argv.append(self.allocator, self.xcrun_path);
-        try argv.append(self.allocator, "simctl");
-        try argv.appendSlice(self.allocator, extra);
-        return try command.run(self.allocator, argv.items, max_output_bytes);
+        return try runSimctlCommand(self.allocator, self.xcrun_path, extra, max_output_bytes);
     }
 };
 
@@ -274,10 +271,46 @@ pub fn listDevices(allocator: std.mem.Allocator, xcrun_path: []const u8) ![]type
 }
 
 fn listDevicesWithPath(allocator: std.mem.Allocator, xcrun_path: []const u8) ![]types.DeviceInfo {
-    const result = try command.run(allocator, &.{ xcrun_path, "simctl", "list", "devices", "--json" }, 4 * 1024 * 1024);
+    const result = try runSimctlCommand(allocator, xcrun_path, &.{ "list", "devices", "--json" }, 4 * 1024 * 1024);
     defer result.deinit(allocator);
     try result.ensureSuccess();
     return try parseDevicesJson(allocator, result.stdout);
+}
+
+fn runSimctlCommand(
+    allocator: std.mem.Allocator,
+    xcrun_path: []const u8,
+    extra: []const []const u8,
+    max_output_bytes: usize,
+) !command.ExecResult {
+    var argv = std.ArrayList([]const u8).empty;
+    defer argv.deinit(allocator);
+    try argv.append(allocator, xcrun_path);
+    try argv.append(allocator, "simctl");
+    try argv.appendSlice(allocator, extra);
+
+    var attempt: usize = 0;
+    while (true) {
+        const result = try command.run(allocator, argv.items, max_output_bytes);
+        if (attempt + 1 >= simctl_retry_attempts or !isRetriableSimctlFailure(result)) {
+            return result;
+        }
+        result.deinit(allocator);
+        attempt += 1;
+        std.Thread.sleep(simctl_retry_delay_ms * std.time.ns_per_ms);
+    }
+}
+
+fn isRetriableSimctlFailure(result: command.ExecResult) bool {
+    if (result.timed_out) return false;
+    switch (result.term) {
+        .Exited => |code| if (code == 0) return false,
+        else => return false,
+    }
+    return std.mem.indexOf(u8, result.stderr, "CoreSimulatorService connection became invalid") != null or
+        std.mem.indexOf(u8, result.stderr, "Failed to initialize simulator device set") != null or
+        std.mem.indexOf(u8, result.stderr, "simdiskimaged") != null or
+        std.mem.indexOf(u8, result.stderr, "Connection refused") != null;
 }
 
 pub fn parseDevicesJson(allocator: std.mem.Allocator, content: []const u8) ![]types.DeviceInfo {
@@ -425,6 +458,58 @@ test "ios simctl parser filters unavailable and shutdown devices" {
     try std.testing.expectEqual(@as(usize, 1), devices.len);
     try std.testing.expectEqualStrings("booted-1", devices[0].serial);
     try std.testing.expectEqualStrings("Booted", devices[0].state);
+}
+
+test "ios device listing retries transient CoreSimulator failures" {
+    const allocator = std.testing.allocator;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+
+    var script = try tmp.dir.createFile("fake-xcrun-flaky.sh", .{ .truncate = true });
+    try script.writeAll(
+        \\#!/usr/bin/env bash
+        \\set -euo pipefail
+        \\
+        \\state="$(dirname "$0")/state"
+        \\if [[ "${1:-}" == "--version" ]]; then
+        \\  printf 'xcrun version 70\n'
+        \\  exit 0
+        \\fi
+        \\if [[ "${1:-}" != "simctl" ]]; then
+        \\  echo "expected simctl command: $*" >&2
+        \\  exit 2
+        \\fi
+        \\shift
+        \\if [[ ! -e "$state" ]]; then
+        \\  touch "$state"
+        \\  echo "CoreSimulatorService connection became invalid" >&2
+        \\  echo "Failed to initialize simulator device set" >&2
+        \\  exit 61
+        \\fi
+        \\if [[ "${1:-}" == "list" && "${2:-}" == "devices" && "${3:-}" == "--json" ]]; then
+        \\  cat <<'JSON'
+        \\{"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-5":[{"name":"iPhone","udid":"retry-ios-1","state":"Booted","isAvailable":true}]}}
+        \\JSON
+        \\  exit 0
+        \\fi
+        \\echo "unsupported simctl command: $*" >&2
+        \\exit 2
+        \\
+    );
+    try script.chmod(0o755);
+    script.close();
+
+    const script_path = try std.fmt.allocPrint(allocator, ".zig-cache/tmp/{s}/fake-xcrun-flaky.sh", .{tmp.sub_path});
+    defer allocator.free(script_path);
+
+    const devices = try listDevices(allocator, script_path);
+    defer {
+        for (devices) |device| device.deinit(allocator);
+        allocator.free(devices);
+    }
+
+    try std.testing.expectEqual(@as(usize, 1), devices.len);
+    try std.testing.expectEqualStrings("retry-ios-1", devices[0].serial);
 }
 
 test "ios selector-grade interactions require XCTest shim" {
