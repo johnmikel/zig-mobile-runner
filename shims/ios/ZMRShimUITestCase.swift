@@ -112,6 +112,9 @@ final class ZMRShimUITestCase: XCTestCase {
                 "nodes": ZMRShim.snapshot(app: app).map { $0.json }
             ]
         case "tap":
+            if let selector = command.selector {
+                return tap(selector: selector, app: app)
+            }
             guard let x = command.x, let y = command.y else {
                 return error("invalid.tap", "tap requires x and y")
             }
@@ -120,10 +123,16 @@ final class ZMRShimUITestCase: XCTestCase {
                 .tap()
             return ok()
         case "type":
+            if let selector = command.selector {
+                return typeText(selector: selector, text: command.text ?? "", app: app)
+            }
             app.typeText(command.text ?? "")
             return ok()
         case "eraseText":
             let count = Int(command.maxChars ?? 0)
+            if let selector = command.selector {
+                return eraseText(selector: selector, count: count, app: app)
+            }
             if count > 0 {
                 app.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count))
             }
@@ -163,6 +172,120 @@ final class ZMRShimUITestCase: XCTestCase {
 
     private func error(_ code: String, _ message: String) -> [String: Any] {
         ["status": "error", "code": code, "message": message]
+    }
+
+    private func tap(selector: String, app: XCUIApplication) -> [String: Any] {
+        guard selectorParts(selector) != nil else {
+            return error("selector.unsupported", "unsupported selector: \(selector)")
+        }
+        guard let element = resolveElement(selector: selector, app: app) else {
+            return error("selector.not_found", "selector did not match: \(selector)")
+        }
+        if !element.isHittable {
+            return error("selector.not_hittable", "selector matched a non-hittable element: \(selector)")
+        }
+        element.tap()
+        return ok()
+    }
+
+    private func typeText(selector: String, text: String, app: XCUIApplication) -> [String: Any] {
+        guard selectorParts(selector) != nil else {
+            return error("selector.unsupported", "unsupported selector: \(selector)")
+        }
+        guard let element = resolveElement(selector: selector, app: app) else {
+            return error("selector.not_found", "selector did not match: \(selector)")
+        }
+        if !element.isHittable {
+            return error("selector.not_hittable", "selector matched a non-hittable element: \(selector)")
+        }
+        element.tap()
+        element.typeText(text)
+        return ok()
+    }
+
+    private func eraseText(selector: String, count: Int, app: XCUIApplication) -> [String: Any] {
+        guard selectorParts(selector) != nil else {
+            return error("selector.unsupported", "unsupported selector: \(selector)")
+        }
+        guard let element = resolveElement(selector: selector, app: app) else {
+            return error("selector.not_found", "selector did not match: \(selector)")
+        }
+        if !element.isHittable {
+            return error("selector.not_hittable", "selector matched a non-hittable element: \(selector)")
+        }
+        element.tap()
+        if count > 0 {
+            element.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: count))
+        }
+        return ok()
+    }
+
+    private func resolveElement(selector: String, app: XCUIApplication) -> XCUIElement? {
+        app.descendants(matching: .any).allElementsBoundByIndex.first { element in
+            matches(selector: selector, element: element)
+        }
+    }
+
+    private func matches(selector: String, element: XCUIElement) -> Bool {
+        guard element.exists, let parts = selectorParts(selector) else {
+            return false
+        }
+
+        let actual: String
+        switch parts.field {
+        case "text", "label":
+            actual = element.label
+        case "identifier", "resourceId":
+            actual = element.identifier
+        case "id":
+            actual = stableId(element: element)
+        case "value":
+            actual = element.value as? String ?? ""
+        case "type":
+            actual = String(describing: element.elementType)
+        default:
+            return false
+        }
+
+        if parts.contains {
+            return actual.localizedCaseInsensitiveContains(parts.value)
+        }
+        return actual == parts.value
+    }
+
+    private func selectorParts(_ selector: String) -> (field: String, value: String, contains: Bool)? {
+        let supportedPrefixes = [
+            ("textContains=", "text", true),
+            ("labelContains=", "label", true),
+            ("identifierContains=", "identifier", true),
+            ("resourceIdContains=", "resourceId", true),
+            ("valueContains=", "value", true),
+            ("type=", "type", false),
+            ("text=", "text", false),
+            ("label=", "label", false),
+            ("identifier=", "identifier", false),
+            ("resourceId=", "resourceId", false),
+            ("id=", "id", false),
+            ("value=", "value", false)
+        ]
+
+        for (prefix, field, contains) in supportedPrefixes {
+            if selector.hasPrefix(prefix) {
+                let value = String(selector.dropFirst(prefix.count))
+                return value.isEmpty ? nil : (field, value, contains)
+            }
+        }
+        return nil
+    }
+
+    private func stableId(element: XCUIElement) -> String {
+        if !element.identifier.isEmpty {
+            return "id:\(element.identifier)"
+        }
+        if !element.label.isEmpty {
+            return "label:\(element.label)"
+        }
+        return String(describing: element.elementType)
     }
 }
 
