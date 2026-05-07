@@ -20,6 +20,7 @@ Public schemas:
 - `schemas/devices-output.schema.json`
 - `schemas/validate-output.schema.json`
 - `schemas/version-output.schema.json`
+- `schemas/capabilities-output.schema.json`
 - `schemas/explain-output.schema.json`
 - `schemas/run-output.schema.json`
 - `schemas/release-manifest.schema.json`
@@ -102,6 +103,18 @@ installers, setup scripts, and generated clients. The response is covered by
 
 ```json
 {"name":"zmr","version":"0.1.0-dev","protocolVersion":"2026-04-28","minimumCompatibleProtocolVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"}
+```
+
+## Capabilities Output Contract
+
+`runner.capabilities` returns the live protocol, platform support, transport,
+and method inventory for JSON-RPC clients. The result object is covered by
+`schemas/capabilities-output.schema.json`. Clients should use
+`platformSupport` rather than parsing prose docs when deciding whether Android,
+iOS simulator, or physical iOS workflows are available.
+
+```json
+{"name":"zmr","version":"0.1.0-dev","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator"],"automation":["simctl","xctest-shim"],"physicalDevices":false}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list"]}
 ```
 
 ## Doctor Output Contract

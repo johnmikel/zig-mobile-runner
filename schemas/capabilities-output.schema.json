@@ -1,0 +1,98 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/capabilities-output.schema.json",
+  "title": "ZMR Capabilities Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "version",
+    "protocolVersion",
+    "protocol",
+    "platforms",
+    "platformSupport",
+    "iosPreview",
+    "transports",
+    "methods"
+  ],
+  "properties": {
+    "name": { "const": "zmr" },
+    "version": { "type": "string", "minLength": 1 },
+    "protocolVersion": { "type": "string", "minLength": 1 },
+    "protocol": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "version",
+        "minimumCompatibleVersion",
+        "stability",
+        "breakingChangePolicy"
+      ],
+      "properties": {
+        "version": { "type": "string", "minLength": 1 },
+        "minimumCompatibleVersion": { "type": "string", "minLength": 1 },
+        "stability": { "type": "string", "minLength": 1 },
+        "breakingChangePolicy": { "type": "string", "minLength": 1 }
+      }
+    },
+    "platforms": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "enum": ["android", "ios"] },
+      "uniqueItems": true
+    },
+    "platformSupport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["android", "ios"],
+      "properties": {
+        "android": { "$ref": "#/$defs/platformSupport" },
+        "ios": {
+          "allOf": [{ "$ref": "#/$defs/platformSupport" }],
+          "required": ["status", "deviceTypes", "automation", "physicalDevices"],
+          "properties": {
+            "physicalDevices": { "const": false }
+          }
+        }
+      }
+    },
+    "iosPreview": { "const": false },
+    "transports": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "enum": ["stdio", "tcp"] },
+      "uniqueItems": true
+    },
+    "methods": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    }
+  },
+  "$defs": {
+    "platformSupport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["status", "deviceTypes", "automation"],
+      "properties": {
+        "status": { "enum": ["supported", "preview", "unsupported"] },
+        "deviceTypes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "enum": ["emulator", "physical", "simulator"]
+          },
+          "uniqueItems": true
+        },
+        "automation": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 },
+          "uniqueItems": true
+        },
+        "physicalDevices": { "type": "boolean" }
+      }
+    }
+  }
+}

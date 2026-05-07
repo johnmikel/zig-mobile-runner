@@ -50,6 +50,7 @@ const public_schemas = [_]PublicSchema{
     .{ .name = "devices-output", .path = "schemas/devices-output.schema.json", .id = "https://zmr.dev/schemas/devices-output.schema.json", .description = "Machine-readable zmr devices --json discovery output" },
     .{ .name = "validate-output", .path = "schemas/validate-output.schema.json", .id = "https://zmr.dev/schemas/validate-output.schema.json", .description = "Machine-readable zmr validate --json scenario preflight output" },
     .{ .name = "version-output", .path = "schemas/version-output.schema.json", .id = "https://zmr.dev/schemas/version-output.schema.json", .description = "Machine-readable zmr version --json compatibility output" },
+    .{ .name = "capabilities-output", .path = "schemas/capabilities-output.schema.json", .id = "https://zmr.dev/schemas/capabilities-output.schema.json", .description = "Machine-readable runner.capabilities JSON-RPC result" },
     .{ .name = "explain-output", .path = "schemas/explain-output.schema.json", .id = "https://zmr.dev/schemas/explain-output.schema.json", .description = "Machine-readable zmr explain --json failure triage output" },
     .{ .name = "run-output", .path = "schemas/run-output.schema.json", .id = "https://zmr.dev/schemas/run-output.schema.json", .description = "Machine-readable zmr run --json terminal summary output" },
     .{ .name = "release-manifest", .path = "schemas/release-manifest.schema.json", .id = "https://zmr.dev/schemas/release-manifest.schema.json", .description = "Machine-readable RELEASE_MANIFEST.json emitted with release archives" },

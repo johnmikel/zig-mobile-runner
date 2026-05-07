@@ -394,7 +394,8 @@ Public JSON Schemas live in [schemas/](schemas/). The scenario schema is
 can run `zmr schemas --json` to discover every packaged public schema. Setup
 tooling can consume [schemas/schemas-output.schema.json](schemas/schemas-output.schema.json)
 for the discovery response, [schemas/version-output.schema.json](schemas/version-output.schema.json)
-for `zmr version --json`, [schemas/doctor-output.schema.json](schemas/doctor-output.schema.json)
+for `zmr version --json`, [schemas/capabilities-output.schema.json](schemas/capabilities-output.schema.json)
+for `runner.capabilities`, [schemas/doctor-output.schema.json](schemas/doctor-output.schema.json)
 for `zmr doctor --json`, [schemas/init-output.schema.json](schemas/init-output.schema.json)
 for `zmr init --json` and [schemas/devices-output.schema.json](schemas/devices-output.schema.json)
 for `zmr devices --json`, [schemas/validate-output.schema.json](schemas/validate-output.schema.json)
@@ -552,7 +553,9 @@ try {
 `protocol.version`, `protocol.minimumCompatibleVersion`, `protocol.stability`,
 and `protocol.breakingChangePolicy`. The top-level `protocolVersion` field
 remains for older clients. Details are in
-[docs/protocol-versioning.md](docs/protocol-versioning.md).
+[docs/protocol-versioning.md](docs/protocol-versioning.md), and the full
+capabilities result is covered by
+[schemas/capabilities-output.schema.json](schemas/capabilities-output.schema.json).
 
 Long-running agents can poll `trace.events` during `zmr serve --trace-dir` to
 stream redacted trace events by sequence cursor without reading trace files
