@@ -26,6 +26,10 @@ test("package exposes zmr bin and public files for npm publishing", () => {
   assert.ok(pkg.files.includes("npm/"));
   assert.ok(pkg.files.includes("clients/typescript/"));
   assert.ok(pkg.files.includes("clients/python/zmr_client.py"));
+  assert.ok(pkg.files.includes("clients/go/"));
+  assert.ok(pkg.files.includes("clients/rust/Cargo.toml"));
+  assert.ok(pkg.files.includes("clients/rust/src/"));
+  assert.ok(pkg.files.includes("clients/rust/examples/"));
   assert.ok(pkg.files.includes("src/"));
   assert.ok(pkg.files.includes("examples/"));
   assert.ok(pkg.files.includes("shims/"));

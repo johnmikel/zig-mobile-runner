@@ -212,7 +212,7 @@ YAML
 ./zig-out/bin/zmr validate traces/demo-imported-flow.json
 
 rm -rf traces/demo-fake-android traces/demo-config-redaction traces/demo-failure traces/demo-android-shim traces/demo-fake-ios traces/demo-ios-shim traces/demo-rpc-session traces/demo-typescript-client traces/demo-python-client traces/demo-fake-android.zmrtrace traces/demo-fake-android-redacted.zmrtrace
-rm -rf traces/demo-android-shim.zmrtrace traces/demo-android-shim-redacted.zmrtrace traces/demo-fake-ios.zmrtrace traces/demo-fake-ios-redacted.zmrtrace traces/demo-ios-shim.zmrtrace traces/demo-ios-shim-redacted.zmrtrace traces/demo-rpc-session-redacted.zmrtrace traces/demo-typescript-client-redacted.zmrtrace traces/demo-python-client-redacted.zmrtrace
+rm -rf traces/demo-android-shim.zmrtrace traces/demo-android-shim-redacted.zmrtrace traces/demo-fake-ios.zmrtrace traces/demo-fake-ios-redacted.zmrtrace traces/demo-ios-shim.zmrtrace traces/demo-ios-shim-redacted.zmrtrace traces/demo-rpc-session-redacted.zmrtrace traces/demo-typescript-client-redacted.zmrtrace traces/demo-python-client-redacted.zmrtrace traces/demo-go-client-redacted.zmrtrace traces/demo-rust-client-redacted.zmrtrace
 rm -f traces/demo-redaction-config.json traces/demo-doctor-config.json traces/demo-bad-config.json traces/demo-doctor-strict.json traces/demo-invalid-smoke-scenario.json traces/demo-fake-adb-empty.sh traces/demo-fake-xcrun-empty.sh traces/demo-flow-yaml-flow.yaml traces/demo-imported-flow.json
 
 echo
@@ -290,6 +290,24 @@ python3 clients/python/examples/fake_session.py
 tail -n 5 traces/demo-python-client/events.jsonl
 
 echo
+echo "== Run Go reference client against fake ZMR server =="
+(
+  cd clients/go
+  go run ./examples/fake-session \
+    --server "$ROOT/tests/fake-json-rpc-server.mjs" \
+    --trace-out "$ROOT/traces/demo-go-client-redacted.zmrtrace"
+)
+
+echo
+echo "== Run Rust reference client against fake ZMR server =="
+cargo run --quiet \
+  --manifest-path clients/rust/Cargo.toml \
+  --example fake_session \
+  -- \
+  --server "$ROOT/tests/fake-json-rpc-server.mjs" \
+  --trace-out "$ROOT/traces/demo-rust-client-redacted.zmrtrace"
+
+echo
 echo "== Run fake Android shim selector demo =="
 ./zig-out/bin/zmr run examples/android-shim-smoke.json \
   --device fake-android-1 \
@@ -355,4 +373,6 @@ echo "  $ROOT/traces/demo-ios-shim-redacted.zmrtrace"
 echo "  $ROOT/traces/demo-rpc-session-redacted.zmrtrace"
 echo "  $ROOT/traces/demo-typescript-client-redacted.zmrtrace"
 echo "  $ROOT/traces/demo-python-client-redacted.zmrtrace"
+echo "  $ROOT/traces/demo-go-client-redacted.zmrtrace"
+echo "  $ROOT/traces/demo-rust-client-redacted.zmrtrace"
 echo "  $ROOT/viewer/index.html"

@@ -534,6 +534,43 @@ with ZmrClient("zmr", ["serve", "--transport", "stdio", "--device", "emulator-55
     zmr.export_trace("traces/agent-session-redacted.zmrtrace", redact=True, omit_screenshots=True)
 ```
 
+## Go Client
+
+The Go reference client in [clients/go](clients/go) uses only the Go standard
+library and drives the same stdio JSON-RPC protocol:
+
+```go
+client, err := zmr.Start(ctx, "zmr", "serve", "--transport", "stdio")
+if err != nil {
+    panic(err)
+}
+defer client.Close()
+
+snapshot, err := client.Snapshot(ctx)
+```
+
+Run the fake-session demo:
+
+```bash
+go run ./clients/go/examples/fake-session --server tests/fake-json-rpc-server.mjs
+```
+
+## Rust Client
+
+The Rust reference client in [clients/rust](clients/rust) provides a small
+synchronous JSON-RPC wrapper around `zmr serve --transport stdio`:
+
+```rust
+let mut client = zmr_client::Client::start("zmr", ["serve", "--transport", "stdio"])?;
+let snapshot = client.snapshot()?;
+```
+
+Run the fake-session demo:
+
+```bash
+cargo run --manifest-path clients/rust/Cargo.toml --example fake_session -- --server tests/fake-json-rpc-server.mjs
+```
+
 ## Benchmarking
 
 Run repeated local comparisons with:
@@ -592,6 +629,8 @@ events, snapshots, reports, and redacted exports.
 - `src/fake_device.zig`: fake device harness for emulator-free tests.
 - `clients/typescript/`: zero-dependency reference JSON-RPC client for Node/TypeScript agents.
 - `clients/python/`: standard-library reference JSON-RPC client for Python agents.
+- `clients/go/`: standard-library reference JSON-RPC client for Go agents.
+- `clients/rust/`: synchronous reference JSON-RPC client for Rust agents.
 
 ## App Integration
 

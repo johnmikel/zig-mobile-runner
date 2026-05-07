@@ -33,9 +33,9 @@ methods.
 form for setup scripts, generated clients, and editor integrations. The
 response is covered by `schemas/schemas-output.schema.json`.
 
-Zero-dependency TypeScript and standard-library Python reference clients live
-under `clients/typescript/` and `clients/python/`; both are exercised by the
-no-device demo.
+Zero-dependency TypeScript, standard-library Python, standard-library Go, and
+Rust reference clients live under `clients/typescript/`, `clients/python/`,
+`clients/go/`, and `clients/rust/`; all are exercised by the no-device demo.
 
 ## Trace Event Contract
 

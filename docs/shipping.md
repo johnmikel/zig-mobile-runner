@@ -37,6 +37,8 @@ For the maintainer-facing GitHub upload and npm publication sequence, see
   need app-local `.zmr/config.json` plus Android/iOS smoke scenarios without npm.
 - TypeScript reference client under `clients/typescript/`.
 - Python reference client under `clients/python/`.
+- Go reference client under `clients/go/`.
+- Rust reference client under `clients/rust/`.
 - npm-exposed Android shim installer for app-local instrumentation source,
   optional module source copy, optional Gradle `testInstrumentationRunner` and
   dependency patching, and command setup.

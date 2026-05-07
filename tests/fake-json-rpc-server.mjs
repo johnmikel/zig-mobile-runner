@@ -41,7 +41,7 @@ rl.on("line", (line) => {
   } else if (method === "trace.export") {
     result = {
       traceDir: "traces/client",
-      out: "traces/client.zmrtrace",
+      out: request.params?.out ?? "traces/client.zmrtrace",
       redacted: Boolean(request.params?.redact || request.params?.omitScreenshots),
       omitScreenshots: Boolean(request.params?.omitScreenshots),
     };

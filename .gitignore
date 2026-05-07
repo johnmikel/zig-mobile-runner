@@ -5,6 +5,7 @@ dist/
 traces/
 prebuilds/
 node_modules/
+clients/rust/target/
 *.tgz
 __pycache__/
 *.pyc

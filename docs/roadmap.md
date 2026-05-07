@@ -127,6 +127,8 @@ Work:
 - [x] Add protocol compatibility tests that load fixtures and assert exact response shapes.
 - [x] Add a TypeScript reference client package in `clients/typescript/`.
 - [x] Add a Python reference client package in `clients/python/`.
+- [x] Add a Go reference client package in `clients/go/`.
+- [x] Add a Rust reference client package in `clients/rust/`.
 - [x] Add streaming observation/event mode for long-running agent sessions.
 - [x] Add `trace.export` support for live RPC sessions, not only scenario runs.
 - [x] Add semantic protocol version policy.

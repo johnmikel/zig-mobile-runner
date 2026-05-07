@@ -1,0 +1,238 @@
+package zmr
+
+import (
+	"bufio"
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"io"
+	"os/exec"
+	"sync"
+)
+
+type Client struct {
+	cmd    *exec.Cmd
+	stdin  io.WriteCloser
+	lines  *bufio.Scanner
+	nextID int64
+	mu     sync.Mutex
+	closed bool
+}
+
+type RPCError struct {
+	Code       int             `json:"code"`
+	Message    string          `json:"message"`
+	PublicCode string          `json:"publicCode,omitempty"`
+	Data       json.RawMessage `json:"data,omitempty"`
+}
+
+func (e *RPCError) Error() string {
+	if e.Message == "" {
+		return "ZMR JSON-RPC error"
+	}
+	return e.Message
+}
+
+type rpcRequest struct {
+	JSONRPC string      `json:"jsonrpc"`
+	ID      int64       `json:"id"`
+	Method  string      `json:"method"`
+	Params  interface{} `json:"params"`
+}
+
+type rpcResponse struct {
+	JSONRPC string          `json:"jsonrpc"`
+	ID      int64           `json:"id"`
+	Result  json.RawMessage `json:"result,omitempty"`
+	Error   *RPCError       `json:"error,omitempty"`
+}
+
+type Capabilities struct {
+	Name            string   `json:"name"`
+	Version         string   `json:"version"`
+	ProtocolVersion string   `json:"protocolVersion"`
+	Platforms       []string `json:"platforms"`
+	Transports      []string `json:"transports"`
+	Methods         []string `json:"methods"`
+}
+
+type Session struct {
+	SessionID string `json:"sessionId"`
+}
+
+type Snapshot struct {
+	ID            string                 `json:"id"`
+	TimestampMS   int64                  `json:"timestampMs"`
+	Viewport      map[string]interface{} `json:"viewport"`
+	ActivePackage string                 `json:"activePackage"`
+	ActiveActivity string                `json:"activeActivity"`
+	Nodes         []Node                 `json:"nodes"`
+}
+
+type Node struct {
+	StableID    string                 `json:"stableId"`
+	ClassName   string                 `json:"className"`
+	ResourceID  string                 `json:"resourceId,omitempty"`
+	Text        *string                `json:"text"`
+	ContentDesc *string                `json:"contentDesc"`
+	Bounds      map[string]interface{} `json:"bounds"`
+	Enabled     bool                   `json:"enabled"`
+	Visible     bool                   `json:"visible"`
+	Selected    bool                   `json:"selected"`
+}
+
+type TraceEvents struct {
+	TraceDir  string                   `json:"traceDir"`
+	AfterSeq  int64                    `json:"afterSeq"`
+	NextSeq   int64                    `json:"nextSeq"`
+	LatestSeq int64                    `json:"latestSeq"`
+	Events    []map[string]interface{} `json:"events"`
+}
+
+type TraceExport struct {
+	TraceDir        string `json:"traceDir"`
+	Out             string `json:"out"`
+	Redacted        bool   `json:"redacted"`
+	OmitScreenshots bool   `json:"omitScreenshots"`
+}
+
+func Start(ctx context.Context, command string, args ...string) (*Client, error) {
+	cmd := exec.CommandContext(ctx, command, args...)
+	stdin, err := cmd.StdinPipe()
+	if err != nil {
+		return nil, err
+	}
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	scanner := bufio.NewScanner(stdout)
+	scanner.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
+	return &Client{cmd: cmd, stdin: stdin, lines: scanner, nextID: 1}, nil
+}
+
+func (c *Client) Close() error {
+	c.mu.Lock()
+	if c.closed {
+		c.mu.Unlock()
+		return nil
+	}
+	c.closed = true
+	stdin := c.stdin
+	cmd := c.cmd
+	c.mu.Unlock()
+
+	_ = stdin.Close()
+	if cmd.Process != nil {
+		_ = cmd.Process.Kill()
+	}
+	return cmd.Wait()
+}
+
+func (c *Client) Request(ctx context.Context, method string, params interface{}, out interface{}) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if c.closed {
+		return errors.New("zmr client is closed")
+	}
+	id := c.nextID
+	c.nextID++
+	request := rpcRequest{JSONRPC: "2.0", ID: id, Method: method, Params: params}
+	line, err := json.Marshal(request)
+	if err != nil {
+		return err
+	}
+	if _, err := c.stdin.Write(append(line, '\n')); err != nil {
+		return err
+	}
+
+	type responseResult struct {
+		line string
+		ok   bool
+	}
+	responseCh := make(chan responseResult, 1)
+	go func() {
+		ok := c.lines.Scan()
+		responseCh <- responseResult{line: c.lines.Text(), ok: ok}
+	}()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case response := <-responseCh:
+		if !response.ok {
+			if err := c.lines.Err(); err != nil {
+				return err
+			}
+			return io.EOF
+		}
+		var decoded rpcResponse
+		if err := json.Unmarshal([]byte(response.line), &decoded); err != nil {
+			return err
+		}
+		if decoded.ID != id {
+			return fmt.Errorf("unexpected JSON-RPC response id %d", decoded.ID)
+		}
+		if decoded.Error != nil {
+			return decoded.Error
+		}
+		if out == nil {
+			return nil
+		}
+		return json.Unmarshal(decoded.Result, out)
+	}
+}
+
+func (c *Client) Capabilities(ctx context.Context) (Capabilities, error) {
+	var out Capabilities
+	err := c.Request(ctx, "runner.capabilities", map[string]interface{}{}, &out)
+	return out, err
+}
+
+func (c *Client) CreateSession(ctx context.Context) (Session, error) {
+	var out Session
+	err := c.Request(ctx, "session.create", map[string]interface{}{}, &out)
+	return out, err
+}
+
+func (c *Client) OpenLink(ctx context.Context, url string) (bool, error) {
+	var out bool
+	err := c.Request(ctx, "app.openLink", map[string]interface{}{"url": url}, &out)
+	return out, err
+}
+
+func (c *Client) Snapshot(ctx context.Context) (Snapshot, error) {
+	var out Snapshot
+	err := c.Request(ctx, "observe.snapshot", map[string]interface{}{}, &out)
+	return out, err
+}
+
+func (c *Client) WaitUntil(ctx context.Context, selector map[string]interface{}, timeoutMS int64) (bool, error) {
+	var out bool
+	params := map[string]interface{}{"visible": selector}
+	if timeoutMS > 0 {
+		params["timeoutMs"] = timeoutMS
+	}
+	err := c.Request(ctx, "wait.until", params, &out)
+	return out, err
+}
+
+func (c *Client) ExportTrace(ctx context.Context, outPath string, redact bool, omitScreenshots bool) (TraceExport, error) {
+	var out TraceExport
+	err := c.Request(ctx, "trace.export", map[string]interface{}{"out": outPath, "redact": redact, "omitScreenshots": omitScreenshots}, &out)
+	return out, err
+}
+
+func (c *Client) TraceEvents(ctx context.Context, afterSeq int64, limit int64) (TraceEvents, error) {
+	var out TraceEvents
+	params := map[string]interface{}{"afterSeq": afterSeq}
+	if limit > 0 {
+		params["limit"] = limit
+	}
+	err := c.Request(ctx, "trace.events", params, &out)
+	return out, err
+}

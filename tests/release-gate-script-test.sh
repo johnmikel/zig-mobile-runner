@@ -34,6 +34,8 @@ required = [
     "bash tests/workflow-readiness-test.sh",
     "bash tests/demo-script-test.sh",
     "node --test tests/npm-package.test.mjs",
+    "bash tests/go-client-test.sh",
+    "bash tests/rust-client-test.sh",
     "bash tests/public-safety-test.sh",
     "node --test tests/viewer-parser.test.mjs",
     "zig test src/main.zig -target aarch64-macos.15.0",

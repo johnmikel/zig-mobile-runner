@@ -18,6 +18,8 @@ All notable changes to Zig Mobile Runner are tracked here.
 - Product roadmap in `docs/roadmap.md`.
 - Demo documentation in `docs/demo.md`.
 - Machine-readable protocol compatibility metadata in `runner.capabilities`.
+- Go and Rust reference JSON-RPC clients with fake-session examples and CI
+  coverage.
 - `trace.events` JSON-RPC cursor polling for live trace events during long-running agent sessions.
 - Field, line, and column diagnostics in `zmr validate --json` for invalid scenarios.
 - Scenario authoring guide plus onboarding, referral deep-link, and error-state templates.

@@ -51,6 +51,8 @@ The script builds `zig-out/bin/zmr`, then runs:
 - `zmr serve --transport stdio --trace-dir traces/demo-rpc-session`
 - `node clients/typescript/examples/fake-session.mjs`
 - `python3 clients/python/examples/fake_session.py`
+- `go run ./clients/go/examples/fake-session --server tests/fake-json-rpc-server.mjs`
+- `cargo run --manifest-path clients/rust/Cargo.toml --example fake_session -- --server tests/fake-json-rpc-server.mjs`
 - `zmr run examples/ios-smoke.json --platform ios --trace-dir traces/demo-fake-ios`
 
 The fake Android flow exercises selector matching and wait/assert trace output.
