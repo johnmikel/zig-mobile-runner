@@ -129,6 +129,7 @@ All notable changes to Zig Mobile Runner are tracked here.
 - README now links to install, demo, schema, and roadmap materials.
 - Protocol documentation now includes concrete request/response examples and error shapes.
 - Protocol versioning now defines the pre-`v1.0.0` compatibility contract and breaking-change policy.
+- Android `openLink` now avoids blocking `am start -W`, retries when Android leaves the launcher foregrounded, and lets selector waits absorb transient observation command timeouts.
 - iOS simulators are supported for lifecycle, snapshots, logs, deep links,
   clear-state-by-uninstall, and selector-driven XCTest shim interaction.
 - Physical iOS devices are not in the current support matrix.

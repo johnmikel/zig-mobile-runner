@@ -9,6 +9,8 @@ const default_max_output = 32 * 1024 * 1024;
 const default_adb_timeout_ms = 15_000;
 const install_adb_timeout_ms = 120_000;
 const shim_timeout_ms = 5_000;
+const open_link_attempts = 3;
+const open_link_retry_delay_ms = 500;
 
 pub const AndroidDevice = struct {
     allocator: std.mem.Allocator,
@@ -78,9 +80,18 @@ pub const AndroidDevice = struct {
     }
 
     pub fn openLink(self: *AndroidDevice, url: []const u8) !void {
-        const result = try self.runAdb(&.{ "shell", "am", "start", "-W", "-a", "android.intent.action.VIEW", "-d", url, self.app_id }, default_max_output);
-        defer result.deinit(self.allocator);
-        try result.ensureSuccess();
+        var attempt: usize = 0;
+        while (attempt < open_link_attempts) : (attempt += 1) {
+            const result = try self.runAdb(&.{ "shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", url, self.app_id }, default_max_output);
+            defer result.deinit(self.allocator);
+            try result.ensureSuccess();
+
+            if (self.isAppForeground() catch false) return;
+            if (attempt + 1 < open_link_attempts) {
+                std.Thread.sleep(open_link_retry_delay_ms * std.time.ns_per_ms);
+            }
+        }
+        return error.AppDidNotOpen;
     }
 
     pub fn tap(self: *AndroidDevice, x: i32, y: i32) !void {
@@ -268,6 +279,13 @@ pub const AndroidDevice = struct {
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
         return try parseActiveWindow(self.allocator, result.stdout);
+    }
+
+    fn isAppForeground(self: *AndroidDevice) !bool {
+        const active = try self.activeWindow();
+        defer active.deinit(self.allocator);
+        const package = active.package orelse return false;
+        return std.mem.eql(u8, package, self.app_id);
     }
 
     fn viewport(self: *AndroidDevice) !types.Viewport {
@@ -485,6 +503,16 @@ pub fn parseDisplayDensityDpi(output: []const u8) ?u32 {
     return null;
 }
 
+fn countOccurrences(haystack: []const u8, needle: []const u8) usize {
+    var count: usize = 0;
+    var index: usize = 0;
+    while (std.mem.indexOfPos(u8, haystack, index, needle)) |found| {
+        count += 1;
+        index = found + needle.len;
+    }
+    return count;
+}
+
 test "parse active window package and activity" {
     const active = try parseActiveWindow(std.testing.allocator, "mCurrentFocus=Window{123 u0 com.example.mobiletest/.MainActivity}\n");
     defer active.deinit(std.testing.allocator);
@@ -546,6 +574,86 @@ test "android device actions and snapshot work through fake adb" {
     try std.testing.expectEqual(@as(usize, 1), devices.len);
     try std.testing.expectEqualStrings("fake-android-1", devices[0].serial);
     try std.testing.expectEqualStrings("device", devices[0].state);
+}
+
+test "android openLink starts intent without waiting for activity launch completion" {
+    const allocator = std.testing.allocator;
+    const log_path = "zig-cache/test-android-open-link-adb.log";
+    const adb_path = "zig-cache/test-android-open-link-adb.sh";
+    try std.fs.cwd().makePath("zig-cache");
+    std.fs.cwd().deleteFile(log_path) catch {};
+    std.fs.cwd().deleteFile(adb_path) catch {};
+    defer std.fs.cwd().deleteFile(log_path) catch {};
+    defer std.fs.cwd().deleteFile(adb_path) catch {};
+
+    var adb_file = try std.fs.cwd().createFile(adb_path, .{ .truncate = true });
+    try adb_file.writeAll(
+        \\#!/usr/bin/env bash
+        \\set -euo pipefail
+        \\printf '%s\n' "$*" >> zig-cache/test-android-open-link-adb.log
+        \\exec ./tests/fake-adb.sh "$@"
+        \\
+    );
+    try adb_file.chmod(0o755);
+    adb_file.close();
+
+    var device = try AndroidDevice.init(allocator, adb_path, "fake-android-1", "com.example.mobiletest");
+    defer device.deinit();
+
+    try device.openLink("exampleapp://probe");
+
+    const contents = try std.fs.cwd().readFileAlloc(allocator, log_path, 4096);
+    defer allocator.free(contents);
+    try std.testing.expect(std.mem.indexOf(u8, contents, "shell am start ") != null);
+    try std.testing.expect(std.mem.indexOf(u8, contents, " -W ") == null);
+    try std.testing.expect(std.mem.indexOf(u8, contents, "android.intent.action.VIEW") != null);
+    try std.testing.expect(std.mem.indexOf(u8, contents, "exampleapp://probe") != null);
+}
+
+test "android openLink retries when deep link leaves launcher foregrounded" {
+    const allocator = std.testing.allocator;
+    const log_path = "zig-cache/test-android-open-link-retry-adb.log";
+    const state_path = "zig-cache/test-android-open-link-retry-state";
+    const adb_path = "zig-cache/test-android-open-link-retry-adb.sh";
+    try std.fs.cwd().makePath("zig-cache");
+    std.fs.cwd().deleteFile(log_path) catch {};
+    std.fs.cwd().deleteFile(state_path) catch {};
+    std.fs.cwd().deleteFile(adb_path) catch {};
+    defer std.fs.cwd().deleteFile(log_path) catch {};
+    defer std.fs.cwd().deleteFile(state_path) catch {};
+    defer std.fs.cwd().deleteFile(adb_path) catch {};
+
+    var adb_file = try std.fs.cwd().createFile(adb_path, .{ .truncate = true });
+    try adb_file.writeAll(
+        \\#!/usr/bin/env bash
+        \\set -euo pipefail
+        \\printf '%s\n' "$*" >> zig-cache/test-android-open-link-retry-adb.log
+        \\if [[ "${1:-}" == "-s" ]]; then shift 2; fi
+        \\if [[ "${1:-}" == "shell" && "${2:-}" == "dumpsys" ]]; then
+        \\  count="$(cat zig-cache/test-android-open-link-retry-state 2>/dev/null || printf '0')"
+        \\  count=$((count + 1))
+        \\  printf '%s' "$count" > zig-cache/test-android-open-link-retry-state
+        \\  if [[ "$count" -eq 1 ]]; then
+        \\    printf 'mCurrentFocus=Window{123 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity}\n'
+        \\  else
+        \\    printf 'mCurrentFocus=Window{123 u0 com.example.mobiletest/.MainActivity}\n'
+        \\  fi
+        \\  exit 0
+        \\fi
+        \\exec ./tests/fake-adb.sh "$@"
+        \\
+    );
+    try adb_file.chmod(0o755);
+    adb_file.close();
+
+    var device = try AndroidDevice.init(allocator, adb_path, "fake-android-1", "com.example.mobiletest");
+    defer device.deinit();
+
+    try device.openLink("exampleapp://probe");
+
+    const contents = try std.fs.cwd().readFileAlloc(allocator, log_path, 8192);
+    defer allocator.free(contents);
+    try std.testing.expectEqual(@as(usize, 2), countOccurrences(contents, "shell am start"));
 }
 
 test "android snapshot honors trace artifact capture controls" {

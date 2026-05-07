@@ -5,6 +5,10 @@ if [[ "${1:-}" == "-s" ]]; then
   shift 2
 fi
 
+if [[ -n "${ZMR_FAKE_ADB_LOG:-}" ]]; then
+  printf '%s\n' "$*" >> "$ZMR_FAKE_ADB_LOG"
+fi
+
 case "${1:-}" in
   version)
     printf 'Android Debug Bridge version 1.0.41\n'

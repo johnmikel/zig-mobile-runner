@@ -309,7 +309,10 @@ pub fn waitUntilVisible(
 ) !bool {
     const deadline = std.time.milliTimestamp() + @as(i64, @intCast(timeout_ms));
     while (true) {
-        var snap = try device.snapshot(writer);
+        var snap = device.snapshot(writer) catch |err| {
+            if (try retryTransientObservation(err, "wait.visible", writer, deadline, options)) continue;
+            return err;
+        };
         defer snap.deinit(device.allocator);
         if (selector.find(snap.nodes, wanted) != null) {
             if (writer) |tw| try tw.recordEvent("wait.visible", "{\"status\":\"ok\"}");
@@ -335,7 +338,10 @@ pub fn waitUntilNotVisible(
 ) !bool {
     const deadline = std.time.milliTimestamp() + @as(i64, @intCast(timeout_ms));
     while (true) {
-        var snap = try device.snapshot(writer);
+        var snap = device.snapshot(writer) catch |err| {
+            if (try retryTransientObservation(err, "wait.notVisible", writer, deadline, options)) continue;
+            return err;
+        };
         defer snap.deinit(device.allocator);
         if (selector.find(snap.nodes, wanted) == null) {
             if (writer) |tw| try tw.recordEvent("wait.notVisible", "{\"status\":\"ok\"}");
@@ -361,7 +367,10 @@ pub fn waitUntilAnyVisible(
 ) !?usize {
     const deadline = std.time.milliTimestamp() + @as(i64, @intCast(timeout_ms));
     while (true) {
-        var snap = try device.snapshot(writer);
+        var snap = device.snapshot(writer) catch |err| {
+            if (try retryTransientObservation(err, "wait.any", writer, deadline, options)) continue;
+            return err;
+        };
         defer snap.deinit(device.allocator);
         for (selectors, 0..) |wanted, index| {
             if (selector.find(snap.nodes, wanted)) |node| {
@@ -394,7 +403,10 @@ pub fn scrollUntilVisible(
 ) !bool {
     const deadline = std.time.milliTimestamp() + @as(i64, @intCast(timeout_ms));
     while (true) {
-        var snap = try device.snapshot(writer);
+        var snap = device.snapshot(writer) catch |err| {
+            if (try retryTransientObservation(err, "ui.scrollUntilVisible", writer, deadline, options)) continue;
+            return err;
+        };
         defer snap.deinit(device.allocator);
         if (selector.find(snap.nodes, wanted)) |node| {
             if (writer) |tw| {
@@ -453,6 +465,20 @@ fn isVisibleNow(
 
 fn sleepMs(ms: u64) !void {
     std.Thread.sleep(ms * std.time.ns_per_ms);
+}
+
+fn retryTransientObservation(
+    err: anyerror,
+    kind: []const u8,
+    writer: ?*trace.TraceWriter,
+    deadline: i64,
+    options: RunOptions,
+) !bool {
+    if (err != error.CommandTimedOut) return false;
+    if (std.time.milliTimestamp() >= deadline) return false;
+    if (writer) |tw| try recordObservationRetry(tw, kind, err);
+    try sleepMs(options.poll_ms);
+    return true;
 }
 
 fn settleDevice(device: anytype, options: RunOptions) !void {
@@ -529,6 +555,18 @@ fn recordWaitTimeout(
     snap: types.ObservationSnapshot,
 ) !void {
     try recordDiagnostic(tw, kind, "timeout", selectors, snap);
+}
+
+fn recordObservationRetry(tw: *trace.TraceWriter, kind: []const u8, err: anyerror) !void {
+    var payload = std.ArrayList(u8).empty;
+    defer payload.deinit(tw.allocator);
+    const writer = payload.writer(tw.allocator);
+    try writer.writeAll("{\"status\":\"retry\",\"kind\":");
+    try trace.writeJsonString(writer, kind);
+    try writer.writeAll(",\"error\":");
+    try trace.writeJsonString(writer, @errorName(err));
+    try writer.writeAll("}");
+    try tw.recordEvent("observe.retry", payload.items);
 }
 
 fn recordDiagnostic(
@@ -805,6 +843,39 @@ test "wait any matches the first visible selector candidate" {
     const selectors = [_]selector.Selector{ .{ .text = "Missing" }, .{ .text = "Home" } };
     const matched = try waitUntilAnyVisible(&fake, selectors[0..], 10, null, .{ .settle_ms = 0, .poll_ms = 1 });
     try std.testing.expectEqual(@as(?usize, 1), matched);
+}
+
+test "wait any retries through transient observation command timeouts" {
+    const allocator = std.testing.allocator;
+
+    const FlakySnapshotDevice = struct {
+        allocator: std.mem.Allocator,
+        snapshots: usize = 0,
+
+        pub fn snapshot(self: *@This(), writer: ?*trace.TraceWriter) !types.ObservationSnapshot {
+            _ = writer;
+            self.snapshots += 1;
+            if (self.snapshots == 1) return error.CommandTimedOut;
+
+            const nodes = try self.allocator.alloc(types.UiNode, 1);
+            nodes[0] = .{
+                .stable_id = try self.allocator.dupe(u8, "node-ready"),
+                .class_name = try self.allocator.dupe(u8, "android.widget.TextView"),
+                .text = try self.allocator.dupe(u8, "Ready"),
+            };
+            return .{
+                .id = try self.allocator.dupe(u8, "snapshot-ready"),
+                .timestamp_ms = 1,
+                .nodes = nodes,
+            };
+        }
+    };
+
+    var fake = FlakySnapshotDevice{ .allocator = allocator };
+    const selectors = [_]selector.Selector{.{ .text = "Ready" }};
+    const matched = try waitUntilAnyVisible(&fake, selectors[0..], 100, null, .{ .settle_ms = 0, .poll_ms = 0 });
+    try std.testing.expectEqual(@as(?usize, 0), matched);
+    try std.testing.expectEqual(@as(usize, 2), fake.snapshots);
 }
 
 test "tap retries through transient empty snapshots" {
