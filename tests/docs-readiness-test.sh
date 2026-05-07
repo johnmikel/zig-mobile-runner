@@ -50,6 +50,7 @@ grep -q 'zmr-compare-benchmarks' "$ROOT/README.md"
 grep -q 'zmr-compare-benchmarks' "$ROOT/docs/benchmarking.md"
 grep -q 'zmr-compare-benchmarks' "$ROOT/docs/npm.md"
 grep -q 'zmr-compare-benchmarks' "$ROOT/docs/shipping.md"
+grep -q 'zmr-compare-benchmarks' "$ROOT/CHANGELOG.md"
 grep -q 'zmr-pilot-gate' "$ROOT/README.md"
 grep -q 'zmr-pilot-gate' "$ROOT/docs/benchmarking.md"
 grep -q 'zmr-pilot-gate' "$ROOT/docs/npm.md"
@@ -91,15 +92,22 @@ grep -q 'Capabilities Output Contract' "$ROOT/docs/protocol.md"
 grep -q 'capabilities-output.schema.json' "$ROOT/README.md"
 grep -q 'capabilities-output.schema.json' "$ROOT/docs/protocol.md"
 grep -q 'capabilities-output.schema.json' "$ROOT/schemas/README.md"
+grep -q 'capabilities-output.schema.json' "$ROOT/CHANGELOG.md"
 grep -q '"platformSupport"' "$ROOT/schemas/capabilities-output.schema.json"
 grep -q '"physicalDevices"' "$ROOT/schemas/capabilities-output.schema.json"
 grep -q 'platformSupport.ios.status: "supported"' "$ROOT/docs/protocol.md"
 grep -q '"iosPreview":false' "$ROOT/docs/protocol-fixtures/core-session.responses.jsonl"
 grep -q 'iOS simulators are supported' "$ROOT/README.md"
+grep -q 'iOS simulators are supported' "$ROOT/CHANGELOG.md"
 grep -q 'Physical iOS devices are not in the current support matrix' "$ROOT/README.md"
+grep -q 'Physical iOS devices are not in the current support matrix' "$ROOT/CHANGELOG.md"
 grep -q 'Physical iOS device automation' "$ROOT/docs/shipping.md"
 if grep -q 'iOS simulator support is a preview' "$ROOT/README.md" "$ROOT/docs/install.md" "$ROOT/docs/shipping.md" "$ROOT/docs/protocol.md"; then
   echo "iOS simulator support should not be documented as preview" >&2
+  exit 1
+fi
+if grep -q 'iOS simulator support remains preview' "$ROOT/CHANGELOG.md"; then
+  echo "changelog still lists iOS simulator support as preview" >&2
   exit 1
 fi
 grep -q '"protocolVersion"' "$ROOT/schemas/version-output.schema.json"

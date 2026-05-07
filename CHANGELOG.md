@@ -97,6 +97,11 @@ All notable changes to Zig Mobile Runner are tracked here.
 - Added `schemas/devices-output.schema.json` for the machine-readable `zmr devices --json` contract.
 - `zmr version --json` now emits machine-readable runner and protocol compatibility metadata for installers and generated clients.
 - Added `schemas/version-output.schema.json` for the machine-readable `zmr version --json` contract.
+- `runner.capabilities` now reports Android and iOS simulator support as
+  structured `platformSupport` metadata, with `iosPreview: false` and physical
+  iOS devices explicitly unsupported in the current support matrix.
+- Added `schemas/capabilities-output.schema.json` for the machine-readable
+  `runner.capabilities` JSON-RPC result.
 - `zmr explain --json` now emits machine-readable failure triage for agents and CI.
 - Added `schemas/explain-output.schema.json` for the machine-readable `zmr explain --json` contract.
 - `zmr schemas --json` now emits a machine-readable index of packaged public schema contracts.
@@ -106,6 +111,12 @@ All notable changes to Zig Mobile Runner are tracked here.
 - Added `zmr-device-matrix` / `scripts/device-matrix.sh` for local Android/iOS
   multi-device smoke gates with `matrix.jsonl`, `summary.json`, and pass-rate
   thresholds.
+- Added `zmr-compare-benchmarks` / `scripts/compare-benchmarks.py` for generic
+  candidate-vs-baseline benchmark comparison reports without naming private app
+  projects or third-party tools in public fixtures.
+- Added `zmr-demo-ios` and `zmr-create-ios-demo-app` flows for a generic
+  simulator app with the XCTest shim installed, selector-grade smoke scenario,
+  and redacted trace output.
 - `zmr validate --json` now reports missing step selectors as `selector.invalid` with `fieldPath: "$.steps[].selector"` instead of falling back to `internal.error`.
 - `zmr validate --json` now reports unknown scenario action typos as `scenario.invalid` with `fieldPath: "$.steps[].action"` and source location diagnostics.
 - `zmr validate --json` now reports invalid `scrollUntilVisible.direction` values as `scenario.invalid` with `fieldPath: "$.steps[].direction"`.
@@ -118,12 +129,17 @@ All notable changes to Zig Mobile Runner are tracked here.
 - README now links to install, demo, schema, and roadmap materials.
 - Protocol documentation now includes concrete request/response examples and error shapes.
 - Protocol versioning now defines the pre-`v1.0.0` compatibility contract and breaking-change policy.
+- iOS simulators are supported for lifecycle, snapshots, logs, deep links,
+  clear-state-by-uninstall, and selector-driven XCTest shim interaction.
+- Physical iOS devices are not in the current support matrix.
 
 ### Known Limitations
 
-- Android is still the primary supported platform.
-- iOS simulator support remains preview; selector-grade flows require a configured local XCTest/XCUIAutomation shim and real simulator validation.
-- Screenshot/XML artifact redaction is not implemented; do not publish real app traces without sanitizing visual/raw artifacts.
+- Physical iOS device automation is not supported yet.
+- Broad cloud-device-farm certification is not included in this dev-preview
+  release.
+- Real app benchmark claims should be made from private app-local
+  `zmr-compare-benchmarks` reports, not from generic public fixtures.
 
 ## 0.1.0-dev
 
