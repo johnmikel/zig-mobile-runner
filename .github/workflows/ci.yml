@@ -13,6 +13,15 @@ jobs:
       ZIG_VERSION: "0.15.2"
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: clients/go/go.mod
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+          rustc --version
+          cargo --version
       - name: Install tools
         run: |
           brew install kcov
