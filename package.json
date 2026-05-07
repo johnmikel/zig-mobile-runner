@@ -5,12 +5,12 @@
   "main": "npm/index.mjs",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/zig-mobile-runner/zig-mobile-runner.git"
+    "url": "git+https://github.com/johnmikel/zig-mobile-runner.git"
   },
   "bugs": {
-    "url": "https://github.com/zig-mobile-runner/zig-mobile-runner/issues"
+    "url": "https://github.com/johnmikel/zig-mobile-runner/issues"
   },
-  "homepage": "https://github.com/zig-mobile-runner/zig-mobile-runner#readme",
+  "homepage": "https://github.com/johnmikel/zig-mobile-runner#readme",
   "bin": {
     "zmr": "npm/zmr.mjs",
     "zmr-init": "npm/init-app.mjs",
