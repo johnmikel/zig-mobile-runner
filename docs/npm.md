@@ -29,6 +29,8 @@ The package exposes:
 - `zmr-demo-ios`: creates, builds, and runs the generated iOS simulator demo
   through the real iOS pilot wrapper.
 - `import { runZmr, spawnZmr, resolveBinary } from "zig-mobile-runner"` for Node scripts.
+- packaged docs, schemas, examples, reference clients, and the reusable
+  `skills/zmr-mobile-testing` agent skill.
 
 ## App Setup
 
@@ -95,6 +97,10 @@ source or release-archive installs:
 zmr init --app --json --dir . --app-id com.example.mobiletest
 zmr doctor --strict --json --config .zmr/config.json
 ```
+
+See [ai-agents.md](ai-agents.md) for JSON-RPC agent workflows and
+[`../skills/zmr-mobile-testing/SKILL.md`](../skills/zmr-mobile-testing/SKILL.md)
+for the packaged agent skill.
 
 Omit `--android-shim` or `--ios-shim` for shell/screenshot-only smoke runs.
 Include them when the app repo provides native shim commands for faster

@@ -36,7 +36,9 @@ test("package exposes zmr bin and public files for npm publishing", () => {
   assert.ok(pkg.files.includes("clients/rust/examples/"));
   assert.ok(pkg.files.includes("src/"));
   assert.ok(pkg.files.includes("examples/"));
+  assert.ok(pkg.files.includes("skills/"));
   assert.ok(pkg.files.includes("shims/"));
+  assert.ok(pkg.files.includes("FEATURES.md"));
   assert.equal(pkg.scripts["zmr:demo"], "node npm/zmr.mjs validate examples/demo-fake.json");
 });
 
@@ -322,6 +324,7 @@ test("packed npm package installs in a temp app and drives zmr through .zmr", ()
     assert.match(tarList.stdout, /package\/scripts\/notarize-macos-release\.sh/);
     assert.match(tarList.stdout, /package\/scripts\/pilot-gate\.sh/);
     assert.match(tarList.stdout, /package\/schemas\/release-manifest\.schema\.json/);
+    assert.match(tarList.stdout, /package\/skills\/zmr-mobile-testing\/SKILL\.md/);
     assert.doesNotMatch(tarList.stdout, /__pycache__|\.pyc/);
 
     const appDir = path.join(tmp, "app");

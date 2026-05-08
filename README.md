@@ -2,7 +2,7 @@
 
 Local, agent-native mobile test automation for Android and iOS simulators.
 
-ZMR is a local mobile test runner designed for AI agents. It exposes typed device actions and structured observations instead of asking agents to scrape CLI output.
+ZMR is a local mobile test runner designed for AI agents. It exposes typed device actions and structured observations instead of asking agents to scrape CLI output. See [FEATURES.md](FEATURES.md) for the current product surface and limitations.
 
 V1 uses Zig for orchestration, subprocess/device control, JSON-RPC, scenario execution, selector matching, wait/assertion logic, and trace generation. Android control uses ADB plus UI Automator hierarchy dumps. iOS simulator support uses `xcrun simctl` for lifecycle, deep links, screenshots, logs, and device discovery, with a local XCTest shim command for hierarchy and selector actions.
 
@@ -109,8 +109,10 @@ Then add scripts such as:
 }
 ```
 
-See [docs/npm.md](docs/npm.md) for npm packaging, [docs/app-integration.md](docs/app-integration.md) for app-side setup, [docs/publication.md](docs/publication.md) for public GitHub release steps, and [docs/scenario-authoring.md](docs/scenario-authoring.md) for resilient scenario patterns.
+See [docs/npm.md](docs/npm.md) for npm packaging, [docs/app-integration.md](docs/app-integration.md) for app-side setup, [docs/publication.md](docs/publication.md) for public GitHub release steps, [docs/ai-agents.md](docs/ai-agents.md) for agent integration, and [docs/scenario-authoring.md](docs/scenario-authoring.md) for resilient scenario patterns.
 The app-local config contract is documented in [docs/config.md](docs/config.md).
+Architecture decisions are tracked in [docs/adr/](docs/adr/), and the reusable
+agent skill lives at [skills/zmr-mobile-testing/SKILL.md](skills/zmr-mobile-testing/SKILL.md).
 
 For the real Sample App pilot, provide the sample app checkout and run:
 
@@ -162,7 +164,7 @@ Coverage is gated at 90% with `kcov`:
 ./scripts/coverage.sh
 ```
 
-Latest local run: `94.16%` line coverage, `5565/5910` lines.
+Latest local run: `93.65%` line coverage, `5809/6203` lines.
 On GitHub-hosted macOS runners, `coverage.sh` runs the full Zig test binary but
 skips `kcov` by default because `kcov` can hang while tracing child device-tool
 processes. Set `ZMR_FORCE_KCOV=1` to force the same coverage collection there.

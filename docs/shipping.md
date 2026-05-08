@@ -64,6 +64,10 @@ For the maintainer-facing GitHub upload and npm publication sequence, see
 - App-local `.zmr/config.json` schema and CLI default loading.
 - Internal iOS/Android shim protocol scaffolds under `shims/`.
 - Security, contribution, trace privacy, and protocol versioning docs.
+- Feature catalog in `FEATURES.md`.
+- Architecture decision records under `docs/adr/`.
+- AI agent integration guide in `docs/ai-agents.md`.
+- Reusable agent skill under `skills/zmr-mobile-testing/`.
 - Changelog and release notes template.
 - Android pilot scenarios:
   - `examples/android-app-auth-probe.json`

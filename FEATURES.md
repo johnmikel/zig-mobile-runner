@@ -1,0 +1,103 @@
+# Features
+
+Zig Mobile Runner is a local, agent-native mobile test runner for Android and
+iOS simulators. It is designed for external agents and normal test files: ZMR
+controls devices, exposes typed observations, executes actions, waits for UI
+state, and writes deterministic traces. It does not embed an LLM.
+
+## Platform Support
+
+- Android emulators and connected devices through ADB, UI Automator, and an
+  optional app-local instrumentation shim.
+- Android emulator lifecycle helpers for boot, wait-ready, reset, snapshot
+  restore, optional AVD creation, and optional screen recording.
+- iOS simulators through `xcrun simctl` for lifecycle, install, launch, deep
+  links, screenshots, logs, clear-state-by-uninstall, and device discovery.
+- iOS selector actions through an app-local XCTest/XCUIAutomation shim.
+- Physical iOS devices are not in the current support matrix.
+
+## App Integration
+
+- npm-first installation with `zig-mobile-runner` as a dev dependency.
+- `npx zmr-wizard` scaffolds `.zmr/config.json`, Android and iOS smoke
+  scenarios, optional app package scripts, and `traces/` gitignore rules.
+- `zmr init --app` provides the same app-local bootstrap for source and archive
+  installs.
+- `.zmr/config.json` is schema validated, auto-discovered from app checkouts,
+  and overridden by explicit CLI flags.
+- Android and iOS shim installers generate app-local commands and source files
+  without requiring ZMR state outside `.zmr/`.
+
+## Agent Interface
+
+- JSON-RPC v1 over newline-delimited stdio or localhost TCP.
+- `runner.capabilities`, `device.list`, `session.create`,
+  `observe.snapshot`, UI actions, waits, assertions, live trace events, and
+  redacted trace export.
+- TypeScript, Python, Go, and Rust reference clients.
+- Machine-readable CLI output for `zmr version --json`, `zmr schemas --json`,
+  `zmr doctor --json`, `zmr devices --json`, `zmr validate --json`,
+  `zmr run --json`, and `zmr explain --json`.
+- Public JSON Schemas for scenarios, snapshots, action results, trace events,
+  protocol messages, setup diagnostics, and release manifests.
+
+## Scenario Execution
+
+- JSON scenarios with launch, stop, clear state, open link, tap, type, erase
+  text, hide keyboard, swipe, back/home-equivalent navigation, waits,
+  assertions, snapshots, optional steps, conditionals, repeats, sleeps, and
+  scroll-until-visible.
+- Selector matching for text, text contains, content description, resource id,
+  class name, role/class, enabled/visible/selected state, and bounds-aware
+  target validation.
+- Wait and retry behavior around transient observation failures.
+- Import helper for a documented subset of common mobile-flow YAML commands
+  into native `.zmr/*.json` scenarios.
+
+## Traces And Diagnostics
+
+- Deterministic trace directories with `trace.json`, `events.jsonl`,
+  snapshots, screenshots, UI hierarchy artifacts, logs, timings, action inputs,
+  assertion results, and optional Android screen recordings.
+- Static trace viewer with timeline, screenshot and UI tree inspection,
+  selected node details, payloads, artifact links, and snapshot replay
+  controls.
+- `zmr explain` summarizes failed traces for humans and agents.
+- Redacted `.zmrtrace` export can replace or omit screenshots, omit screen
+  recordings, and redact common secrets plus app-configured denylist fields.
+
+## Reliability And Benchmarks
+
+- `zmr-benchmark` repeats ZMR scenarios with pass-rate, failure-count, and p95
+  duration gates.
+- `zmr-benchmark-command` records normalized rows for app-local baseline
+  commands without hardcoding another tool.
+- `zmr-compare-benchmarks` compares candidate and baseline rows into generic
+  reports.
+- `zmr-device-matrix` runs local Android/iOS smoke gates across configured
+  devices.
+- `zmr-pilot-gate` coordinates Android and iOS app-local pre-release pilot
+  checks.
+
+## Shipping Surface
+
+- Release archive builder with checksums, SPDX SBOM, third-party notices,
+  generated Homebrew formula, and `RELEASE_MANIFEST.json`.
+- npm package tarball generation with bundled prebuilt binaries.
+- Tagged release workflow with artifact attestation and optional npm
+  provenance publishing.
+- Security, contribution, trace privacy, troubleshooting, protocol versioning,
+  app integration, benchmarking, and publication docs.
+- Reusable agent skill under `skills/zmr-mobile-testing/`.
+
+## Current Limitations
+
+- Current release status is `0.1.0-dev`, a public developer preview rather than
+  a production-stable `1.0.0`.
+- Physical iOS devices and broad cloud device farm certification are out of
+  scope for this preview.
+- Public benchmark fixtures are generic. Performance claims for a real app
+  should come from equivalent app-local candidate and baseline runs.
+- Screenshot and video redaction is conservative: redacted exports can replace
+  screenshots with placeholders or omit visual artifacts, but they do not mask
+  pixels inside original raw captures.

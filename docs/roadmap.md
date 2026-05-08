@@ -1,7 +1,5 @@
 # ZMR Product Roadmap
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development or superpowers:executing-plans to implement roadmap tasks task-by-task. Keep TDD active, preserve the 90% coverage gate, and do not regress the fake-device demo.
-
 **Goal:** Make Zig Mobile Runner a shippable open-source mobile test runner for AI agents, with Android production support first and iOS production support next.
 
 **Product Thesis:** ZMR should feel like Playwright for mobile agents: fast typed control, rich observations, deterministic traces, and reliable isolation. It should beat shell-driven mobile automation by moving orchestration, waits, retries, traces, and protocol handling into a small Zig core while delegating platform-specific state and interaction to focused native adapters.

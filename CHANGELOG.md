@@ -22,6 +22,10 @@ All notable changes to Zig Mobile Runner are tracked here.
   coverage.
 - `zmr-benchmark-command` for timing app-local baseline commands and writing
   normalized rows that can be compared with ZMR benchmark results.
+- Feature catalog in `FEATURES.md`.
+- Architecture decision records under `docs/adr/`.
+- AI agent integration guide in `docs/ai-agents.md`.
+- Reusable `zmr-mobile-testing` agent skill under `skills/`.
 - `trace.events` JSON-RPC cursor polling for live trace events during long-running agent sessions.
 - Field, line, and column diagnostics in `zmr validate --json` for invalid scenarios.
 - Scenario authoring guide plus onboarding, referral deep-link, and error-state templates.
