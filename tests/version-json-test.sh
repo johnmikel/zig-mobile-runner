@@ -6,7 +6,7 @@ ZMR="$ROOT/zig-out/bin/zmr"
 
 OUTPUT="$("$ZMR" version --json)"
 grep -q '"name":"zmr"' <<< "$OUTPUT"
-grep -q '"version":"0.1.0-dev"' <<< "$OUTPUT"
+grep -q '"version":"0.1.0-dev.1"' <<< "$OUTPUT"
 grep -q '"protocolVersion":"2026-04-28"' <<< "$OUTPUT"
 grep -q '"minimumCompatibleProtocolVersion":"2026-04-28"' <<< "$OUTPUT"
 grep -q '"stability":"dev-preview"' <<< "$OUTPUT"

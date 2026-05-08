@@ -148,7 +148,7 @@ All notable changes to Zig Mobile Runner are tracked here.
 - Real app benchmark claims should be made from private app-local
   `zmr-compare-benchmarks` reports, not from generic public fixtures.
 
-## 0.1.0-dev
+## 0.1.0-dev.1
 
 Initial local dev preview:
 

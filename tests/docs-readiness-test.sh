@@ -44,10 +44,10 @@ grep -q 'npm pack --dry-run' "$ROOT/docs/publication.md"
 grep -q 'git status --short' "$ROOT/docs/publication.md"
 grep -q 'Do not commit generated traces' "$ROOT/docs/publication.md"
 grep -q 'docs/publication.md' "$ROOT/docs/shipping.md"
-grep -q 'v0.1.0-dev' "$ROOT/docs/publication.md"
-grep -q 'v0.1.0-dev' "$ROOT/docs/shipping.md"
-if grep -q 'v0.1.0-dev.1' "$ROOT/docs/publication.md" "$ROOT/docs/shipping.md"; then
-  echo "publication docs should use the current package tag v0.1.0-dev until the version is bumped" >&2
+grep -q 'v0.1.0-dev.1' "$ROOT/docs/publication.md"
+grep -q 'v0.1.0-dev.1' "$ROOT/docs/shipping.md"
+if grep -q 'v0.1.0-dev.2' "$ROOT/docs/publication.md" "$ROOT/docs/shipping.md"; then
+  echo "publication docs should use the current package tag v0.1.0-dev.1 until the version is bumped" >&2
   exit 1
 fi
 

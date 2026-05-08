@@ -1,4 +1,4 @@
-pub const runner_version = "0.1.0-dev";
+pub const runner_version = "0.1.0-dev.1";
 pub const protocol_version = "2026-04-28";
 pub const protocol_min_compatible_version = "2026-04-28";
 pub const protocol_stability = "dev-preview";
@@ -28,7 +28,7 @@ test "plain version output includes runner and protocol versions" {
 
     try writePlain(buffer.writer(std.testing.allocator));
 
-    try std.testing.expectEqualStrings("zmr 0.1.0-dev protocol 2026-04-28\n", buffer.items);
+    try std.testing.expectEqualStrings("zmr 0.1.0-dev.1 protocol 2026-04-28\n", buffer.items);
 }
 
 test "json version output includes protocol compatibility metadata" {
@@ -39,7 +39,7 @@ test "json version output includes protocol compatibility metadata" {
     try writeJson(buffer.writer(std.testing.allocator));
 
     try std.testing.expectEqualStrings(
-        "{\"name\":\"zmr\",\"version\":\"0.1.0-dev\",\"protocolVersion\":\"2026-04-28\",\"minimumCompatibleProtocolVersion\":\"2026-04-28\",\"stability\":\"dev-preview\",\"breakingChangePolicy\":\"version-and-changelog\"}\n",
+        "{\"name\":\"zmr\",\"version\":\"0.1.0-dev.1\",\"protocolVersion\":\"2026-04-28\",\"minimumCompatibleProtocolVersion\":\"2026-04-28\",\"stability\":\"dev-preview\",\"breakingChangePolicy\":\"version-and-changelog\"}\n",
         buffer.items,
     );
 }

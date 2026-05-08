@@ -14,7 +14,7 @@ V1 uses Zig for orchestration, subprocess/device control, JSON-RPC, scenario exe
 - Local runner only.
 - AI stays outside the runner.
 - JSON-RPC v1 is newline-delimited over stdio or localhost TCP.
-- Runner version: `0.1.0-dev`.
+- Runner version: `0.1.0-dev.1`.
 - Protocol version: `2026-04-28`.
 - Tested and pinned for the dev-preview release with Zig `0.15.2`.
 - Zig `0.16.x` migration is a compatibility milestone because its stdlib APIs changed across filesystem, process, writer, and time surfaces used by ZMR.

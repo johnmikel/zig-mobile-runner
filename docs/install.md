@@ -23,8 +23,8 @@ zig build
 
 ```bash
 ./scripts/build-release.sh
-tar -xzf dist/zmr-0.1.0-dev-aarch64-macos.15.0.tar.gz -C /tmp
-/tmp/zmr-0.1.0-dev-aarch64-macos.15.0/zmr version
+tar -xzf dist/zmr-0.1.0-dev.1-aarch64-macos.15.0.tar.gz -C /tmp
+/tmp/zmr-0.1.0-dev.1-aarch64-macos.15.0/zmr version
 ```
 
 Verify checksums:
