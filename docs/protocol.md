@@ -114,7 +114,7 @@ and method inventory for JSON-RPC clients. The result object is covered by
 iOS simulator, or physical iOS workflows are available.
 
 ```json
-{"name":"zmr","version":"0.1.0-dev.1","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator"],"automation":["simctl","xctest-shim"],"physicalDevices":false}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list"]}
+{"name":"zmr","version":"0.1.0-dev.1","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator","physical"],"automation":["simctl","devicectl","xctest-shim"],"physicalDevices":true}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list"]}
 ```
 
 ## Doctor Output Contract
@@ -199,8 +199,15 @@ The response is covered by `schemas/devices-output.schema.json`:
 {"platform":"android","count":1,"devices":[{"serial":"emulator-5554","state":"device"}]}
 ```
 
-For iOS, use `zmr devices --json --platform ios`; states come from `simctl`,
-for example `Booted`.
+For iOS simulators, use `zmr devices --json --platform ios`; states come from
+`simctl`, for example `Booted`. For physical iOS devices, use:
+
+```bash
+zmr devices --json --platform ios --ios-device-type physical
+```
+
+Physical-device states come from `devicectl` connection data, for example
+`connected`, `disconnected`, or `paired`.
 
 ## Start
 
@@ -208,9 +215,10 @@ for example `Booted`.
 zmr serve --transport stdio --device emulator-5554 --app-id com.example.mobiletest --trace-dir traces/agent-session
 zmr serve --transport tcp --port 8765 --device emulator-5554 --app-id com.example.mobiletest --trace-dir traces/agent-session
 zmr serve --transport stdio --platform ios --device <sim-udid> --app-id com.example.mobiletest --trace-dir traces/ios-agent-session
+zmr serve --transport stdio --platform ios --ios-device-type physical --device <device-udid> --app-id com.example.mobiletest --trace-dir traces/ios-physical-agent-session
 ```
 
-`runner.capabilities` reports `platforms: ["android","ios"]`, `platformSupport.ios.status: "supported"`, and legacy `iosPreview: false`. Android supports emulators and connected devices. iOS support is simulator-scoped: discovery, install, launch, stop, clear-state-by-uninstall, deep links, screenshots, logs, and snapshots run through `simctl`. iOS `app.clearState` is a best-effort `simctl uninstall <device> <bundle-id>`; if the app is already missing, the simulator is treated as clean. Selector-grade `ui.*` methods on iOS require a configured XCTest/XCUIAutomation shim command; without one they return `IosXCTestShimRequired`. With the shim configured, single-field `ui.tap`, selector-scoped `ui.type`, and selector-scoped `ui.eraseText` can execute directly through XCTest; compound selectors continue to use the portable snapshot-matching fallback. Physical iOS devices are intentionally reported as unsupported in this release.
+`runner.capabilities` reports `platforms: ["android","ios"]`, `platformSupport.ios.status: "supported"`, and legacy `iosPreview: false`. Android supports emulators and connected devices. iOS simulators use `simctl` for discovery, install, launch, stop, clear-state-by-uninstall, deep links, screenshots, logs, and snapshots. Physical iOS devices use `devicectl` for discovery, install, launch, deep-link launch, clear-state-by-uninstall, and best-effort stop. Selector-grade `ui.*` methods on iOS require a configured XCTest/XCUIAutomation shim command; without one they return `IosXCTestShimRequired`. With the shim configured, single-field `ui.tap`, selector-scoped `ui.type`, and selector-scoped `ui.eraseText` can execute directly through XCTest; compound selectors continue to use the portable snapshot-matching fallback. Physical iOS screenshot/log capture is intentionally limited in this release.
 
 ## Core Methods
 
@@ -218,7 +226,7 @@ zmr serve --transport stdio --platform ios --device <sim-udid> --app-id com.exam
 - `device.list`
 - `session.create`
 - `session.close`
-- `app.install` with `{ "path": "/path/app.apk" }` on Android or `{ "path": "/path/App.app" }` on iOS simulator
+- `app.install` with `{ "path": "/path/app.apk" }` on Android or `{ "path": "/path/App.app" }` on iOS
 - `app.launch`
 - `app.stop`
 - `app.openLink` with `{ "url": "exampleapp://e2e-auth?probe=1" }`
@@ -276,7 +284,7 @@ Request:
 Response:
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"name":"zmr","version":"0.1.0-dev.1","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator"],"automation":["simctl","xctest-shim"],"physicalDevices":false}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list","session.create","session.close","app.install","app.launch","app.stop","app.openLink","app.clearState","observe.snapshot","ui.tap","ui.type","ui.eraseText","ui.hideKeyboard","ui.swipe","ui.pressBack","ui.scrollUntilVisible","wait.until","wait.any","wait.gone","assert.visible","assert.notVisible","trace.events","trace.export"]}}
+{"jsonrpc":"2.0","id":1,"result":{"name":"zmr","version":"0.1.0-dev.1","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator","physical"],"automation":["simctl","devicectl","xctest-shim"],"physicalDevices":true}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list","session.create","session.close","app.install","app.launch","app.stop","app.openLink","app.clearState","observe.snapshot","ui.tap","ui.type","ui.eraseText","ui.hideKeyboard","ui.swipe","ui.pressBack","ui.scrollUntilVisible","wait.until","wait.any","wait.gone","assert.visible","assert.notVisible","trace.events","trace.export"]}}
 ```
 
 ### `trace.events`

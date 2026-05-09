@@ -23,20 +23,25 @@ Then it sends JSON-RPC methods such as:
 - `trace.export`
 
 Use clients when an AI agent, service, or test harness wants to drive ZMR
-programmatically instead of shelling out for each scenario.
+programmatically instead of shelling out for each scenario. For package-manager
+install commands, see [client-installation.md](client-installation.md).
 
 ## Language Layouts
 
 | Language | Files | Why it looks this way |
 | --- | --- | --- |
 | TypeScript | `clients/typescript/index.mjs`, `index.d.ts` | ESM runtime plus type declarations, no build step required |
-| Python | `clients/python/zmr_client.py` | Standard-library importable module that can be vendored |
+| Python | `clients/python/zmr_client.py`, `pyproject.toml` | Standard-library importable module that can be vendored or pip-installed from source |
 | Go | `clients/go/zmr/client.go` | Normal Go package inside a module |
 | Rust | `clients/rust/src/lib.rs` | Cargo library crate convention |
+| Swift | `clients/swift/Sources/ZMRClient/ZMRClient.swift` | SwiftPM package for macOS host-side tools |
+| Kotlin | `clients/kotlin/src/main/kotlin/dev/zmr/ZmrClient.kt` | Gradle/Kotlin source package for JVM host-side tools |
 
 Rust has `src/lib.rs` because Cargo expects a library crate there. The other
 clients do have equivalent entry points; they are just idiomatic for their
-languages rather than named `lib.rs`.
+languages rather than named `lib.rs`. Swift and Kotlin are useful for native
+mobile teams, but they still run on the development machine and drive the
+external `zmr` binary. They are not app-runtime SDKs.
 
 ## Quick Starts
 
@@ -62,6 +67,18 @@ Rust:
 
 ```bash
 cargo run --manifest-path clients/rust/Cargo.toml --example fake_session -- --server tests/fake-json-rpc-server.mjs
+```
+
+Swift:
+
+```bash
+swift build --package-path clients/swift
+```
+
+Kotlin:
+
+```bash
+gradle -p clients/kotlin build
 ```
 
 For real app usage, replace the fake server with `zmr serve --transport stdio`

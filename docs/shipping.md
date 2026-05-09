@@ -119,8 +119,9 @@ Run the pilot gates before publishing reliability or performance claims.
 - Automatic iOS workspace resolution when multiple workspace projects contain
   the same requested app target and bundle id. In that case, callers must pass
   `--project`.
-- Physical iOS device automation. The supported iOS target for this release is
-  local simulators.
+- Full physical iOS artifact parity. Physical iOS lifecycle and XCTest shim
+  interaction are supported locally, but screenshot/log capture still needs a
+  physical-device capture channel.
 - Pixel-level screenshot or video masking. Redacted bundles at present replace
   PNG screenshots with placeholder frames or omit screenshots entirely, and
   omit screen recordings instead of attempting visual masking.

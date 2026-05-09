@@ -26,6 +26,13 @@ All notable changes to Zig Mobile Runner are tracked here.
 - Architecture decision records under `docs/adr/`.
 - AI agent integration guide in `docs/ai-agents.md`.
 - Simplified market-facing README plus dedicated DSL, client, and positioning docs.
+- Client installation guide for npm, Homebrew, TypeScript, Python, Go, Rust,
+  Swift, and Kotlin.
+- SwiftPM and Kotlin/JVM reference clients for host-side native mobile team
+  automation.
+- Physical iOS discovery and lifecycle support through `xcrun devicectl`,
+  including install, launch, deep-link launch, clear-state uninstall, and
+  best-effort stop.
 - GitHub issue templates for bug reports and feature requests.
 - Reusable `zmr-mobile-testing` agent skill under `skills/`.
 - `trace.events` JSON-RPC cursor polling for live trace events during long-running agent sessions.
@@ -101,13 +108,13 @@ All notable changes to Zig Mobile Runner are tracked here.
 - `zmr import flow-yaml` now converts a supported subset of mobile-flow YAML commands into native `.zmr/*.json` scenarios.
 - Added `schemas/import-output.schema.json` for the machine-readable `zmr import --json` contract.
 - The no-device demo now shows config-driven `zmr doctor --json` smoke scenario diagnostics for missing files and malformed JSON.
-- `zmr devices --json` now emits machine-readable Android device and iOS simulator discovery output for setup scripts.
+- `zmr devices --json` now emits machine-readable Android device, iOS
+  simulator, and physical iOS discovery output for setup scripts.
 - Added `schemas/devices-output.schema.json` for the machine-readable `zmr devices --json` contract.
 - `zmr version --json` now emits machine-readable runner and protocol compatibility metadata for installers and generated clients.
 - Added `schemas/version-output.schema.json` for the machine-readable `zmr version --json` contract.
-- `runner.capabilities` now reports Android and iOS simulator support as
-  structured `platformSupport` metadata, with `iosPreview: false` and physical
-  iOS devices explicitly unsupported in the current support matrix.
+- `runner.capabilities` now reports Android, iOS simulator, and physical iOS
+  support as structured `platformSupport` metadata, with `iosPreview: false`.
 - Added `schemas/capabilities-output.schema.json` for the machine-readable
   `runner.capabilities` JSON-RPC result.
 - `zmr explain --json` now emits machine-readable failure triage for agents and CI.
@@ -140,11 +147,12 @@ All notable changes to Zig Mobile Runner are tracked here.
 - Android `openLink` now avoids blocking `am start -W`, retries when Android leaves the launcher foregrounded, and lets selector waits absorb transient observation command timeouts.
 - iOS simulators are supported for lifecycle, snapshots, logs, deep links,
   clear-state-by-uninstall, and selector-driven XCTest shim interaction.
-- Physical iOS devices are not in the current support matrix.
+- Physical iOS devices are supported for local lifecycle and selector-grade
+  XCTest shim interaction. Screenshot/log capture remains simulator-first.
 
 ### Known Limitations
 
-- Physical iOS device automation is not supported yet.
+- Physical iOS screenshot/log capture is not complete yet.
 - Broad cloud-device-farm certification is not included in this dev-preview
   release.
 - Real app benchmark claims should be made from private app-local
@@ -156,7 +164,8 @@ Initial local dev preview:
 
 - Zig CLI and JSON-RPC runner.
 - Android ADB/UI Automator adapter.
-- iOS simulator lifecycle/snapshot preview.
+- iOS simulator lifecycle, snapshots, logs, deep links, and selector-driven
+  XCTest shim preview.
 - Scenario runner with waits, assertions, selectors, retries, and trace writing.
 - Fake-device test harness and no-emulator demo.
 - Release archive script and CI workflows.

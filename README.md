@@ -1,6 +1,6 @@
 # Zig Mobile Runner
 
-> Agent-native mobile UI automation for Android and iOS simulators.
+> Agent-native mobile UI automation for Android, iOS simulators, and physical iOS devices.
 
 [![CI](https://github.com/johnmikel/zig-mobile-runner/actions/workflows/ci.yml/badge.svg)](https://github.com/johnmikel/zig-mobile-runner/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/johnmikel/zig-mobile-runner?include_prereleases)](https://github.com/johnmikel/zig-mobile-runner/releases)
@@ -22,7 +22,8 @@ ZMR through JSON-RPC, CLI JSON, scenarios, and language clients.
 - **App-local setup:** `.zmr/config.json`, smoke scenarios, shim commands, and
   traces live in the app repo.
 - **Android and iOS:** Android uses ADB/UI Automator plus an optional native
-  shim. iOS simulators use `simctl` plus an XCTest/XCUIAutomation shim.
+  shim. iOS simulators use `simctl`; physical iOS devices use `devicectl`;
+  selector-grade iOS automation uses the XCTest/XCUIAutomation shim.
 
 ## Install
 
@@ -54,6 +55,12 @@ zig build-exe src/main.zig -target aarch64-macos.15.0 -O Debug -femit-bin=zig-ou
 
 Release archives and npm tarballs are attached to GitHub releases. The npm
 registry package is pending publish with a rotated `NPM_TOKEN`.
+
+Homebrew is the preferred binary install for teams that do not use JavaScript:
+
+```bash
+brew install --build-from-source ./dist/homebrew/zmr.rb
+```
 
 ## Try It
 
@@ -151,15 +158,19 @@ zmr serve --transport stdio --config .zmr/config.json --trace-dir traces/zmr-age
 | Language | Entry point | Example |
 | --- | --- | --- |
 | TypeScript | `clients/typescript/index.mjs` + `index.d.ts` | `node clients/typescript/examples/fake-session.mjs` |
-| Python | `clients/python/zmr_client.py` | `python3 clients/python/examples/fake_session.py` |
+| Python | `clients/python/zmr_client.py` + `pyproject.toml` | `python3 clients/python/examples/fake_session.py` |
 | Go | `clients/go/zmr/client.go` | `go run ./clients/go/examples/fake-session` |
 | Rust | `clients/rust/src/lib.rs` | `cargo run --manifest-path clients/rust/Cargo.toml --example fake_session` |
+| Swift | `clients/swift/Sources/ZMRClient` | `swift build --package-path clients/swift` |
+| Kotlin | `clients/kotlin/src/main/kotlin/dev/zmr` | `gradle -p clients/kotlin build` |
 
 Rust uses `src/lib.rs` because that is the idiomatic crate layout. TypeScript
-uses `index.mjs` plus declarations, Python uses one importable module, and Go
-uses a package directory under `clients/go/zmr`.
+uses `index.mjs` plus declarations, Python uses a pip-installable module, Go
+uses a package directory under `clients/go/zmr`, Swift uses SwiftPM, and Kotlin
+uses Gradle.
 
-See [clients/README.md](clients/README.md) and [docs/ai-agents.md](docs/ai-agents.md).
+See [clients/README.md](clients/README.md), [docs/client-installation.md](docs/client-installation.md),
+and [docs/ai-agents.md](docs/ai-agents.md).
 
 ## Platform Support
 
@@ -168,7 +179,7 @@ See [clients/README.md](clients/README.md) and [docs/ai-agents.md](docs/ai-agent
 | Android emulator | Supported | ADB/UI Automator, optional Android shim, emulator lifecycle helpers |
 | Android physical device | Supported | Requires ADB connection and app build/install surface |
 | iOS simulator | Supported | `simctl` plus app-local XCTest/XCUIAutomation shim |
-| iOS physical device | Not yet | Planned after simulator shim hardening |
+| iOS physical device | Supported | `devicectl` lifecycle plus app-local XCTest/XCUIAutomation shim; screenshot/log capture is simulator-first |
 | Cloud device farms | Not yet | Planned after local matrix certification |
 
 Current release: `0.1.0-dev.1` developer preview. Protocol version:
@@ -182,6 +193,7 @@ Current release: `0.1.0-dev.1` developer preview. Protocol version:
 - [docs/protocol.md](docs/protocol.md): JSON-RPC methods and schemas
 - [docs/dsl.md](docs/dsl.md): scenario DSL decision and roadmap
 - [docs/clients.md](docs/clients.md): language client guide
+- [docs/client-installation.md](docs/client-installation.md): npm, Homebrew, TS, Python, Go, Rust, Swift, and Kotlin setup
 - [docs/market-positioning.md](docs/market-positioning.md): competitive positioning
 - [docs/adr/](docs/adr/): architecture decision records
 - [docs/shipping.md](docs/shipping.md): release gate and support matrix

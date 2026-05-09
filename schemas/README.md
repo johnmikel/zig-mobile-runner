@@ -12,7 +12,7 @@ This directory contains draft 2020-12 JSON Schemas for public ZMR file and proto
 - `doctor-output.schema.json`: machine-readable `zmr doctor --json` setup diagnostics, including remediation hints for actionable checks
 - `init-output.schema.json`: machine-readable `zmr init --json` bootstrap output for scenario and app-local `.zmr/` initialization
 - `import-output.schema.json`: machine-readable `zmr import --json` output for one-time scenario migration helpers
-- `devices-output.schema.json`: machine-readable `zmr devices --json` output for Android device and iOS simulator discovery
+- `devices-output.schema.json`: machine-readable `zmr devices --json` output for Android, iOS simulator, and physical iOS discovery
 - `validate-output.schema.json`: machine-readable `zmr validate --json` scenario preflight output
 - `version-output.schema.json`: machine-readable `zmr version --json` output for runner and protocol compatibility discovery
 - `capabilities-output.schema.json`: machine-readable `runner.capabilities` JSON-RPC result for protocol, platform support, transport, and method discovery

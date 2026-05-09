@@ -36,7 +36,7 @@ func TestClientDrivesFakeSession(t *testing.T) {
 		t.Fatal("iOS should be reported as supported, not preview")
 	}
 	iosSupport := capabilities.PlatformSupport["ios"]
-	if iosSupport.Status != "supported" || len(iosSupport.DeviceTypes) != 1 || iosSupport.DeviceTypes[0] != "simulator" || iosSupport.PhysicalDevices {
+	if iosSupport.Status != "supported" || len(iosSupport.DeviceTypes) != 2 || iosSupport.DeviceTypes[0] != "simulator" || iosSupport.DeviceTypes[1] != "physical" || !iosSupport.PhysicalDevices {
 		t.Fatalf("unexpected iOS platform support: %+v", iosSupport)
 	}
 

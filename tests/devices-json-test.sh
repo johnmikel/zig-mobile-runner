@@ -16,3 +16,12 @@ grep -q '"platform":"ios"' <<< "$IOS_JSON"
 grep -q '"count":1' <<< "$IOS_JSON"
 grep -q '"serial":"fake-ios-1"' <<< "$IOS_JSON"
 grep -q '"state":"Booted"' <<< "$IOS_JSON"
+
+IOS_PHYSICAL_JSON="$("$ZMR" devices --json --platform ios --ios-device-type physical --xcrun "$ROOT/tests/fake-xcrun.sh")"
+grep -q '"platform":"ios"' <<< "$IOS_PHYSICAL_JSON"
+grep -q '"count":1' <<< "$IOS_PHYSICAL_JSON"
+grep -q '"serial":"fake-physical-ios-1"' <<< "$IOS_PHYSICAL_JSON"
+grep -q '"state":"connected"' <<< "$IOS_PHYSICAL_JSON"
+
+IOS_ALL_JSON="$("$ZMR" devices --json --platform ios --ios-device-type all --xcrun "$ROOT/tests/fake-xcrun.sh")"
+grep -q '"count":2' <<< "$IOS_ALL_JSON"

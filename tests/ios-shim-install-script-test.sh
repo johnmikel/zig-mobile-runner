@@ -23,6 +23,8 @@ bash -n "$TMPDIR/app/.zmr/ios-shim"
 
 grep -q 'xcodebuild test' "$TMPDIR/app/.zmr/ios-shim"
 grep -q 'cd "'"$TMPDIR/app"'"' "$TMPDIR/app/.zmr/ios-shim"
+grep -q 'destination_spec' "$TMPDIR/app/.zmr/ios-shim"
+grep -q 'platform_name="iOS Simulator"' "$TMPDIR/app/.zmr/ios-shim"
 grep -q -- '-project "ios/Sample.xcodeproj"' "$TMPDIR/app/.zmr/ios-shim"
 grep -q -- '-derivedDataPath "ios/build/ZMRDerivedData"' "$TMPDIR/app/.zmr/ios-shim"
 grep -q 'ZMR_SHIM_REQUEST_FILE' "$TMPDIR/app/.zmr/ios-shim"
@@ -73,3 +75,15 @@ grep -q 'selector.unsupported' "$TMPDIR/app/.zmr/ZMRShimUITestCase.swift"
 grep -q 'ZMR_SHIM_REQUEST_FILE' "$TMPDIR/app/.zmr/ZMRShimUITests-Info.plist"
 grep -q 'ZMR_SHIM_MODE' "$TMPDIR/app/.zmr/ZMRShimUITests-Info.plist"
 grep -q 'ZMR_SHIM_SERVER_DIR' "$TMPDIR/app/.zmr/ZMRShimUITests-Info.plist"
+
+"$ROOT/scripts/install-ios-shim.sh" \
+  --app-root "$TMPDIR/physical-app" \
+  --scheme SampleUITests \
+  --project ios/Sample.xcodeproj \
+  --bundle-id com.example.mobiletest \
+  --device fake-physical-ios-1 \
+  --device-type physical
+
+bash -n "$TMPDIR/physical-app/.zmr/ios-shim"
+grep -q 'platform_name="iOS"' "$TMPDIR/physical-app/.zmr/ios-shim"
+grep -q 'local destination_id="fake-physical-ios-1"' "$TMPDIR/physical-app/.zmr/ios-shim"

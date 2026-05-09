@@ -10,7 +10,7 @@ test -f "$ROOT/clients/go/examples/fake-session/main.go"
 
 (
   cd "$ROOT/clients/go"
-  go test ./...
+  go test -count=1 ./...
 )
 
 (

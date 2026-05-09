@@ -1,0 +1,20 @@
+# ZMR Swift Client
+
+Small Foundation-based client for macOS test harnesses and agents that drive
+`zmr serve --transport stdio`.
+
+Add it to a Swift package. Until this client is published as a standalone Swift
+package, consume it from a local checkout:
+
+```bash
+git submodule add https://github.com/johnmikel/zig-mobile-runner.git vendor/zig-mobile-runner
+```
+
+```swift
+.package(path: "vendor/zig-mobile-runner/clients/swift")
+```
+
+Then depend on the `ZMRClient` product from `clients/swift`.
+
+The Swift client is host-side. It is for macOS automation code, not code that
+runs inside the iOS app.

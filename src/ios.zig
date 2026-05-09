@@ -10,12 +10,18 @@ const shim_timeout_ms = 180_000;
 const simctl_retry_attempts = 6;
 const simctl_retry_delay_ms = 500;
 
+pub const TargetKind = enum {
+    simulator,
+    physical,
+};
+
 pub const IosDevice = struct {
     allocator: std.mem.Allocator,
     xcrun_path: []const u8 = "xcrun",
     udid: ?[]const u8 = null,
     app_id: []const u8,
     shim_path: ?[]const u8 = null,
+    target_kind: TargetKind = .simulator,
 
     pub fn init(
         allocator: std.mem.Allocator,
@@ -33,6 +39,17 @@ pub const IosDevice = struct {
         app_id: []const u8,
         shim_path: ?[]const u8,
     ) !IosDevice {
+        return try initWithKindAndShim(allocator, xcrun_path, udid, app_id, .simulator, shim_path);
+    }
+
+    pub fn initWithKindAndShim(
+        allocator: std.mem.Allocator,
+        xcrun_path: []const u8,
+        udid: ?[]const u8,
+        app_id: []const u8,
+        target_kind: TargetKind,
+        shim_path: ?[]const u8,
+    ) !IosDevice {
         const owned_xcrun = try allocator.dupe(u8, xcrun_path);
         errdefer allocator.free(owned_xcrun);
         const owned_udid = try types.dupeOptional(allocator, udid);
@@ -47,6 +64,7 @@ pub const IosDevice = struct {
             .udid = owned_udid,
             .app_id = owned_app_id,
             .shim_path = owned_shim_path,
+            .target_kind = target_kind,
         };
     }
 
@@ -58,28 +76,35 @@ pub const IosDevice = struct {
     }
 
     pub fn listDevices(self: *IosDevice) ![]types.DeviceInfo {
-        return try listDevicesWithPath(self.allocator, self.xcrun_path);
+        return switch (self.target_kind) {
+            .simulator => try listDevicesWithPath(self.allocator, self.xcrun_path),
+            .physical => try listPhysicalDevicesWithPath(self.allocator, self.xcrun_path),
+        };
     }
 
     pub fn install(self: *IosDevice, app_path: []const u8) !void {
+        if (self.target_kind == .physical) return try self.installPhysical(app_path);
         const result = try self.runSimctl(&.{ "install", self.target(), app_path }, default_max_output);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
     }
 
     pub fn launch(self: *IosDevice) !void {
+        if (self.target_kind == .physical) return try self.launchPhysical(null);
         const result = try self.runSimctl(&.{ "launch", self.target(), self.app_id }, default_max_output);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
     }
 
     pub fn stop(self: *IosDevice) !void {
+        if (self.target_kind == .physical) return try self.stopPhysicalBestEffort();
         const result = try self.runSimctl(&.{ "terminate", self.target(), self.app_id }, default_max_output);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
     }
 
     pub fn clearState(self: *IosDevice) !void {
+        if (self.target_kind == .physical) return try self.uninstallPhysicalBestEffort();
         const result = try self.runSimctl(&.{ "uninstall", self.target(), self.app_id }, default_max_output);
         defer result.deinit(self.allocator);
         if (isMissingInstalledApp(result)) return;
@@ -87,6 +112,7 @@ pub const IosDevice = struct {
     }
 
     pub fn openLink(self: *IosDevice, url: []const u8) !void {
+        if (self.target_kind == .physical) return try self.launchPhysical(url);
         const result = try self.runSimctl(&.{ "openurl", self.target(), url }, default_max_output);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
@@ -186,6 +212,7 @@ pub const IosDevice = struct {
     }
 
     fn captureScreenshot(self: *IosDevice) ![]u8 {
+        if (self.target_kind == .physical) return error.IosPhysicalScreenshotUnsupported;
         const path = try std.fmt.allocPrint(self.allocator, "/tmp/zmr-ios-screenshot-{d}.png", .{std.time.nanoTimestamp()});
         defer self.allocator.free(path);
         defer std.fs.cwd().deleteFile(path) catch {};
@@ -197,6 +224,7 @@ pub const IosDevice = struct {
     }
 
     fn logDelta(self: *IosDevice) !?[]const u8 {
+        if (self.target_kind == .physical) return null;
         const result = try self.runSimctl(&.{ "spawn", self.target(), "log", "show", "--style", "compact", "--last", "30s" }, 1024 * 1024);
         defer result.deinit(self.allocator);
         if (result.term != .Exited or result.term.Exited != 0) return null;
@@ -246,6 +274,52 @@ pub const IosDevice = struct {
     fn runSimctl(self: *IosDevice, extra: []const []const u8, max_output_bytes: usize) !command.ExecResult {
         return try runSimctlCommand(self.allocator, self.xcrun_path, extra, max_output_bytes);
     }
+
+    fn installPhysical(self: *IosDevice, app_path: []const u8) !void {
+        const result = try self.runDevicectl(&.{ "device", "install", "app", "--device", self.target(), app_path }, default_max_output);
+        defer result.deinit(self.allocator);
+        try result.ensureSuccess();
+    }
+
+    fn launchPhysical(self: *IosDevice, url: ?[]const u8) !void {
+        var argv = std.ArrayList([]const u8).empty;
+        defer argv.deinit(self.allocator);
+        try argv.appendSlice(self.allocator, &.{ "device", "process", "launch", "--device", self.target(), "--terminate-existing" });
+        if (url) |value| try argv.appendSlice(self.allocator, &.{ "--payload-url", value });
+        try argv.append(self.allocator, self.app_id);
+
+        const result = try self.runDevicectl(argv.items, default_max_output);
+        defer result.deinit(self.allocator);
+        try result.ensureSuccess();
+    }
+
+    fn stopPhysicalBestEffort(self: *IosDevice) !void {
+        const process_json = self.runDevicectlJson(&.{ "device", "info", "processes", "--device", self.target() }) catch return;
+        defer self.allocator.free(process_json);
+        const pid = findPidForBundleId(self.allocator, process_json, self.app_id) catch null;
+        if (pid) |value| {
+            const pid_text = try std.fmt.allocPrint(self.allocator, "{d}", .{value});
+            defer self.allocator.free(pid_text);
+            const result = try self.runDevicectl(&.{ "device", "process", "terminate", "--device", self.target(), "--pid", pid_text }, default_max_output);
+            defer result.deinit(self.allocator);
+            try result.ensureSuccess();
+        }
+    }
+
+    fn uninstallPhysicalBestEffort(self: *IosDevice) !void {
+        const result = try self.runDevicectl(&.{ "device", "uninstall", "app", "--device", self.target(), self.app_id }, default_max_output);
+        defer result.deinit(self.allocator);
+        if (isMissingInstalledApp(result)) return;
+        try result.ensureSuccess();
+    }
+
+    fn runDevicectl(self: *IosDevice, extra: []const []const u8, max_output_bytes: usize) !command.ExecResult {
+        return try runDevicectlCommand(self.allocator, self.xcrun_path, extra, max_output_bytes);
+    }
+
+    fn runDevicectlJson(self: *IosDevice, extra: []const []const u8) ![]u8 {
+        return try runDevicectlJsonCommand(self.allocator, self.xcrun_path, extra);
+    }
 };
 
 fn parsePngViewport(bytes: []const u8) ?types.Viewport {
@@ -268,6 +342,10 @@ fn readBigEndianU32(bytes: []const u8) u32 {
 
 pub fn listDevices(allocator: std.mem.Allocator, xcrun_path: []const u8) ![]types.DeviceInfo {
     return try listDevicesWithPath(allocator, xcrun_path);
+}
+
+pub fn listPhysicalDevices(allocator: std.mem.Allocator, xcrun_path: []const u8) ![]types.DeviceInfo {
+    return try listPhysicalDevicesWithPath(allocator, xcrun_path);
 }
 
 fn listDevicesWithPath(allocator: std.mem.Allocator, xcrun_path: []const u8) ![]types.DeviceInfo {
@@ -299,6 +377,48 @@ fn runSimctlCommand(
         attempt += 1;
         std.Thread.sleep(simctl_retry_delay_ms * std.time.ns_per_ms);
     }
+}
+
+fn runDevicectlCommand(
+    allocator: std.mem.Allocator,
+    xcrun_path: []const u8,
+    extra: []const []const u8,
+    max_output_bytes: usize,
+) !command.ExecResult {
+    var argv = std.ArrayList([]const u8).empty;
+    defer argv.deinit(allocator);
+    try argv.append(allocator, xcrun_path);
+    try argv.append(allocator, "devicectl");
+    try argv.appendSlice(allocator, extra);
+    return try command.run(allocator, argv.items, max_output_bytes);
+}
+
+fn runDevicectlJsonCommand(
+    allocator: std.mem.Allocator,
+    xcrun_path: []const u8,
+    extra: []const []const u8,
+) ![]u8 {
+    const path = try std.fmt.allocPrint(allocator, "/tmp/zmr-devicectl-{d}.json", .{std.time.nanoTimestamp()});
+    defer allocator.free(path);
+    defer std.fs.cwd().deleteFile(path) catch {};
+
+    var argv = std.ArrayList([]const u8).empty;
+    defer argv.deinit(allocator);
+    try argv.append(allocator, xcrun_path);
+    try argv.append(allocator, "devicectl");
+    try argv.appendSlice(allocator, extra);
+    try argv.appendSlice(allocator, &.{ "--json-output", path, "--quiet" });
+
+    const result = try command.run(allocator, argv.items, default_max_output);
+    defer result.deinit(allocator);
+    try result.ensureSuccess();
+    return try std.fs.cwd().readFileAlloc(allocator, path, default_max_output);
+}
+
+fn listPhysicalDevicesWithPath(allocator: std.mem.Allocator, xcrun_path: []const u8) ![]types.DeviceInfo {
+    const json = try runDevicectlJsonCommand(allocator, xcrun_path, &.{ "list", "devices" });
+    defer allocator.free(json);
+    return try parsePhysicalDevicesJson(allocator, json);
 }
 
 fn isRetriableSimctlFailure(result: command.ExecResult) bool {
@@ -345,6 +465,87 @@ pub fn parseDevicesJson(allocator: std.mem.Allocator, content: []const u8) ![]ty
     }
 
     return try devices.toOwnedSlice(allocator);
+}
+
+pub fn parsePhysicalDevicesJson(allocator: std.mem.Allocator, content: []const u8) ![]types.DeviceInfo {
+    const parsed = try std.json.parseFromSlice(std.json.Value, allocator, content, .{});
+    defer parsed.deinit();
+    if (parsed.value != .object) return error.DevicectlDevicesMustBeObject;
+    const result_value = parsed.value.object.get("result") orelse return error.DevicectlDevicesMissingResult;
+    if (result_value != .object) return error.DevicectlDevicesMustBeObject;
+    const devices_value = result_value.object.get("devices") orelse return error.DevicectlDevicesMissingDevices;
+    if (devices_value != .array) return error.DevicectlDevicesMustBeArray;
+
+    var devices = std.ArrayList(types.DeviceInfo).empty;
+    errdefer {
+        for (devices.items) |device| device.deinit(allocator);
+        devices.deinit(allocator);
+    }
+
+    for (devices_value.array.items) |device_value| {
+        if (device_value != .object) continue;
+        const object = device_value.object;
+        const hardware = fieldObject(object, "hardwareProperties") orelse continue;
+        if (!fieldStringEquals(hardware, "platform", "iOS")) continue;
+        if (!fieldStringEquals(hardware, "reality", "physical")) continue;
+        const serial = fieldString(hardware, "udid") orelse fieldString(object, "identifier") orelse continue;
+        const connection = fieldObject(object, "connectionProperties");
+        const state = if (connection) |value|
+            fieldString(value, "tunnelState") orelse fieldString(value, "pairingState") orelse "available"
+        else
+            "available";
+        try devices.append(allocator, .{
+            .serial = try allocator.dupe(u8, serial),
+            .state = try allocator.dupe(u8, state),
+        });
+    }
+
+    return try devices.toOwnedSlice(allocator);
+}
+
+fn fieldObject(object: std.json.ObjectMap, key: []const u8) ?std.json.ObjectMap {
+    const value = object.get(key) orelse return null;
+    if (value != .object) return null;
+    return value.object;
+}
+
+fn fieldStringEquals(object: std.json.ObjectMap, key: []const u8, expected: []const u8) bool {
+    const value = fieldString(object, key) orelse return false;
+    return std.mem.eql(u8, value, expected);
+}
+
+fn findPidForBundleId(allocator: std.mem.Allocator, content: []const u8, app_id: []const u8) !?i64 {
+    const parsed = try std.json.parseFromSlice(std.json.Value, allocator, content, .{});
+    defer parsed.deinit();
+    return findPidInValue(parsed.value, app_id);
+}
+
+fn findPidInValue(value: std.json.Value, app_id: []const u8) ?i64 {
+    switch (value) {
+        .object => |object| {
+            var has_bundle = false;
+            var pid: ?i64 = null;
+            var iterator = object.iterator();
+            while (iterator.next()) |entry| {
+                if (entry.value_ptr.* == .string and std.mem.eql(u8, entry.value_ptr.string, app_id)) {
+                    has_bundle = true;
+                }
+                if (std.mem.indexOf(u8, entry.key_ptr.*, "pid") != null or std.mem.indexOf(u8, entry.key_ptr.*, "processIdentifier") != null) {
+                    if (entry.value_ptr.* == .integer) pid = entry.value_ptr.integer;
+                }
+                if (findPidInValue(entry.value_ptr.*, app_id)) |nested| return nested;
+            }
+            if (has_bundle) return pid;
+            return null;
+        },
+        .array => |array| {
+            for (array.items) |item| {
+                if (findPidInValue(item, app_id)) |pid| return pid;
+            }
+            return null;
+        },
+        else => return null,
+    }
 }
 
 fn fieldString(object: std.json.ObjectMap, key: []const u8) ?[]const u8 {
@@ -510,6 +711,69 @@ test "ios device listing retries transient CoreSimulator failures" {
 
     try std.testing.expectEqual(@as(usize, 1), devices.len);
     try std.testing.expectEqualStrings("retry-ios-1", devices[0].serial);
+}
+
+test "ios physical device adapter lists devices and supports devicectl lifecycle" {
+    const allocator = std.testing.allocator;
+
+    const devices = try listPhysicalDevices(allocator, "./tests/fake-xcrun.sh");
+    defer {
+        for (devices) |device| device.deinit(allocator);
+        allocator.free(devices);
+    }
+    try std.testing.expectEqual(@as(usize, 1), devices.len);
+    try std.testing.expectEqualStrings("fake-physical-ios-1", devices[0].serial);
+    try std.testing.expectEqualStrings("connected", devices[0].state);
+
+    var device = try IosDevice.initWithKindAndShim(allocator, "./tests/fake-xcrun.sh", "fake-physical-ios-1", "com.example.mobiletest", .physical, null);
+    defer device.deinit();
+
+    try device.install("/tmp/Sample.app");
+    try device.launch();
+    try device.openLink("exampleapp:///e2e-auth?probe=1");
+    try device.stop();
+    try device.clearState();
+
+    var snapshot = try device.snapshot(null);
+    defer snapshot.deinit(allocator);
+    try std.testing.expectEqualStrings("com.example.mobiletest", snapshot.active_package.?);
+    try std.testing.expect(snapshot.screenshot_artifact == null);
+    try std.testing.expect(snapshot.log_delta == null);
+}
+
+test "ios physical devicectl parser filters iOS physical devices" {
+    const allocator = std.testing.allocator;
+    const devices = try parsePhysicalDevicesJson(allocator,
+        \\{
+        \\  "result": {
+        \\    "devices": [
+        \\      {
+        \\        "identifier": "coredevice-1",
+        \\        "connectionProperties": {"pairingState": "paired", "tunnelState": "connected"},
+        \\        "hardwareProperties": {"platform": "iOS", "reality": "physical", "udid": "physical-1"}
+        \\      },
+        \\      {
+        \\        "identifier": "sim-1",
+        \\        "connectionProperties": {"pairingState": "paired"},
+        \\        "hardwareProperties": {"platform": "iOS", "reality": "virtual", "udid": "sim-1"}
+        \\      },
+        \\      {
+        \\        "identifier": "watch-1",
+        \\        "connectionProperties": {"pairingState": "paired"},
+        \\        "hardwareProperties": {"platform": "watchOS", "udid": "watch-1"}
+        \\      }
+        \\    ]
+        \\  }
+        \\}
+    );
+    defer {
+        for (devices) |device| device.deinit(allocator);
+        allocator.free(devices);
+    }
+
+    try std.testing.expectEqual(@as(usize, 1), devices.len);
+    try std.testing.expectEqualStrings("physical-1", devices[0].serial);
+    try std.testing.expectEqualStrings("connected", devices[0].state);
 }
 
 test "ios selector-grade interactions require XCTest shim" {

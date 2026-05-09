@@ -10,6 +10,9 @@ zmr serve --transport stdio --config .zmr/config.json --trace-dir traces/zmr-age
 They are intended for AI agents, CI harnesses, and app teams that want typed
 or idiomatic calls without reimplementing JSON-RPC framing.
 
+For install commands across package managers, see
+[docs/client-installation.md](../docs/client-installation.md).
+
 ## TypeScript
 
 Runtime: `clients/typescript/index.mjs`
@@ -33,6 +36,10 @@ const zmr = createZmrClient({
 Runtime: `clients/python/zmr_client.py`
 
 ```bash
+python3 -m pip install "git+https://github.com/johnmikel/zig-mobile-runner.git#subdirectory=clients/python"
+```
+
+```bash
 python3 clients/python/examples/fake_session.py
 ```
 
@@ -48,6 +55,10 @@ with ZmrClient("zmr", ["serve", "--transport", "stdio", "--config", ".zmr/config
 Runtime: `clients/go/zmr/client.go`
 
 ```bash
+go get github.com/johnmikel/zig-mobile-runner/clients/go@main
+```
+
+```bash
 go run ./clients/go/examples/fake-session --server tests/fake-json-rpc-server.mjs
 ```
 
@@ -59,6 +70,18 @@ client, err := zmr.Start(ctx, "zmr", "serve", "--transport", "stdio", "--config"
 
 Runtime: `clients/rust/src/lib.rs`
 
+Cargo packages library code from `src/lib.rs` by convention. Because this repo
+is not yet published as a Rust crate, consume the client from a local checkout:
+
+```bash
+git submodule add https://github.com/johnmikel/zig-mobile-runner.git vendor/zig-mobile-runner
+```
+
+```toml
+[dependencies]
+zmr-client = { path = "vendor/zig-mobile-runner/clients/rust" }
+```
+
 ```bash
 cargo run --manifest-path clients/rust/Cargo.toml --example fake_session -- --server tests/fake-json-rpc-server.mjs
 ```
@@ -68,7 +91,37 @@ let mut client = zmr_client::Client::start("zmr", ["serve", "--transport", "stdi
 let snapshot = client.snapshot()?;
 ```
 
+## Swift
+
+Runtime: `clients/swift/Sources/ZMRClient/ZMRClient.swift`
+
+Use the Swift client from a local SwiftPM package path until it is published as
+a standalone Swift package:
+
+```bash
+git submodule add https://github.com/johnmikel/zig-mobile-runner.git vendor/zig-mobile-runner
+```
+
+```swift
+.package(path: "vendor/zig-mobile-runner/clients/swift")
+```
+
+Swift is useful for macOS host-side automation next to iOS app code. It is not
+an SDK embedded in the app under test.
+
+## Kotlin
+
+Runtime: `clients/kotlin/src/main/kotlin/dev/zmr/ZmrClient.kt`
+
+```bash
+git submodule add https://github.com/johnmikel/zig-mobile-runner.git vendor/zig-mobile-runner
+gradle -p vendor/zig-mobile-runner/clients/kotlin build
+```
+
+Kotlin is useful for Android teams that want host-side orchestration in Kotlin.
+It still drives the external `zmr` binary.
+
 Rust has `src/lib.rs` because Cargo packages libraries from that path by
 convention. The other clients use the equivalent idiomatic layout for their
-ecosystem: ESM entry file for TypeScript, a single importable module for
-Python, and a package directory for Go.
+ecosystem: ESM entry file for TypeScript, a pip-installable Python module, a Go
+package directory, a SwiftPM package, and a Gradle/Kotlin source package.

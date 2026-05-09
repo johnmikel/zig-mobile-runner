@@ -34,10 +34,16 @@ require_file docs/shipping.md
 require_file docs/trace-privacy.md
 require_file docs/ai-agents.md
 require_file docs/clients.md
+require_file docs/client-installation.md
 require_file docs/dsl.md
 require_file docs/market-positioning.md
 require_file docs/adr/README.md
 require_file schemas/README.md
+require_file clients/python/pyproject.toml
+require_file clients/swift/Package.swift
+require_file clients/swift/Sources/ZMRClient/ZMRClient.swift
+require_file clients/kotlin/build.gradle.kts
+require_file clients/kotlin/src/main/kotlin/dev/zmr/ZmrClient.kt
 require_file skills/zmr-mobile-testing/SKILL.md
 
 require_file .github/ISSUE_TEMPLATE/bug_report.yml
@@ -52,7 +58,7 @@ require_grep '## Scenario Example' README.md
 require_grep 'JSON is strict' README.md
 require_grep '## Agent And Language Clients' README.md
 require_grep 'Rust uses `src/lib.rs`' README.md
-require_grep 'iOS simulators use `simctl` plus an XCTest/XCUIAutomation shim' README.md
+require_grep 'physical iOS devices use `devicectl`' README.md
 require_grep 'iOS physical device' README.md
 require_grep 'zmr validate --json' README.md
 require_grep 'zmr devices --json' README.md
@@ -72,14 +78,15 @@ require_grep 'explain-output.schema.json' README.md
 require_grep 'docs/adr/' README.md
 require_grep 'docs/ai-agents.md' README.md
 require_grep 'docs/clients.md' README.md
+require_grep 'docs/client-installation.md' README.md
 require_grep 'docs/dsl.md' README.md
 require_grep 'docs/market-positioning.md' README.md
 require_grep 'skills/zmr-mobile-testing/SKILL.md' README.md
 
 require_grep 'Agent Interface' FEATURES.md
 require_grep 'Current Limitations' FEATURES.md
-require_grep 'Physical iOS devices are not in the current support matrix' FEATURES.md
-require_grep 'Physical iOS devices are not in the current support matrix' CHANGELOG.md
+require_grep 'Physical iOS devices through `xcrun devicectl`' FEATURES.md
+require_grep 'Physical iOS devices are supported for local lifecycle' CHANGELOG.md
 require_grep 'Architecture decision records' CHANGELOG.md
 require_grep 'AI agent integration guide' CHANGELOG.md
 require_grep 'zmr-benchmark-command' CHANGELOG.md
@@ -92,6 +99,12 @@ require_grep 'TypeScript' clients/README.md
 require_grep 'Python' clients/README.md
 require_grep 'Go' clients/README.md
 require_grep 'Rust' clients/README.md
+require_grep 'Swift' clients/README.md
+require_grep 'Kotlin' clients/README.md
+require_grep 'Homebrew' docs/client-installation.md
+require_grep 'pip install' docs/client-installation.md
+require_grep 'go get' docs/client-installation.md
+require_grep 'zmr-client' docs/client-installation.md
 require_grep 'Market Positioning' docs/market-positioning.md
 require_grep 'Detox' docs/market-positioning.md
 require_grep 'Maestro' docs/market-positioning.md
@@ -100,7 +113,7 @@ require_grep 'GitHub README plus release assets' docs/market-positioning.md
 require_grep 'Architecture Decisions' docs/adr/README.md
 require_grep 'Agent-Native Runner Boundary' docs/adr/0001-agent-native-runner-boundary.md
 require_grep 'App-Local `.zmr/` Contract' docs/adr/0002-app-local-zmr-contract.md
-require_grep 'iOS Simulator XCTest Shim' docs/adr/0003-ios-simulator-xctest-shim.md
+require_grep 'iOS XCTest Shim' docs/adr/0003-ios-simulator-xctest-shim.md
 require_grep 'Benchmark Claims And Baseline Collection' docs/adr/0004-benchmark-claims-and-baseline-collection.md
 
 require_grep 'AI Agent Guide' docs/ai-agents.md

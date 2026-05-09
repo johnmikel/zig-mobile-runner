@@ -9,6 +9,7 @@ APP_TARGET=""
 BUNDLE_ID=""
 TEST_BUNDLE_ID=""
 DEVICE="booted"
+DEVICE_TYPE="simulator"
 CONFIGURATION="Debug"
 WORKSPACE=""
 PROJECT=""
@@ -34,7 +35,8 @@ Options:
   --project <path>       Xcode project path relative to app root.
   --derived-data-path <path>
                           Derived data path relative to app root.
-  --device <udid|booted> Simulator destination id. Default: booted.
+  --device <udid|booted> Simulator or physical-device destination id. Default: booted.
+  --device-type <type>   simulator or physical. Default: simulator.
   --configuration <name> Xcode build configuration. Default: Debug.
   --deployment-target <version>
                           iOS deployment target for generated UI test target. Default: 15.0.
@@ -94,6 +96,10 @@ while [[ $# -gt 0 ]]; do
       DEVICE="${2:-}"
       shift 2
       ;;
+    --device-type)
+      DEVICE_TYPE="${2:-}"
+      shift 2
+      ;;
     --configuration)
       CONFIGURATION="${2:-}"
       shift 2
@@ -131,6 +137,12 @@ fi
 if [[ "$PATCH_XCODEPROJ" -eq 1 ]]; then
   [[ -n "$PROJECT" || -n "$WORKSPACE" ]] || die "--patch-xcodeproj requires --project or --workspace"
   [[ -n "$APP_TARGET" ]] || die "--patch-xcodeproj requires --app-target"
+fi
+if [[ "$DEVICE_TYPE" != "simulator" && "$DEVICE_TYPE" != "physical" ]]; then
+  die "--device-type must be simulator or physical"
+fi
+if [[ "$DEVICE_TYPE" == "physical" && "$DEVICE" == "booted" ]]; then
+  die "--device-type physical requires --device <physical-device-udid>"
 fi
 
 mkdir -p "$APP_ROOT"
@@ -214,6 +226,10 @@ tail_log() {
 resolve_destination() {
   local destination_id="$DEVICE"
   if [[ "\$destination_id" == "booted" ]]; then
+    if [[ "$DEVICE_TYPE" == "physical" ]]; then
+      echo "physical iOS shim requires an explicit --device id" >&2
+      exit 2
+    fi
     destination_id="\$(xcrun simctl list devices booted | sed -n 's/.*(\([0-9A-Fa-f-][0-9A-Fa-f-]*\)) (Booted).*/\1/p' | head -n 1)"
   fi
   if [[ -z "\$destination_id" ]]; then
@@ -221,6 +237,17 @@ resolve_destination() {
     exit 2
   fi
   printf '%s' "\$destination_id"
+}
+
+destination_spec() {
+  local destination_id platform_name
+  destination_id="\$(resolve_destination)"
+  if [[ "$DEVICE_TYPE" == "physical" ]]; then
+    platform_name="iOS"
+  else
+    platform_name="iOS Simulator"
+  fi
+  printf 'platform=%s,id=%s' "\$platform_name" "\$destination_id"
 }
 
 is_server_running() {
@@ -238,13 +265,13 @@ run_oneshot() {
   response_file="\$(mktemp "\$STATE_DIR/response.XXXXXX")"
   oneshot_log="\$(mktemp "\$STATE_DIR/xcodebuild.oneshot.XXXXXX.log")"
   cp "\$STDIN_FILE" "\$request_file"
-  destination_id="\$(resolve_destination)"
+  destination_id="\$(destination_spec)"
 
   if ! xcodebuild test \\
     "\${XCODEBUILD_ARGS[@]}" \\
     -scheme "$SCHEME" \\
     -configuration "$CONFIGURATION" \\
-    -destination "platform=iOS Simulator,id=\$destination_id" \\
+    -destination "\$destination_id" \\
     -only-testing:"$TEST_TARGET/ZMRShimUITestCase/testRunZMRCommand" \\
     ZMR_SHIM_MODE="oneshot" \\
     ZMR_SHIM_REQUEST_FILE="\$request_file" \\
@@ -284,14 +311,14 @@ build_for_testing() {
   fi
 
   local destination_id build_log
-  destination_id="\$(resolve_destination)"
+  destination_id="\$(destination_spec)"
   build_log="\$STATE_DIR/xcodebuild.build.log"
 
   if ! xcodebuild build-for-testing \\
     "\${XCODEBUILD_ARGS[@]}" \\
     -scheme "$SCHEME" \\
     -configuration "$CONFIGURATION" \\
-    -destination "platform=iOS Simulator,id=\$destination_id" \\
+    -destination "\$destination_id" \\
     ZMR_SHIM_MODE="server" \\
     ZMR_SHIM_SERVER_DIR="\$SERVER_DIR" \\
     ZMR_APP_BUNDLE_ID="$BUNDLE_ID" \\
@@ -314,12 +341,12 @@ start_server() {
   build_for_testing
 
   local destination_id
-  destination_id="\$(resolve_destination)"
+  destination_id="\$(destination_spec)"
   nohup xcodebuild test-without-building \\
     "\${XCODEBUILD_ARGS[@]}" \\
     -scheme "$SCHEME" \\
     -configuration "$CONFIGURATION" \\
-    -destination "platform=iOS Simulator,id=\$destination_id" \\
+    -destination "\$destination_id" \\
     -only-testing:"$TEST_TARGET/ZMRShimUITestCase/testRunZMRCommand" \\
     ZMR_SHIM_MODE="server" \\
     ZMR_SHIM_SERVER_DIR="\$SERVER_DIR" \\

@@ -237,7 +237,8 @@ Acceptance:
 
 Scope:
 - Current Android runner.
-- iOS simulator lifecycle/snapshot/selector support with `scripts/run-ios-pilot.sh`.
+- iOS lifecycle/snapshot/selector support with `scripts/run-ios-pilot.sh`,
+  simulator-first capture, and physical-device lifecycle through `devicectl`.
 - Fake demo.
 - Public Android and iOS pilot wrappers.
 - Release archives and docs.

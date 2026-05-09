@@ -22,7 +22,7 @@ rl.on("line", (line) => {
       platforms: ["android", "ios"],
       platformSupport: {
         android: { status: "supported", deviceTypes: ["emulator", "physical"], automation: ["adb", "uiautomator", "android-shim"] },
-        ios: { status: "supported", deviceTypes: ["simulator"], automation: ["simctl", "xctest-shim"], physicalDevices: false },
+        ios: { status: "supported", deviceTypes: ["simulator", "physical"], automation: ["simctl", "devicectl", "xctest-shim"], physicalDevices: true },
       },
       iosPreview: false,
       transports: ["stdio", "tcp"],

@@ -24,8 +24,8 @@ fn client_drives_fake_session() {
     assert!(!capabilities.ios_preview);
     let ios_support = capabilities.platform_support.get("ios").unwrap();
     assert_eq!(ios_support.status, "supported");
-    assert_eq!(ios_support.device_types, vec!["simulator"]);
-    assert!(!ios_support.physical_devices);
+    assert_eq!(ios_support.device_types, vec!["simulator", "physical"]);
+    assert!(ios_support.physical_devices);
 
     let session = client.create_session().unwrap();
     assert_eq!(session.session_id, "default");

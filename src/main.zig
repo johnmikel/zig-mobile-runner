@@ -27,6 +27,17 @@ const Platform = enum {
     ios,
 };
 
+const IosDeviceType = enum {
+    simulator,
+    physical,
+};
+
+const IosDevicesScope = enum {
+    simulator,
+    physical,
+    all,
+};
+
 const default_config_path = ".zmr/config.json";
 
 const PublicSchema = struct {
@@ -73,6 +84,7 @@ const RawRunOptions = struct {
     android_reset_before_run: ?bool = null,
     android_wait_ready: ?bool = null,
     platform: Platform = .android,
+    ios_device_type: IosDeviceType = .simulator,
 };
 
 const ResolvedRunOptions = struct {
@@ -90,6 +102,7 @@ const ResolvedRunOptions = struct {
     android_reset_before_run: bool,
     android_wait_ready: bool,
     platform: Platform,
+    ios_device_type: IosDeviceType,
 };
 
 const RawServeOptions = struct {
@@ -99,6 +112,7 @@ const RawServeOptions = struct {
     android_shim_path: ?[]const u8 = null,
     ios_shim_path: ?[]const u8 = null,
     platform: Platform = .android,
+    ios_device_type: IosDeviceType = .simulator,
 };
 
 const ResolvedServeOptions = struct {
@@ -108,6 +122,7 @@ const ResolvedServeOptions = struct {
     android_shim_path: ?[]const u8,
     ios_shim_path: ?[]const u8,
     platform: Platform,
+    ios_device_type: IosDeviceType,
 };
 
 pub fn main() void {
@@ -188,8 +203,10 @@ fn exitCodeForError(err: anyerror) u8 {
         error.MissingXcrunPath,
         error.MissingZigPath,
         error.MissingPlatform,
+        error.MissingIosDeviceType,
         error.MissingParam,
         error.UnsupportedPlatform,
+        error.UnsupportedIosDeviceType,
         error.UnsupportedTransport,
         => 2,
         else => 1,
@@ -247,6 +264,7 @@ fn writeSchemasJson(writer: anytype) !void {
 
 fn cmdDevices(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
     var platform: Platform = .android;
+    var ios_devices_scope: IosDevicesScope = .simulator;
     var adb_path: []const u8 = "adb";
     var xcrun_path: []const u8 = "xcrun";
     var json = false;
@@ -254,6 +272,8 @@ fn cmdDevices(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !voi
     while (args.next()) |arg| {
         if (std.mem.eql(u8, arg, "--platform")) {
             platform = try parsePlatform(args.next() orelse return error.MissingPlatform);
+        } else if (std.mem.eql(u8, arg, "--ios-device-type")) {
+            ios_devices_scope = try parseIosDevicesScope(args.next() orelse return error.MissingIosDeviceType);
         } else if (std.mem.eql(u8, arg, "--adb")) {
             adb_path = args.next() orelse return error.MissingAdbPath;
         } else if (std.mem.eql(u8, arg, "--xcrun")) {
@@ -267,7 +287,7 @@ fn cmdDevices(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !voi
 
     const devices = switch (platform) {
         .android => try android.listDevices(allocator, adb_path),
-        .ios => try ios.listDevices(allocator, xcrun_path),
+        .ios => try listIosDevicesForScope(allocator, xcrun_path, ios_devices_scope),
     };
     defer {
         for (devices) |device| device.deinit(allocator);
@@ -279,6 +299,31 @@ fn cmdDevices(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !voi
     for (devices) |device| {
         try stdout.print("{s}\t{s}\n", .{ device.serial, device.state });
     }
+}
+
+fn listIosDevicesForScope(allocator: std.mem.Allocator, xcrun_path: []const u8, scope: IosDevicesScope) ![]types.DeviceInfo {
+    return switch (scope) {
+        .simulator => try ios.listDevices(allocator, xcrun_path),
+        .physical => try ios.listPhysicalDevices(allocator, xcrun_path),
+        .all => blk: {
+            const simulators = try ios.listDevices(allocator, xcrun_path);
+            errdefer {
+                for (simulators) |device| device.deinit(allocator);
+                allocator.free(simulators);
+            }
+            const physical = try ios.listPhysicalDevices(allocator, xcrun_path);
+            errdefer {
+                for (physical) |device| device.deinit(allocator);
+                allocator.free(physical);
+            }
+            const combined = try allocator.alloc(types.DeviceInfo, simulators.len + physical.len);
+            @memcpy(combined[0..simulators.len], simulators);
+            @memcpy(combined[simulators.len..], physical);
+            allocator.free(simulators);
+            allocator.free(physical);
+            break :blk combined;
+        },
+    };
 }
 
 fn writeDevicesJson(writer: anytype, platform: Platform, devices: []const types.DeviceInfo) !void {
@@ -602,6 +647,8 @@ fn cmdRun(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
             raw.ios_shim_path = args.next() orelse return error.MissingIosShimPath;
         } else if (std.mem.eql(u8, arg, "--platform")) {
             raw.platform = try parsePlatform(args.next() orelse return error.MissingPlatform);
+        } else if (std.mem.eql(u8, arg, "--ios-device-type")) {
+            raw.ios_device_type = try parseIosDeviceType(args.next() orelse return error.MissingIosDeviceType);
         } else if (std.mem.eql(u8, arg, "--config")) {
             config_path = args.next() orelse return error.MissingConfigPath;
         } else if (std.mem.eql(u8, arg, "--screen-record")) {
@@ -694,7 +741,7 @@ fn cmdRun(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
                 runAndroidWithTrace(allocator, &device, script, trace_dir, capture) catch |err| break :blk err;
             },
             .ios => {
-                var device = try ios.IosDevice.initWithShim(allocator, xcrun_path, resolved.serial, app_id, ios_shim_path);
+                var device = try ios.IosDevice.initWithKindAndShim(allocator, xcrun_path, resolved.serial, app_id, iosTargetKind(resolved.ios_device_type), ios_shim_path);
                 defer device.deinit();
                 runWithTrace(allocator, &device, script, trace_dir, capture) catch |err| break :blk err;
             },
@@ -940,6 +987,8 @@ fn cmdServe(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
             raw.ios_shim_path = args.next() orelse return error.MissingIosShimPath;
         } else if (std.mem.eql(u8, arg, "--platform")) {
             raw.platform = try parsePlatform(args.next() orelse return error.MissingPlatform);
+        } else if (std.mem.eql(u8, arg, "--ios-device-type")) {
+            raw.ios_device_type = try parseIosDeviceType(args.next() orelse return error.MissingIosDeviceType);
         } else if (std.mem.eql(u8, arg, "--transport")) {
             transport = args.next() orelse return error.MissingTransport;
         } else if (std.mem.eql(u8, arg, "--port")) {
@@ -994,7 +1043,7 @@ fn cmdServe(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
             try serveWithDevice(allocator, &device, transport, port, trace_dir, resolved.app_id, capture);
         },
         .ios => {
-            var device = try ios.IosDevice.initWithShim(allocator, xcrun_path, resolved.serial, resolved.app_id, ios_shim_path);
+            var device = try ios.IosDevice.initWithKindAndShim(allocator, xcrun_path, resolved.serial, resolved.app_id, iosTargetKind(resolved.ios_device_type), ios_shim_path);
             defer device.deinit();
             try serveWithDevice(allocator, &device, transport, port, trace_dir, resolved.app_id, capture);
         },
@@ -1031,6 +1080,26 @@ fn parsePlatform(value: []const u8) !Platform {
     if (std.mem.eql(u8, value, "android")) return .android;
     if (std.mem.eql(u8, value, "ios")) return .ios;
     return error.UnsupportedPlatform;
+}
+
+fn parseIosDeviceType(value: []const u8) !IosDeviceType {
+    if (std.mem.eql(u8, value, "simulator")) return .simulator;
+    if (std.mem.eql(u8, value, "physical")) return .physical;
+    return error.UnsupportedIosDeviceType;
+}
+
+fn parseIosDevicesScope(value: []const u8) !IosDevicesScope {
+    if (std.mem.eql(u8, value, "simulator")) return .simulator;
+    if (std.mem.eql(u8, value, "physical")) return .physical;
+    if (std.mem.eql(u8, value, "all")) return .all;
+    return error.UnsupportedIosDeviceType;
+}
+
+fn iosTargetKind(value: IosDeviceType) ios.TargetKind {
+    return switch (value) {
+        .simulator => .simulator,
+        .physical => .physical,
+    };
 }
 
 fn loadConfigIfPresent(allocator: std.mem.Allocator, explicit_path: ?[]const u8) !?config.Config {
@@ -1095,6 +1164,7 @@ fn resolveRunOptions(raw: RawRunOptions, cfg: ?config.Config) ResolvedRunOptions
         .android_reset_before_run = raw.android_reset_before_run orelse if (platform_cfg) |pc| pc.reset_before_run else false,
         .android_wait_ready = raw.android_wait_ready orelse if (platform_cfg) |pc| pc.wait_ready else false,
         .platform = raw.platform,
+        .ios_device_type = raw.ios_device_type,
     };
 }
 
@@ -1124,6 +1194,7 @@ fn resolveServeOptions(raw: RawServeOptions, cfg: ?config.Config) ResolvedServeO
         .android_shim_path = raw.android_shim_path orelse if (cfg) |value| value.tools.android_shim_path else null,
         .ios_shim_path = raw.ios_shim_path orelse if (cfg) |value| value.tools.ios_shim_path else null,
         .platform = raw.platform,
+        .ios_device_type = raw.ios_device_type,
     };
 }
 
@@ -1268,18 +1339,18 @@ fn usage() !void {
         \\Commands:
         \\  zmr version [--json]
         \\  zmr schemas [--json]
-        \\  zmr devices [--json] [--platform android|ios] [--adb <path>] [--xcrun <path>]
+        \\  zmr devices [--json] [--platform android|ios] [--ios-device-type simulator|physical|all] [--adb <path>] [--xcrun <path>]
         \\  zmr doctor [--json] [--strict] [--config <path>] [--zig <path>] [--adb <path>] [--android-shim <path>] [--xcrun <path>] [--ios-shim <path>]
         \\  zmr validate <scenario.json> [--json]
         \\  zmr init [scenario.json] [--app-id <id>] [--force] [--json]
         \\  zmr init --app [--dir <app-root>] [--app-id <id>] [--force] [--json]
         \\  zmr import flow-yaml <flow.yaml> --out <scenario.json> [--name <name>] [--app-id <id>] [--force] [--json]
-        \\  zmr run [scenario.json] [--json] [--config <path>] [--platform android|ios] [--device <serial>] [--app-id <id>] [--trace-dir <path>] [--android-avd <name>] [--create-avd-if-missing] [--avd-system-image <pkg>] [--avd-device <profile>] [--restore-snapshot <name>] [--reset-emulator] [--wait-emulator] [--screen-record] [--no-screen-record] [--adb <path>] [--emulator <path>] [--avdmanager <path>] [--android-shim <path>] [--xcrun <path>] [--ios-shim <path>]
+        \\  zmr run [scenario.json] [--json] [--config <path>] [--platform android|ios] [--ios-device-type simulator|physical] [--device <serial>] [--app-id <id>] [--trace-dir <path>] [--android-avd <name>] [--create-avd-if-missing] [--avd-system-image <pkg>] [--avd-device <profile>] [--restore-snapshot <name>] [--reset-emulator] [--wait-emulator] [--screen-record] [--no-screen-record] [--adb <path>] [--emulator <path>] [--avdmanager <path>] [--android-shim <path>] [--xcrun <path>] [--ios-shim <path>]
         \\  zmr report <trace-or-benchmark-dir> --out <report.html>
         \\  zmr explain <trace-dir> [--json]
         \\  zmr export <trace-dir> --out <bundle.zmrtrace> [--redact] [--omit-screenshots]
-        \\  zmr serve --transport stdio [--config <path>] [--platform android|ios] [--device <serial>] [--app-id <id>] [--trace-dir <path>] [--adb <path>] [--android-shim <path>] [--xcrun <path>] [--ios-shim <path>]
-        \\  zmr serve --transport tcp [--port <port>] [--config <path>] [--platform android|ios] [--device <serial>] [--app-id <id>] [--trace-dir <path>] [--adb <path>] [--android-shim <path>] [--xcrun <path>] [--ios-shim <path>]
+        \\  zmr serve --transport stdio [--config <path>] [--platform android|ios] [--ios-device-type simulator|physical] [--device <serial>] [--app-id <id>] [--trace-dir <path>] [--adb <path>] [--android-shim <path>] [--xcrun <path>] [--ios-shim <path>]
+        \\  zmr serve --transport tcp [--port <port>] [--config <path>] [--platform android|ios] [--ios-device-type simulator|physical] [--device <serial>] [--app-id <id>] [--trace-dir <path>] [--adb <path>] [--android-shim <path>] [--xcrun <path>] [--ios-shim <path>]
         \\
         \\Scenario actions: launch, stop, clearState, openLink, tap, typeText,
         \\eraseText, hideKeyboard, swipe, pressBack, waitVisible, waitNotVisible,

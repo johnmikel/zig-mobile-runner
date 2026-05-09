@@ -51,7 +51,7 @@
           "allOf": [{ "$ref": "#/$defs/platformSupport" }],
           "required": ["status", "deviceTypes", "automation", "physicalDevices"],
           "properties": {
-            "physicalDevices": { "const": false }
+            "physicalDevices": { "const": true }
           }
         }
       }

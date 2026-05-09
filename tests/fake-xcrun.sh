@@ -6,8 +6,87 @@ if [[ "${1:-}" == "--version" ]]; then
   exit 0
 fi
 
+if [[ "${1:-}" == "devicectl" ]]; then
+  shift
+  json_output=""
+  filtered=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --json-output)
+        json_output="${2:-}"
+        shift 2
+        ;;
+      --quiet)
+        shift
+        ;;
+      *)
+        filtered+=("$1")
+        shift
+        ;;
+    esac
+  done
+  set -- "${filtered[@]}"
+  case "${1:-}" in
+    list)
+      if [[ "${2:-}" == "devices" && -n "$json_output" ]]; then
+        cat > "$json_output" <<'JSON'
+{"result":{"devices":[{"identifier":"physical-ios-1","connectionProperties":{"pairingState":"paired","tunnelState":"connected"},"deviceProperties":{"name":"Fake iPhone"},"hardwareProperties":{"platform":"iOS","reality":"physical","udid":"fake-physical-ios-1"}}]}}
+JSON
+      else
+        echo "unsupported devicectl list command: $*" >&2
+        exit 2
+      fi
+      ;;
+    device)
+      case "${2:-}" in
+        install)
+          [[ "${3:-}" == "app" && "${4:-}" == "--device" && "${5:-}" == "fake-physical-ios-1" && "${6:-}" == "/tmp/Sample.app" ]] || {
+            echo "unsupported devicectl install command: $*" >&2
+            exit 2
+          }
+          ;;
+        process)
+          if [[ "${3:-}" == "launch" && "${4:-}" == "--device" && "${5:-}" == "fake-physical-ios-1" ]]; then
+            exit 0
+          fi
+          if [[ "${3:-}" == "terminate" && "${4:-}" == "--device" && "${5:-}" == "fake-physical-ios-1" && "${6:-}" == "--pid" ]]; then
+            exit 0
+          fi
+          echo "unsupported devicectl process command: $*" >&2
+          exit 2
+          ;;
+        info)
+          if [[ "${3:-}" == "processes" && "${4:-}" == "--device" && "${5:-}" == "fake-physical-ios-1" && -n "$json_output" ]]; then
+            cat > "$json_output" <<'JSON'
+{"result":{"processes":[{"processIdentifier":12345,"bundleIdentifier":"com.example.mobiletest"}]}}
+JSON
+            exit 0
+          fi
+          echo "unsupported devicectl info command: $*" >&2
+          exit 2
+          ;;
+        uninstall)
+          [[ "${3:-}" == "app" && "${4:-}" == "--device" && "${5:-}" == "fake-physical-ios-1" && "${6:-}" == "com.example.mobiletest" ]] || {
+            echo "unsupported devicectl uninstall command: $*" >&2
+            exit 2
+          }
+          ;;
+        *)
+          echo "unsupported devicectl device command: $*" >&2
+          exit 2
+          ;;
+      esac
+      ;;
+    *)
+      echo "unsupported devicectl command: $*" >&2
+      exit 2
+      ;;
+  esac
+  exit 0
+fi
+
 if [[ "${1:-}" != "simctl" ]]; then
-  echo "expected simctl command: $*" >&2
+  echo "expected simctl or devicectl command: $*" >&2
   exit 2
 fi
 shift

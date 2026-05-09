@@ -48,7 +48,7 @@ ZMR should lead with:
 | npm distribution | Tarball exists in GitHub release, registry publish still pending |
 | Android proof | Needs repeated public generic Android demo and app-local pilots |
 | iOS scale | Simulator demo passes, but repeated-run evidence should be published |
-| Physical iOS | Not supported yet |
+| Physical iOS | Initial local support exists through `devicectl` plus the XCTest shim; screenshot/log capture still needs hardening |
 | Cloud | Not supported yet |
 | Human DSL | JSON is reliable for agents; a friendlier authoring layer should compile to JSON |
 | Brand surface | README is now concise; a docs/landing site should follow after npm publish |

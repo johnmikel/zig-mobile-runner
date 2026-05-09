@@ -1,7 +1,7 @@
 # Features
 
-Zig Mobile Runner is a local, agent-native mobile test runner for Android and
-iOS simulators. It is designed for external agents and normal test files: ZMR
+Zig Mobile Runner is a local, agent-native mobile test runner for Android,
+iOS simulators, and physical iOS devices. It is designed for external agents and normal test files: ZMR
 controls devices, exposes typed observations, executes actions, waits for UI
 state, and writes deterministic traces. It does not embed an LLM.
 
@@ -13,8 +13,10 @@ state, and writes deterministic traces. It does not embed an LLM.
   restore, optional AVD creation, and optional screen recording.
 - iOS simulators through `xcrun simctl` for lifecycle, install, launch, deep
   links, screenshots, logs, clear-state-by-uninstall, and device discovery.
-- iOS selector actions through an app-local XCTest/XCUIAutomation shim.
-- Physical iOS devices are not in the current support matrix.
+- Physical iOS devices through `xcrun devicectl` for discovery, install,
+  launch, deep-link launch, clear-state-by-uninstall, and best-effort stop.
+- iOS selector actions through an app-local XCTest/XCUIAutomation shim on
+  simulators and physical devices.
 
 ## App Integration
 
@@ -34,7 +36,7 @@ state, and writes deterministic traces. It does not embed an LLM.
 - `runner.capabilities`, `device.list`, `session.create`,
   `observe.snapshot`, UI actions, waits, assertions, live trace events, and
   redacted trace export.
-- TypeScript, Python, Go, and Rust reference clients.
+- TypeScript, Python, Go, Rust, Swift, and Kotlin reference clients.
 - Machine-readable CLI output for `zmr version --json`, `zmr schemas --json`,
   `zmr doctor --json`, `zmr devices --json`, `zmr validate --json`,
   `zmr run --json`, and `zmr explain --json`.
@@ -94,8 +96,9 @@ state, and writes deterministic traces. It does not embed an LLM.
 
 - Current release status is `0.1.0-dev`, a public developer preview rather than
   a production-stable `1.0.0`.
-- Physical iOS devices and broad cloud device farm certification are out of
-  scope for this preview.
+- Physical iOS screenshot/log capture is still simulator-first; physical iOS
+  selector traces rely on the XCTest/XCUIAutomation shim hierarchy.
+- Broad cloud device farm certification is out of scope for this preview.
 - Public benchmark fixtures are generic. Performance claims for a real app
   should come from equivalent app-local candidate and baseline runs.
 - Screenshot and video redaction is conservative: redacted exports can replace

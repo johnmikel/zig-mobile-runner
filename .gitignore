@@ -6,6 +6,9 @@ traces/
 prebuilds/
 node_modules/
 clients/rust/target/
+clients/swift/.build/
+clients/kotlin/.gradle/
+clients/kotlin/build/
 *.tgz
 __pycache__/
 *.pyc
