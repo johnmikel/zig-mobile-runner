@@ -16,6 +16,7 @@ Then it sends JSON-RPC methods such as:
 - `runner.capabilities`
 - `session.create`
 - `observe.snapshot`
+- `observe.semanticSnapshot`
 - `ui.tap`
 - `wait.until`
 - `assert.visible`
@@ -25,6 +26,8 @@ Then it sends JSON-RPC methods such as:
 Use clients when an AI agent, service, or test harness wants to drive ZMR
 programmatically instead of shelling out for each scenario. For package-manager
 install commands, see [client-installation.md](client-installation.md).
+Prefer the semantic snapshot helper for agent planning; it normalizes native
+Android/iOS classes into roles, selectors, bounds, and recommended actions.
 
 ## Language Layouts
 

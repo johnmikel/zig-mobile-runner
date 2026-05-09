@@ -11,11 +11,13 @@ const ios = @import("ios.zig");
 const ios_shim = @import("ios_shim.zig");
 const importer = @import("importer.zig");
 const json_rpc = @import("json_rpc.zig");
+const mcp = @import("mcp.zig");
 const report = @import("report.zig");
 const runner = @import("runner.zig");
 const scaffold = @import("scaffold.zig");
 const scenario = @import("scenario.zig");
 const selector = @import("selector.zig");
+const semantic = @import("semantic.zig");
 const trace = @import("trace.zig");
 const types = @import("types.zig");
 const uiautomator = @import("uiautomator.zig");
@@ -51,6 +53,7 @@ const public_schemas = [_]PublicSchema{
     .{ .name = "json-rpc", .path = "schemas/json-rpc.schema.json", .id = "https://zmr.dev/schemas/json-rpc.schema.json", .description = "JSON-RPC requests and responses used by zmr serve" },
     .{ .name = "scenario", .path = "schemas/scenario.schema.json", .id = "https://zmr.dev/schemas/scenario.schema.json", .description = "Scenario files consumed by zmr run and zmr validate" },
     .{ .name = "snapshot", .path = "schemas/snapshot.schema.json", .id = "https://zmr.dev/schemas/snapshot.schema.json", .description = "ObservationSnapshot JSON emitted by live RPC and persisted trace snapshots" },
+    .{ .name = "semantic-snapshot", .path = "schemas/semantic-snapshot.schema.json", .id = "https://zmr.dev/schemas/semantic-snapshot.schema.json", .description = "Agent-optimized semantic snapshot emitted by observe.semanticSnapshot and zmr mcp" },
     .{ .name = "action-result", .path = "schemas/action-result.schema.json", .id = "https://zmr.dev/schemas/action-result.schema.json", .description = "Typed action result shape reserved for richer protocol responses" },
     .{ .name = "trace-event", .path = "schemas/trace-event.schema.json", .id = "https://zmr.dev/schemas/trace-event.schema.json", .description = "One JSONL event row from events.jsonl" },
     .{ .name = "trace-manifest", .path = "schemas/trace-manifest.schema.json", .id = "https://zmr.dev/schemas/trace-manifest.schema.json", .description = "trace.json summary for one traced run" },
@@ -171,6 +174,8 @@ fn mainInner() !void {
         try cmdExport(allocator, &args);
     } else if (std.mem.eql(u8, command_name, "serve")) {
         try cmdServe(allocator, &args);
+    } else if (std.mem.eql(u8, command_name, "mcp")) {
+        try cmdMcp(allocator, &args);
     } else if (std.mem.eql(u8, command_name, "version") or std.mem.eql(u8, command_name, "--version")) {
         try cmdVersion(&args);
     } else if (std.mem.eql(u8, command_name, "help") or std.mem.eql(u8, command_name, "--help")) {
@@ -1050,6 +1055,104 @@ fn cmdServe(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void 
     }
 }
 
+fn cmdMcp(allocator: std.mem.Allocator, args: *std.process.ArgIterator) !void {
+    var raw = RawServeOptions{};
+    var adb_path: []const u8 = "adb";
+    var xcrun_path: []const u8 = "xcrun";
+    var config_path: ?[]const u8 = null;
+
+    while (args.next()) |arg| {
+        if (std.mem.eql(u8, arg, "--device")) {
+            raw.serial = args.next() orelse return error.MissingDeviceSerial;
+        } else if (std.mem.eql(u8, arg, "--app-id")) {
+            raw.app_id = args.next() orelse return error.MissingAppId;
+        } else if (std.mem.eql(u8, arg, "--trace-dir")) {
+            raw.trace_dir = args.next() orelse return error.MissingTraceDir;
+        } else if (std.mem.eql(u8, arg, "--adb")) {
+            adb_path = args.next() orelse return error.MissingAdbPath;
+        } else if (std.mem.eql(u8, arg, "--android-shim")) {
+            raw.android_shim_path = args.next() orelse return error.MissingAndroidShimPath;
+        } else if (std.mem.eql(u8, arg, "--xcrun")) {
+            xcrun_path = args.next() orelse return error.MissingXcrunPath;
+        } else if (std.mem.eql(u8, arg, "--ios-shim")) {
+            raw.ios_shim_path = args.next() orelse return error.MissingIosShimPath;
+        } else if (std.mem.eql(u8, arg, "--platform")) {
+            raw.platform = try parsePlatform(args.next() orelse return error.MissingPlatform);
+        } else if (std.mem.eql(u8, arg, "--ios-device-type")) {
+            raw.ios_device_type = try parseIosDeviceType(args.next() orelse return error.MissingIosDeviceType);
+        } else if (std.mem.eql(u8, arg, "--config")) {
+            config_path = args.next() orelse return error.MissingConfigPath;
+        } else {
+            return error.UnknownFlag;
+        }
+    }
+
+    const actual_config_path = config_path orelse default_config_path;
+    var owned_config_paths = std.ArrayList([]const u8).empty;
+    defer {
+        for (owned_config_paths.items) |path| allocator.free(path);
+        owned_config_paths.deinit(allocator);
+    }
+    var config_root: ?[]const u8 = null;
+    defer if (config_root) |root| allocator.free(root);
+
+    var loaded_config = try loadConfigIfPresent(allocator, config_path);
+    defer if (loaded_config) |*cfg| cfg.deinit(allocator);
+    if (loaded_config) |cfg| {
+        config_root = try configRootForPath(allocator, actual_config_path);
+        if (std.mem.eql(u8, adb_path, "adb")) {
+            if (cfg.tools.adb_path) |path| adb_path = try ownConfigCommandPath(allocator, &owned_config_paths, config_root.?, path);
+        }
+        if (std.mem.eql(u8, xcrun_path, "xcrun")) {
+            if (cfg.tools.xcrun_path) |path| xcrun_path = try ownConfigCommandPath(allocator, &owned_config_paths, config_root.?, path);
+        }
+    }
+    const resolved = if (loaded_config) |cfg| resolveServeOptions(raw, cfg) else resolveServeOptions(raw, null);
+    const capture = if (loaded_config) |cfg| traceCaptureOptions(cfg) else trace.CaptureOptions{};
+    const trace_dir = if (raw.trace_dir == null and config_root != null and resolved.trace_dir != null)
+        try ownConfigFilePath(allocator, &owned_config_paths, config_root.?, resolved.trace_dir.?)
+    else
+        resolved.trace_dir;
+    const android_shim_path = if (raw.android_shim_path == null and config_root != null and resolved.android_shim_path != null)
+        try ownConfigFilePath(allocator, &owned_config_paths, config_root.?, resolved.android_shim_path.?)
+    else
+        resolved.android_shim_path;
+    const ios_shim_path = if (raw.ios_shim_path == null and config_root != null and resolved.ios_shim_path != null)
+        try ownConfigFilePath(allocator, &owned_config_paths, config_root.?, resolved.ios_shim_path.?)
+    else
+        resolved.ios_shim_path;
+
+    switch (resolved.platform) {
+        .android => {
+            var device = try android.AndroidDevice.initWithShim(allocator, adb_path, resolved.serial, resolved.app_id, android_shim_path);
+            defer device.deinit();
+            try serveMcpWithDevice(allocator, &device, trace_dir, resolved.app_id, capture);
+        },
+        .ios => {
+            var device = try ios.IosDevice.initWithKindAndShim(allocator, xcrun_path, resolved.serial, resolved.app_id, iosTargetKind(resolved.ios_device_type), ios_shim_path);
+            defer device.deinit();
+            try serveMcpWithDevice(allocator, &device, trace_dir, resolved.app_id, capture);
+        },
+    }
+}
+
+fn serveMcpWithDevice(
+    allocator: std.mem.Allocator,
+    device: anytype,
+    trace_dir: ?[]const u8,
+    app_id: []const u8,
+    capture: trace.CaptureOptions,
+) !void {
+    var trace_writer: ?trace.TraceWriter = null;
+    if (trace_dir) |dir| {
+        trace_writer = try trace.TraceWriter.initWithOptions(allocator, dir, capture);
+        try trace_writer.?.startManifest("mcp session", app_id);
+    }
+    defer if (trace_writer) |*tw| tw.deinit();
+    const live_trace = if (trace_writer) |*tw| tw else null;
+    try mcp.serveStdioWithTrace(allocator, device, live_trace);
+}
+
 fn serveWithDevice(
     allocator: std.mem.Allocator,
     device: anytype,
@@ -1351,6 +1454,7 @@ fn usage() !void {
         \\  zmr export <trace-dir> --out <bundle.zmrtrace> [--redact] [--omit-screenshots]
         \\  zmr serve --transport stdio [--config <path>] [--platform android|ios] [--ios-device-type simulator|physical] [--device <serial>] [--app-id <id>] [--trace-dir <path>] [--adb <path>] [--android-shim <path>] [--xcrun <path>] [--ios-shim <path>]
         \\  zmr serve --transport tcp [--port <port>] [--config <path>] [--platform android|ios] [--ios-device-type simulator|physical] [--device <serial>] [--app-id <id>] [--trace-dir <path>] [--adb <path>] [--android-shim <path>] [--xcrun <path>] [--ios-shim <path>]
+        \\  zmr mcp [--config <path>] [--platform android|ios] [--ios-device-type simulator|physical] [--device <serial>] [--app-id <id>] [--trace-dir <path>] [--adb <path>] [--android-shim <path>] [--xcrun <path>] [--ios-shim <path>]
         \\
         \\Scenario actions: launch, stop, clearState, openLink, tap, typeText,
         \\eraseText, hideKeyboard, swipe, pressBack, waitVisible, waitNotVisible,
@@ -1373,11 +1477,13 @@ test {
     _ = ios_shim;
     _ = importer;
     _ = json_rpc;
+    _ = mcp;
     _ = report;
     _ = runner;
     _ = scaffold;
     _ = scenario;
     _ = selector;
+    _ = semantic;
     _ = trace;
     _ = types;
     _ = uiautomator;

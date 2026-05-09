@@ -30,7 +30,8 @@ Recommended flow:
 
 1. Call `runner.capabilities` and check protocol/platform support.
 2. Call `session.create`.
-3. Call `observe.snapshot`.
+3. Call `observe.semanticSnapshot` when choosing the next action, or
+   `observe.snapshot` when raw adapter details are needed.
 4. Choose one typed action or assertion.
 5. Let ZMR settle, then observe again.
 6. Poll `trace.events` during long runs.
@@ -39,6 +40,27 @@ Recommended flow:
 
 Do not parse screenshots or terminal text when the same fact is available from
 snapshot nodes, action results, CLI JSON, or trace events.
+
+## MCP Session
+
+Agents that support the Model Context Protocol can use ZMR directly as a local
+stdio MCP server:
+
+```bash
+zmr mcp --config .zmr/config.json --trace-dir traces/zmr-agent
+```
+
+The MCP server exposes mobile-specific tools:
+
+- `snapshot`: raw ZMR observation JSON
+- `semantic_snapshot`: normalized roles, names, selectors, bounds, and
+  recommended actions
+- `tap`, `type`, `press_back`, and `open_link`
+- `wait_visible`
+- `trace_events` and `trace_export`
+
+Prefer `semantic_snapshot` for action planning. It avoids forcing an agent to
+infer intent from platform-specific Android/UI Automator or XCTest class names.
 
 ## Scenario File Workflow
 

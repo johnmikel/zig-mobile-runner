@@ -91,6 +91,35 @@ type Node struct {
 	Selected    bool                   `json:"selected"`
 }
 
+type SemanticSnapshot struct {
+	ID             string         `json:"id"`
+	TimestampMS    int64          `json:"timestampMs"`
+	Viewport       map[string]any `json:"viewport"`
+	ActivePackage  string         `json:"activePackage"`
+	ActiveActivity string         `json:"activeActivity"`
+	FocusedNodeID  *string        `json:"focusedNodeId"`
+	Nodes          []SemanticNode `json:"nodes"`
+	Summary        struct {
+		NodeCount        int      `json:"nodeCount"`
+		InteractiveCount int      `json:"interactiveCount"`
+		VisibleText      []string `json:"visibleText"`
+	} `json:"summary"`
+}
+
+type SemanticNode struct {
+	ID                string                 `json:"id"`
+	Role              string                 `json:"role"`
+	Name              string                 `json:"name"`
+	Selector          map[string]string      `json:"selector"`
+	Source            map[string]interface{} `json:"source"`
+	Bounds            map[string]interface{} `json:"bounds"`
+	Enabled           bool                   `json:"enabled"`
+	Visible           bool                   `json:"visible"`
+	Selected          bool                   `json:"selected"`
+	Interactive       bool                   `json:"interactive"`
+	RecommendedAction *string                `json:"recommendedAction"`
+}
+
 type TraceEvents struct {
 	TraceDir  string                   `json:"traceDir"`
 	AfterSeq  int64                    `json:"afterSeq"`
@@ -217,6 +246,12 @@ func (c *Client) OpenLink(ctx context.Context, url string) (bool, error) {
 func (c *Client) Snapshot(ctx context.Context) (Snapshot, error) {
 	var out Snapshot
 	err := c.Request(ctx, "observe.snapshot", map[string]interface{}{}, &out)
+	return out, err
+}
+
+func (c *Client) SemanticSnapshot(ctx context.Context) (SemanticSnapshot, error) {
+	var out SemanticSnapshot
+	err := c.Request(ctx, "observe.semanticSnapshot", map[string]interface{}{}, &out)
 	return out, err
 }
 

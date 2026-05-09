@@ -70,6 +70,7 @@ require_grep 'release-manifest.schema.json' README.md
 require_grep 'schemas-output.schema.json' README.md
 require_grep 'version-output.schema.json' README.md
 require_grep 'capabilities-output.schema.json' README.md
+require_grep 'semantic-snapshot.schema.json' README.md
 require_grep 'init-output.schema.json' README.md
 require_grep 'devices-output.schema.json' README.md
 require_grep 'validate-output.schema.json' README.md
@@ -84,6 +85,7 @@ require_grep 'docs/market-positioning.md' README.md
 require_grep 'skills/zmr-mobile-testing/SKILL.md' README.md
 
 require_grep 'Agent Interface' FEATURES.md
+require_grep 'MCP stdio server' FEATURES.md
 require_grep 'Current Limitations' FEATURES.md
 require_grep 'Physical iOS devices through `xcrun devicectl`' FEATURES.md
 require_grep 'Physical iOS devices are supported for local lifecycle' CHANGELOG.md
@@ -118,6 +120,8 @@ require_grep 'Benchmark Claims And Baseline Collection' docs/adr/0004-benchmark-
 
 require_grep 'AI Agent Guide' docs/ai-agents.md
 require_grep 'runner.capabilities' docs/ai-agents.md
+require_grep 'zmr mcp' docs/ai-agents.md
+require_grep 'semantic_snapshot' docs/ai-agents.md
 require_grep 'trace.export' docs/ai-agents.md
 require_grep 'zmr-mobile-testing' skills/zmr-mobile-testing/SKILL.md
 
@@ -128,6 +132,8 @@ require_grep 'zmr init --app' docs/npm.md
 require_grep 'zmr init --json' docs/protocol.md
 require_grep 'Relative scenario, trace, and shim paths from config resolve against the app' docs/config.md
 require_grep 'zmr version --json' docs/protocol.md
+require_grep 'zmr mcp' docs/protocol.md
+require_grep 'observe.semanticSnapshot' docs/protocol.md
 require_grep 'zmr schemas --json' docs/protocol.md
 require_grep 'zmr devices --json' docs/protocol.md
 require_grep 'zmr validate <scenario.json> --json' docs/protocol.md
@@ -160,6 +166,7 @@ require_grep 'Do not commit generated traces' docs/publication.md
 require_grep 'schemas-output.schema.json' schemas/README.md
 require_grep 'version-output.schema.json' schemas/README.md
 require_grep 'capabilities-output.schema.json' schemas/README.md
+require_grep 'semantic-snapshot.schema.json' schemas/README.md
 require_grep 'init-output.schema.json' schemas/README.md
 require_grep 'import-output.schema.json' schemas/README.md
 require_grep 'devices-output.schema.json' schemas/README.md
@@ -168,6 +175,7 @@ require_grep '"schemas"' schemas/schemas-output.schema.json
 require_grep '"protocolVersion"' schemas/version-output.schema.json
 require_grep '"platformSupport"' schemas/capabilities-output.schema.json
 require_grep '"physicalDevices"' schemas/capabilities-output.schema.json
+require_grep '"recommendedAction"' schemas/semantic-snapshot.schema.json
 require_grep '"mode"' schemas/init-output.schema.json
 require_grep '"format"' schemas/import-output.schema.json
 require_grep '"platform"' schemas/devices-output.schema.json

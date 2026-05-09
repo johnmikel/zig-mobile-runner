@@ -36,6 +36,14 @@ All notable changes to Zig Mobile Runner are tracked here.
 - GitHub issue templates for bug reports and feature requests.
 - Reusable `zmr-mobile-testing` agent skill under `skills/`.
 - `trace.events` JSON-RPC cursor polling for live trace events during long-running agent sessions.
+- `observe.semanticSnapshot` JSON-RPC output with normalized roles, stable
+  selectors, center bounds, visible text summary, and recommended actions for
+  AI agents.
+- `zmr mcp` stdio server for MCP-capable agents, exposing mobile-specific tools
+  for semantic snapshots, selector actions, waits, live trace polling, and
+  redacted trace export.
+- `schemas/semantic-snapshot.schema.json` for the machine-readable semantic
+  observation contract.
 - Field, line, and column diagnostics in `zmr validate --json` for invalid scenarios.
 - Scenario authoring guide plus onboarding, referral deep-link, and error-state templates.
 - Adapter-level settle hook after mutating scenario actions, with native shim idle support and shell fallback.

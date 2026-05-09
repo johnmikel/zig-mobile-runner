@@ -18,11 +18,21 @@ mobile and web UI automation framework. The `maestro-runner` project positions
 itself as a single-binary alternative that runs existing YAML flows and claims
 Android, iOS, web, cloud, reports, JavaScript scripting, and parallel execution.
 
+Lightpanda is a fast Zig browser runtime with CDP and MCP surfaces. It is a
+useful architectural reference for a small native automation engine, but it is
+web-first. ZMR should not clone browser automation. Its opportunity is a
+mobile-native equivalent: device lifecycle, app install/launch/clear state,
+accessibility trees, selector actions, logs, screenshots, trace bundles, and
+physical-device workflows.
+
 ## ZMR Position
 
 ZMR should lead with:
 
-- **Agent-native protocol:** structured snapshots and actions over JSON-RPC.
+- **Agent-native protocol:** structured snapshots and actions over JSON-RPC,
+  plus an MCP stdio server for agent runtimes.
+- **Semantic mobile tree:** normalized roles, names, selectors, bounds, and
+  recommended actions so agents do not parse platform-specific hierarchy dumps.
 - **Trace-first reliability:** every action produces evidence agents and humans
   can inspect.
 - **Small deterministic core:** Zig runner, explicit adapters, schema-validated
@@ -35,11 +45,12 @@ ZMR should lead with:
 
 | Area | ZMR advantage |
 | --- | --- |
-| AI agent integration | First-class JSON-RPC, live trace events, schemas, agent guide, packaged skill |
+| AI agent integration | First-class JSON-RPC, MCP tools, semantic snapshots, live trace events, schemas, agent guide, packaged skill |
 | Failure diagnostics | Trace bundles, snapshot replay, UI tree, screenshots, logs, `zmr explain` |
 | Language neutrality | Protocol clients across multiple languages |
 | Local release discipline | Release gate, coverage gate, artifacts, SBOM, checksums, attestation |
 | App-local privacy | `.zmr/` config and redacted trace export |
+| Mobile focus versus browser engines | Native Android/iOS device lifecycle and accessibility semantics instead of CDP-only web primitives |
 
 ## Where ZMR Must Catch Up
 
@@ -74,3 +85,4 @@ actually works.
 - Detox getting started docs: https://wix.github.io/Detox/docs/introduction/getting-started/
 - Maestro docs: https://docs.maestro.dev/
 - maestro-runner GitHub repository: https://github.com/devicelab-dev/maestro-runner
+- Lightpanda browser repository: https://github.com/lightpanda-io/browser

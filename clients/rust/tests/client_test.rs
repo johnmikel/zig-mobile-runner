@@ -39,6 +39,13 @@ fn client_drives_fake_session() {
     assert_eq!(snapshot.active_package, "com.example.mobiletest");
     assert_eq!(snapshot.nodes[0].text.as_deref(), Some("Home"));
 
+    let semantic_snapshot = client.semantic_snapshot().unwrap();
+    assert_eq!(semantic_snapshot.nodes[0].role, "button");
+    assert_eq!(
+        semantic_snapshot.nodes[0].recommended_action.as_deref(),
+        Some("tap")
+    );
+
     let exported = client
         .export_trace("traces/rust-client.zmrtrace", true, true)
         .unwrap();

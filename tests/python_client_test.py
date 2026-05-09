@@ -37,6 +37,10 @@ class PythonClientTest(unittest.TestCase):
             self.assertEqual(snapshot["activePackage"], "com.example.mobiletest")
             self.assertEqual(snapshot["nodes"][0]["text"], "Home")
 
+            semantic_snapshot = client.semantic_snapshot()
+            self.assertEqual(semantic_snapshot["nodes"][0]["role"], "button")
+            self.assertEqual(semantic_snapshot["nodes"][0]["recommendedAction"], "tap")
+
             exported = client.export_trace("traces/python-client.zmrtrace", redact=True, omit_screenshots=True)
             self.assertTrue(exported["redacted"])
             self.assertTrue(exported["omitScreenshots"])

@@ -18,6 +18,8 @@ class ZmrClient(
 
     fun snapshot(): String = call("observe.snapshot")
 
+    fun semanticSnapshot(): String = call("observe.semanticSnapshot")
+
     @Synchronized
     fun call(method: String, paramsJson: String? = null): String {
         val id = nextId++

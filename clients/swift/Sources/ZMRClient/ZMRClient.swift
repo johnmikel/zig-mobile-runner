@@ -80,6 +80,13 @@ public final class ZMRClient {
         return result
     }
 
+    public func semanticSnapshot() throws -> [String: Any] {
+        guard let result = try call("observe.semanticSnapshot") as? [String: Any] else {
+            throw ZMRError.invalidResponse
+        }
+        return result
+    }
+
     private func readLineData() throws -> Data {
         var data = Data()
         while true {

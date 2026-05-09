@@ -133,6 +133,48 @@ pub struct Node {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct SemanticSnapshot {
+    pub id: String,
+    #[serde(rename = "timestampMs")]
+    pub timestamp_ms: i64,
+    pub viewport: Value,
+    #[serde(rename = "activePackage")]
+    pub active_package: Option<String>,
+    #[serde(rename = "activeActivity")]
+    pub active_activity: Option<String>,
+    #[serde(rename = "focusedNodeId")]
+    pub focused_node_id: Option<String>,
+    pub nodes: Vec<SemanticNode>,
+    pub summary: SemanticSummary,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SemanticSummary {
+    #[serde(rename = "nodeCount")]
+    pub node_count: usize,
+    #[serde(rename = "interactiveCount")]
+    pub interactive_count: usize,
+    #[serde(rename = "visibleText")]
+    pub visible_text: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct SemanticNode {
+    pub id: String,
+    pub role: String,
+    pub name: String,
+    pub selector: Value,
+    pub source: Value,
+    pub bounds: Value,
+    pub enabled: bool,
+    pub visible: bool,
+    pub selected: bool,
+    pub interactive: bool,
+    #[serde(rename = "recommendedAction")]
+    pub recommended_action: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct TraceExport {
     #[serde(rename = "traceDir")]
     pub trace_dir: String,
@@ -219,6 +261,10 @@ impl Client {
 
     pub fn snapshot(&mut self) -> Result<Snapshot, Error> {
         self.request("observe.snapshot", json!({}))
+    }
+
+    pub fn semantic_snapshot(&mut self) -> Result<SemanticSnapshot, Error> {
+        self.request("observe.semanticSnapshot", json!({}))
     }
 
     pub fn wait_until(&mut self, selector: Value, timeout_ms: Option<i64>) -> Result<bool, Error> {

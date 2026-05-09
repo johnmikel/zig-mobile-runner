@@ -81,6 +81,9 @@ class ZmrClient:
     def snapshot(self):
         return self.request("observe.snapshot")
 
+    def semantic_snapshot(self):
+        return self.request("observe.semanticSnapshot")
+
     def tap(self, selector):
         return self.request("ui.tap", {"selector": selector})
 

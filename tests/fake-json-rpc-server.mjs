@@ -26,7 +26,7 @@ rl.on("line", (line) => {
       },
       iosPreview: false,
       transports: ["stdio", "tcp"],
-      methods: ["runner.capabilities", "session.create", "app.openLink", "observe.snapshot", "wait.until", "trace.events", "trace.export"],
+      methods: ["runner.capabilities", "session.create", "app.openLink", "observe.snapshot", "observe.semanticSnapshot", "wait.until", "trace.events", "trace.export"],
     };
   } else if (method === "session.create") {
     result = { sessionId: "default" };
@@ -42,6 +42,31 @@ rl.on("line", (line) => {
       activePackage: "com.example.mobiletest",
       activeActivity: ".MainActivity",
       nodes: [{ stableId: "title", className: "Text", text: "Home", bounds: { x: 0, y: 0, width: 100, height: 44 }, enabled: true, visible: true, selected: false }],
+    };
+  } else if (method === "observe.semanticSnapshot") {
+    result = {
+      id: "snapshot-1",
+      timestampMs: 1,
+      viewport: { width: 720, height: 1280 },
+      activePackage: "com.example.mobiletest",
+      activeActivity: ".MainActivity",
+      focusedNodeId: null,
+      nodes: [
+        {
+          id: "title",
+          role: "button",
+          name: "Home",
+          selector: { text: "Home" },
+          source: { className: "Button", resourceId: null, text: "Home", contentDesc: null },
+          bounds: { x: 0, y: 0, width: 100, height: 44, centerX: 50, centerY: 22 },
+          enabled: true,
+          visible: true,
+          selected: false,
+          interactive: true,
+          recommendedAction: "tap",
+        },
+      ],
+      summary: { nodeCount: 1, interactiveCount: 1, visibleText: ["Home"] },
     };
   } else if (method === "trace.export") {
     result = {

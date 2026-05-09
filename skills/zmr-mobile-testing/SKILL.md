@@ -1,6 +1,6 @@
 ---
 name: zmr-mobile-testing
-description: Use when testing mobile apps with Zig Mobile Runner, integrating app-local .zmr setup, driving Android or iOS simulator scenarios, using JSON-RPC agent sessions, exporting traces, or comparing mobile runner benchmarks.
+description: Use when testing mobile apps with Zig Mobile Runner, integrating app-local .zmr setup, driving Android or iOS simulator scenarios, using JSON-RPC or MCP agent sessions, exporting traces, or comparing mobile runner benchmarks.
 ---
 
 # ZMR Mobile Testing
@@ -40,15 +40,26 @@ Call methods in this order:
 
 1. `runner.capabilities`
 2. `session.create`
-3. `observe.snapshot`
+3. `observe.semanticSnapshot` for planning, or `observe.snapshot` for raw adapter data
 4. one typed action, wait, or assertion
-5. `observe.snapshot`
+5. `observe.semanticSnapshot`
 6. `trace.events` while the session is active
 7. `trace.export` with redaction enabled
 8. `session.close`
 
 Do not scrape terminal output when CLI JSON, snapshots, action results, or trace
 events contain the same information.
+
+For MCP-capable agents, start:
+
+```bash
+zmr mcp --config .zmr/config.json --trace-dir traces/zmr-agent
+```
+
+Use the `semantic_snapshot`, `tap`, `type`, `wait_visible`, `trace_events`, and
+`trace_export` tools. Prefer `semantic_snapshot` because it normalizes Android
+and iOS hierarchy classes into roles, selectors, bounds, and recommended
+actions.
 
 ## Scenario Pattern
 

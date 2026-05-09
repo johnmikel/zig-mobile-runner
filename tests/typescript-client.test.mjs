@@ -31,6 +31,10 @@ test("typescript reference client drives a stdio JSON-RPC session", async () => 
     assert.equal(snapshot.activePackage, "com.example.mobiletest");
     assert.equal(snapshot.nodes[0].text, "Home");
 
+    const semanticSnapshot = await client.semanticSnapshot();
+    assert.equal(semanticSnapshot.nodes[0].role, "button");
+    assert.equal(semanticSnapshot.nodes[0].recommendedAction, "tap");
+
     const exported = await client.exportTrace("traces/client.zmrtrace", { redact: true, omitScreenshots: true });
     assert.equal(exported.redacted, true);
     assert.equal(exported.omitScreenshots, true);

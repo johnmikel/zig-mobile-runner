@@ -1,0 +1,116 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/semantic-snapshot.schema.json",
+  "title": "ZMR Semantic Snapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "timestampMs",
+    "viewport",
+    "activePackage",
+    "activeActivity",
+    "focusedNodeId",
+    "nodes",
+    "summary"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "timestampMs": { "type": "integer" },
+    "viewport": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["width", "height"],
+      "properties": {
+        "width": { "type": "integer", "minimum": 0 },
+        "height": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "activePackage": { "type": ["string", "null"] },
+    "activeActivity": { "type": ["string", "null"] },
+    "focusedNodeId": { "type": ["string", "null"] },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/semanticNode" }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["nodeCount", "interactiveCount", "visibleText"],
+      "properties": {
+        "nodeCount": { "type": "integer", "minimum": 0 },
+        "interactiveCount": { "type": "integer", "minimum": 0 },
+        "visibleText": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "semanticNode": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "role",
+        "name",
+        "selector",
+        "source",
+        "bounds",
+        "enabled",
+        "visible",
+        "selected",
+        "interactive",
+        "recommendedAction"
+      ],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "role": {
+          "enum": ["button", "textbox", "switch", "checkbox", "radio", "image", "text", "node"]
+        },
+        "name": { "type": "string" },
+        "selector": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": false,
+          "properties": {
+            "resourceId": { "type": "string" },
+            "contentDesc": { "type": "string" },
+            "text": { "type": "string" },
+            "stableId": { "type": "string" }
+          }
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["className", "resourceId", "text", "contentDesc"],
+          "properties": {
+            "className": { "type": "string" },
+            "resourceId": { "type": ["string", "null"] },
+            "text": { "type": ["string", "null"] },
+            "contentDesc": { "type": ["string", "null"] }
+          }
+        },
+        "bounds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "width", "height", "centerX", "centerY"],
+          "properties": {
+            "x": { "type": "integer" },
+            "y": { "type": "integer" },
+            "width": { "type": "integer" },
+            "height": { "type": "integer" },
+            "centerX": { "type": "integer" },
+            "centerY": { "type": "integer" }
+          }
+        },
+        "enabled": { "type": "boolean" },
+        "visible": { "type": "boolean" },
+        "selected": { "type": "boolean" },
+        "interactive": { "type": "boolean" },
+        "recommendedAction": { "enum": ["tap", "type", null] }
+      }
+    }
+  }
+}

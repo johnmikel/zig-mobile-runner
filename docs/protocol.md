@@ -11,6 +11,7 @@ Public schemas:
 - `schemas/json-rpc.schema.json`
 - `schemas/scenario.schema.json`
 - `schemas/snapshot.schema.json`
+- `schemas/semantic-snapshot.schema.json`
 - `schemas/action-result.schema.json`
 - `schemas/trace-event.schema.json`
 - `schemas/trace-manifest.schema.json`
@@ -114,7 +115,7 @@ and method inventory for JSON-RPC clients. The result object is covered by
 iOS simulator, or physical iOS workflows are available.
 
 ```json
-{"name":"zmr","version":"0.1.0-dev.1","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator","physical"],"automation":["simctl","devicectl","xctest-shim"],"physicalDevices":true}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list"]}
+{"name":"zmr","version":"0.1.0-dev.1","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator","physical"],"automation":["simctl","devicectl","xctest-shim"],"physicalDevices":true}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list","observe.snapshot","observe.semanticSnapshot"]}
 ```
 
 ## Doctor Output Contract
@@ -216,6 +217,7 @@ zmr serve --transport stdio --device emulator-5554 --app-id com.example.mobilete
 zmr serve --transport tcp --port 8765 --device emulator-5554 --app-id com.example.mobiletest --trace-dir traces/agent-session
 zmr serve --transport stdio --platform ios --device <sim-udid> --app-id com.example.mobiletest --trace-dir traces/ios-agent-session
 zmr serve --transport stdio --platform ios --ios-device-type physical --device <device-udid> --app-id com.example.mobiletest --trace-dir traces/ios-physical-agent-session
+zmr mcp --config .zmr/config.json --trace-dir traces/mcp-agent-session
 ```
 
 `runner.capabilities` reports `platforms: ["android","ios"]`, `platformSupport.ios.status: "supported"`, and legacy `iosPreview: false`. Android supports emulators and connected devices. iOS simulators use `simctl` for discovery, install, launch, stop, clear-state-by-uninstall, deep links, screenshots, logs, and snapshots. Physical iOS devices use `devicectl` for discovery, install, launch, deep-link launch, clear-state-by-uninstall, and best-effort stop. Selector-grade `ui.*` methods on iOS require a configured XCTest/XCUIAutomation shim command; without one they return `IosXCTestShimRequired`. With the shim configured, single-field `ui.tap`, selector-scoped `ui.type`, and selector-scoped `ui.eraseText` can execute directly through XCTest; compound selectors continue to use the portable snapshot-matching fallback. Physical iOS screenshot/log capture is intentionally limited in this release.
@@ -232,6 +234,7 @@ zmr serve --transport stdio --platform ios --ios-device-type physical --device <
 - `app.openLink` with `{ "url": "exampleapp://e2e-auth?probe=1" }`
 - `app.clearState`
 - `observe.snapshot`
+- `observe.semanticSnapshot`
 - `ui.tap` with `{ "selector": { "text": "Sign in" } }`
 - `ui.type` with `{ "text": "hello" }`, optionally with `selector`
 - `ui.eraseText` with `{ "maxChars": 80 }`, optionally with `selector`
@@ -284,7 +287,7 @@ Request:
 Response:
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"name":"zmr","version":"0.1.0-dev.1","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator","physical"],"automation":["simctl","devicectl","xctest-shim"],"physicalDevices":true}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list","session.create","session.close","app.install","app.launch","app.stop","app.openLink","app.clearState","observe.snapshot","ui.tap","ui.type","ui.eraseText","ui.hideKeyboard","ui.swipe","ui.pressBack","ui.scrollUntilVisible","wait.until","wait.any","wait.gone","assert.visible","assert.notVisible","trace.events","trace.export"]}}
+{"jsonrpc":"2.0","id":1,"result":{"name":"zmr","version":"0.1.0-dev.1","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator","physical"],"automation":["simctl","devicectl","xctest-shim"],"physicalDevices":true}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list","session.create","session.close","app.install","app.launch","app.stop","app.openLink","app.clearState","observe.snapshot","observe.semanticSnapshot","ui.tap","ui.type","ui.eraseText","ui.hideKeyboard","ui.swipe","ui.pressBack","ui.scrollUntilVisible","wait.until","wait.any","wait.gone","assert.visible","assert.notVisible","trace.events","trace.export"]}}
 ```
 
 ### `trace.events`
@@ -343,6 +346,36 @@ Response shape:
   }
 }
 ```
+
+### `observe.semanticSnapshot`
+
+Returns an agent-optimized view of the same observation. It normalizes
+platform-specific UI classes into roles, emits the best selector for each node,
+adds center points, and marks the recommended action when a node is actionable.
+The result is covered by `schemas/semantic-snapshot.schema.json`.
+
+```json
+{"jsonrpc":"2.0","id":3,"method":"observe.semanticSnapshot","params":{}}
+```
+
+```json
+{"jsonrpc":"2.0","id":3,"result":{"id":"snapshot-1","timestampMs":1777367889379,"viewport":{"width":720,"height":1280},"activePackage":"com.example.mobiletest","activeActivity":".MainActivity","focusedNodeId":null,"nodes":[{"id":"submit","role":"button","name":"Sign in","selector":{"resourceId":"submit"},"source":{"className":"android.widget.Button","resourceId":"submit","text":"Sign in","contentDesc":null},"bounds":{"x":80,"y":470,"width":560,"height":70,"centerX":360,"centerY":505},"enabled":true,"visible":true,"selected":false,"interactive":true,"recommendedAction":"tap"}],"summary":{"nodeCount":1,"interactiveCount":1,"visibleText":["Sign in"]}}}
+```
+
+## MCP Tool Surface
+
+`zmr mcp` speaks the Model Context Protocol over stdio. It uses the same app
+config, device adapters, selectors, waits, and trace writer as `zmr serve`, but
+exposes tool calls for agent runtimes that prefer MCP over raw JSON-RPC.
+
+```bash
+zmr mcp --config .zmr/config.json --trace-dir traces/mcp-agent
+```
+
+Core tools are `snapshot`, `semantic_snapshot`, `tap`, `type`, `press_back`,
+`open_link`, `wait_visible`, `trace_events`, and `trace_export`. The MCP
+protocol handshake is intentionally standard, while the tool names and payloads
+are versioned with the ZMR runner and public schemas.
 
 ### `ui.tap`
 

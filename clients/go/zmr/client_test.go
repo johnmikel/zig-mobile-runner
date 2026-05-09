@@ -69,6 +69,14 @@ func TestClientDrivesFakeSession(t *testing.T) {
 		t.Fatalf("unexpected first node: %+v", snapshot.Nodes)
 	}
 
+	semanticSnapshot, err := client.SemanticSnapshot(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(semanticSnapshot.Nodes) == 0 || semanticSnapshot.Nodes[0].Role != "button" || semanticSnapshot.Nodes[0].RecommendedAction == nil || *semanticSnapshot.Nodes[0].RecommendedAction != "tap" {
+		t.Fatalf("unexpected semantic first node: %+v", semanticSnapshot.Nodes)
+	}
+
 	exported, err := client.ExportTrace(ctx, filepath.Join(os.TempDir(), "go-client.zmrtrace"), true, true)
 	if err != nil {
 		t.Fatal(err)

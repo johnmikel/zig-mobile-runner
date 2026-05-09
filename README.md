@@ -13,8 +13,9 @@ ZMR through JSON-RPC, CLI JSON, scenarios, and language clients.
 
 ## Why ZMR
 
-- **AI-native protocol:** structured snapshots, actions, waits, assertions,
-  live trace events, and redacted trace export over stdio or localhost TCP.
+- **AI-native protocol:** structured snapshots, semantic mobile trees, actions,
+  waits, assertions, live trace events, and redacted trace export over
+  JSON-RPC or MCP.
 - **Trace-first debugging:** every run can produce screenshots, UI trees, logs,
   timings, action inputs, assertion results, and an HTML report.
 - **Fast local core:** Zig owns orchestration, subprocess control, selectors,
@@ -141,6 +142,7 @@ Stable JSON outputs are documented with schemas:
 `capabilities-output.schema.json`, `init-output.schema.json`,
 `devices-output.schema.json`, `validate-output.schema.json`,
 `run-output.schema.json`, `explain-output.schema.json`,
+`semantic-snapshot.schema.json`,
 `release-manifest.schema.json`, and `RELEASE_MANIFEST.json`.
 
 See [docs/dsl.md](docs/dsl.md) for the DSL decision and roadmap.
@@ -154,6 +156,15 @@ same JSON-RPC protocol.
 ```bash
 zmr serve --transport stdio --config .zmr/config.json --trace-dir traces/zmr-agent
 ```
+
+Agents that support the Model Context Protocol can use the native MCP surface:
+
+```bash
+zmr mcp --config .zmr/config.json --trace-dir traces/zmr-agent
+```
+
+The MCP server exposes mobile-specific tools such as `semantic_snapshot`,
+`tap`, `type`, `wait_visible`, `trace_events`, and `trace_export`.
 
 | Language | Entry point | Example |
 | --- | --- | --- |
@@ -191,6 +202,7 @@ Current release: `0.1.0-dev.1` developer preview. Protocol version:
 - [docs/install.md](docs/install.md): source, archive, npm, and app setup
 - [docs/app-integration.md](docs/app-integration.md): app-side Android/iOS shims
 - [docs/protocol.md](docs/protocol.md): JSON-RPC methods and schemas
+- [docs/ai-agents.md](docs/ai-agents.md): JSON-RPC and MCP agent workflows
 - [docs/dsl.md](docs/dsl.md): scenario DSL decision and roadmap
 - [docs/clients.md](docs/clients.md): language client guide
 - [docs/client-installation.md](docs/client-installation.md): npm, Homebrew, TS, Python, Go, Rust, Swift, and Kotlin setup

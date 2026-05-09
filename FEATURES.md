@@ -33,15 +33,18 @@ state, and writes deterministic traces. It does not embed an LLM.
 ## Agent Interface
 
 - JSON-RPC v1 over newline-delimited stdio or localhost TCP.
+- MCP stdio server with mobile-native tools for AI agents, including semantic
+  snapshots, selector actions, waits, trace polling, and trace export.
 - `runner.capabilities`, `device.list`, `session.create`,
-  `observe.snapshot`, UI actions, waits, assertions, live trace events, and
-  redacted trace export.
+  `observe.snapshot`, `observe.semanticSnapshot`, UI actions, waits,
+  assertions, live trace events, and redacted trace export.
 - TypeScript, Python, Go, Rust, Swift, and Kotlin reference clients.
 - Machine-readable CLI output for `zmr version --json`, `zmr schemas --json`,
   `zmr doctor --json`, `zmr devices --json`, `zmr validate --json`,
   `zmr run --json`, and `zmr explain --json`.
-- Public JSON Schemas for scenarios, snapshots, action results, trace events,
-  protocol messages, setup diagnostics, and release manifests.
+- Public JSON Schemas for scenarios, snapshots, semantic snapshots, action
+  results, trace events, protocol messages, setup diagnostics, and release
+  manifests.
 
 ## Scenario Execution
 

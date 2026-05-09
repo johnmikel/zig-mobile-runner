@@ -237,12 +237,19 @@ External agents can call:
 - `app.launch`
 - `app.openLink`
 - `observe.snapshot`
+- `observe.semanticSnapshot`
 - `ui.tap`
 - `wait.until`
 - `assert.visible`
 - `trace.export`
 
-Use `observe.snapshot` before choosing actions. Every action should settle and observe again. Scenario runs call the adapter-level settle hook after mutating actions; native shims can wait for platform idle while shell-only paths keep a bounded sleep fallback. Start `serve` with `--trace-dir` so `trace.export` can produce a redacted `.zmrtrace` bundle for the whole agent session.
+Use `observe.semanticSnapshot` before choosing actions, and use
+`observe.snapshot` when raw adapter details are needed. Every action should
+settle and observe again. Scenario runs call the adapter-level settle hook after
+mutating actions; native shims can wait for platform idle while shell-only paths
+keep a bounded sleep fallback. Start `serve` with `--trace-dir` so
+`trace.export` can produce a redacted `.zmrtrace` bundle for the whole agent
+session.
 
 ## Public Artifact Rules
 

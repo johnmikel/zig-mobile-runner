@@ -4,6 +4,7 @@ const errors = @import("errors.zig");
 const runner = @import("runner.zig");
 const scenario = @import("scenario.zig");
 const selector = @import("selector.zig");
+const semantic = @import("semantic.zig");
 const trace = @import("trace.zig");
 const version = @import("version.zig");
 
@@ -136,7 +137,7 @@ fn dispatchMethod(
     live_trace: ?*trace.TraceWriter,
 ) !void {
     if (std.mem.eql(u8, method, "runner.capabilities")) {
-        try writeResultRaw(writer, id, "{\"name\":\"zmr\",\"version\":\"" ++ version.runner_version ++ "\",\"protocolVersion\":\"" ++ version.protocol_version ++ "\",\"protocol\":{\"version\":\"" ++ version.protocol_version ++ "\",\"minimumCompatibleVersion\":\"" ++ version.protocol_min_compatible_version ++ "\",\"stability\":\"" ++ version.protocol_stability ++ "\",\"breakingChangePolicy\":\"" ++ version.protocol_breaking_change_policy ++ "\"},\"platforms\":[\"android\",\"ios\"],\"platformSupport\":{\"android\":{\"status\":\"supported\",\"deviceTypes\":[\"emulator\",\"physical\"],\"automation\":[\"adb\",\"uiautomator\",\"android-shim\"]},\"ios\":{\"status\":\"supported\",\"deviceTypes\":[\"simulator\",\"physical\"],\"automation\":[\"simctl\",\"devicectl\",\"xctest-shim\"],\"physicalDevices\":true}},\"iosPreview\":false,\"transports\":[\"stdio\",\"tcp\"],\"methods\":[\"runner.capabilities\",\"device.list\",\"session.create\",\"session.close\",\"app.install\",\"app.launch\",\"app.stop\",\"app.openLink\",\"app.clearState\",\"observe.snapshot\",\"ui.tap\",\"ui.type\",\"ui.eraseText\",\"ui.hideKeyboard\",\"ui.swipe\",\"ui.pressBack\",\"ui.scrollUntilVisible\",\"wait.until\",\"wait.any\",\"wait.gone\",\"assert.visible\",\"assert.notVisible\",\"trace.events\",\"trace.export\"]}");
+        try writeResultRaw(writer, id, "{\"name\":\"zmr\",\"version\":\"" ++ version.runner_version ++ "\",\"protocolVersion\":\"" ++ version.protocol_version ++ "\",\"protocol\":{\"version\":\"" ++ version.protocol_version ++ "\",\"minimumCompatibleVersion\":\"" ++ version.protocol_min_compatible_version ++ "\",\"stability\":\"" ++ version.protocol_stability ++ "\",\"breakingChangePolicy\":\"" ++ version.protocol_breaking_change_policy ++ "\"},\"platforms\":[\"android\",\"ios\"],\"platformSupport\":{\"android\":{\"status\":\"supported\",\"deviceTypes\":[\"emulator\",\"physical\"],\"automation\":[\"adb\",\"uiautomator\",\"android-shim\"]},\"ios\":{\"status\":\"supported\",\"deviceTypes\":[\"simulator\",\"physical\"],\"automation\":[\"simctl\",\"devicectl\",\"xctest-shim\"],\"physicalDevices\":true}},\"iosPreview\":false,\"transports\":[\"stdio\",\"tcp\"],\"methods\":[\"runner.capabilities\",\"device.list\",\"session.create\",\"session.close\",\"app.install\",\"app.launch\",\"app.stop\",\"app.openLink\",\"app.clearState\",\"observe.snapshot\",\"observe.semanticSnapshot\",\"ui.tap\",\"ui.type\",\"ui.eraseText\",\"ui.hideKeyboard\",\"ui.swipe\",\"ui.pressBack\",\"ui.scrollUntilVisible\",\"wait.until\",\"wait.any\",\"wait.gone\",\"assert.visible\",\"assert.notVisible\",\"trace.events\",\"trace.export\"]}");
         return;
     }
     if (std.mem.eql(u8, method, "device.list")) {
@@ -213,6 +214,28 @@ fn dispatchMethod(
         try writeId(writer, id);
         try writer.writeAll(",\"result\":");
         try trace.writeSnapshotJson(writer, snap);
+        try writer.writeAll("}\n");
+        return;
+    }
+    if (std.mem.eql(u8, method, "observe.semanticSnapshot")) {
+        var snap = try device.snapshot(live_trace);
+        defer snap.deinit(device.allocator);
+        if (live_trace) |tw| {
+            const path = try tw.writeSnapshot(snap);
+            defer tw.allocator.free(path);
+            var payload = std.ArrayList(u8).empty;
+            defer payload.deinit(tw.allocator);
+            try payload.writer(tw.allocator).writeAll("{\"path\":");
+            try trace.writeJsonString(payload.writer(tw.allocator), path);
+            try payload.writer(tw.allocator).writeAll(",\"snapshotId\":");
+            try trace.writeJsonString(payload.writer(tw.allocator), snap.id);
+            try payload.writer(tw.allocator).writeAll("}");
+            try tw.recordEvent("observe.semanticSnapshot", payload.items);
+        }
+        try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":");
+        try writeId(writer, id);
+        try writer.writeAll(",\"result\":");
+        try semantic.writeSemanticSnapshotJson(writer, snap);
         try writer.writeAll("}\n");
         return;
     }

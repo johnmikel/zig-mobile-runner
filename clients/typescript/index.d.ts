@@ -47,6 +47,40 @@ export interface ObservationSnapshot {
   nodes: UiNode[];
 }
 
+export interface SemanticNode {
+  id: string;
+  role: "button" | "textbox" | "switch" | "checkbox" | "radio" | "image" | "text" | "node" | string;
+  name: string;
+  selector: Record<string, string>;
+  source: {
+    className: string;
+    resourceId?: string | null;
+    text?: string | null;
+    contentDesc?: string | null;
+  };
+  bounds: { x: number; y: number; width: number; height: number; centerX: number; centerY: number };
+  enabled: boolean;
+  visible: boolean;
+  selected: boolean;
+  interactive: boolean;
+  recommendedAction?: "tap" | "type" | null | string;
+}
+
+export interface SemanticSnapshot {
+  id: string;
+  timestampMs: number;
+  viewport: Viewport;
+  activePackage?: string | null;
+  activeActivity?: string | null;
+  focusedNodeId?: string | null;
+  nodes: SemanticNode[];
+  summary: {
+    nodeCount: number;
+    interactiveCount: number;
+    visibleText: string[];
+  };
+}
+
 export interface PlatformSupport {
   status: "supported" | "preview" | "unsupported" | string;
   deviceTypes: string[];
@@ -75,6 +109,7 @@ export interface ZmrClient {
   clearState(): Promise<boolean>;
   openLink(url: string): Promise<boolean>;
   snapshot(): Promise<ObservationSnapshot>;
+  semanticSnapshot(): Promise<SemanticSnapshot>;
   tap(selector: Selector): Promise<boolean>;
   typeText(text: string, options?: { selector?: Selector }): Promise<boolean>;
   eraseText(options?: { selector?: Selector; maxChars?: number }): Promise<boolean>;

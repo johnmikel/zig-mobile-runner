@@ -4,6 +4,7 @@ This directory contains draft 2020-12 JSON Schemas for public ZMR file and proto
 
 - `scenario.schema.json`: scenario files consumed by `zmr run` and `zmr validate`
 - `snapshot.schema.json`: `ObservationSnapshot` JSON emitted by live RPC and persisted trace snapshots, including viewport and optional display density metrics
+- `semantic-snapshot.schema.json`: agent-optimized semantic tree emitted by `observe.semanticSnapshot` and `zmr mcp` `semantic_snapshot`
 - `action-result.schema.json`: typed action result shape reserved for richer protocol responses
 - `trace-event.schema.json`: one JSONL event row from `events.jsonl`
 - `trace-manifest.schema.json`: `trace.json` summary for one traced run

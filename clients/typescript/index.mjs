@@ -86,6 +86,10 @@ export class ZmrClient {
     return this.request("observe.snapshot", {});
   }
 
+  semanticSnapshot() {
+    return this.request("observe.semanticSnapshot", {});
+  }
+
   tap(selector) {
     return this.request("ui.tap", { selector });
   }

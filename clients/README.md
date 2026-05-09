@@ -9,6 +9,9 @@ zmr serve --transport stdio --config .zmr/config.json --trace-dir traces/zmr-age
 
 They are intended for AI agents, CI harnesses, and app teams that want typed
 or idiomatic calls without reimplementing JSON-RPC framing.
+Each client includes a semantic snapshot helper for `observe.semanticSnapshot`
+so agents can work from normalized roles, selectors, bounds, and recommended
+actions instead of raw platform hierarchy classes.
 
 For install commands across package managers, see
 [docs/client-installation.md](../docs/client-installation.md).
