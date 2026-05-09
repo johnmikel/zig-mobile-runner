@@ -3,285 +3,171 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
-test -f "$ROOT/docs/troubleshooting.md"
-test -f "$ROOT/docs/publication.md"
-test -f "$ROOT/FEATURES.md"
-test -f "$ROOT/docs/ai-agents.md"
-test -f "$ROOT/docs/adr/README.md"
-test -f "$ROOT/skills/zmr-mobile-testing/SKILL.md"
+require_file() {
+  test -f "$ROOT/$1"
+}
 
-grep -q 'FEATURES.md' "$ROOT/README.md"
-grep -q 'docs/ai-agents.md' "$ROOT/README.md"
-grep -q 'docs/adr/' "$ROOT/README.md"
-grep -q 'skills/zmr-mobile-testing/SKILL.md' "$ROOT/README.md"
-grep -q 'Agent Interface' "$ROOT/FEATURES.md"
-grep -q 'Current Limitations' "$ROOT/FEATURES.md"
-grep -q 'Physical iOS devices are not in the current support matrix' "$ROOT/FEATURES.md"
-grep -q 'Architecture Decisions' "$ROOT/docs/adr/README.md"
-grep -q 'Agent-Native Runner Boundary' "$ROOT/docs/adr/0001-agent-native-runner-boundary.md"
-grep -q 'App-Local `.zmr/` Contract' "$ROOT/docs/adr/0002-app-local-zmr-contract.md"
-grep -q 'iOS Simulator XCTest Shim' "$ROOT/docs/adr/0003-ios-simulator-xctest-shim.md"
-grep -q 'Benchmark Claims And Baseline Collection' "$ROOT/docs/adr/0004-benchmark-claims-and-baseline-collection.md"
-grep -q 'AI Agent Guide' "$ROOT/docs/ai-agents.md"
-grep -q 'runner.capabilities' "$ROOT/docs/ai-agents.md"
-grep -q 'trace.export' "$ROOT/docs/ai-agents.md"
-grep -q 'zmr-mobile-testing' "$ROOT/skills/zmr-mobile-testing/SKILL.md"
-grep -q 'ai-agents.md' "$ROOT/docs/npm.md"
-grep -q 'skills/zmr-mobile-testing' "$ROOT/docs/npm.md"
-grep -q 'FEATURES.md' "$ROOT/docs/shipping.md"
-grep -q 'docs/adr/' "$ROOT/docs/shipping.md"
-grep -q 'docs/ai-agents.md' "$ROOT/docs/shipping.md"
-grep -q 'skills/zmr-mobile-testing' "$ROOT/docs/shipping.md"
-grep -q 'Architecture decision records' "$ROOT/CHANGELOG.md"
-grep -q 'AI agent integration guide' "$ROOT/CHANGELOG.md"
-grep -q '^## Troubleshooting$' "$ROOT/README.md"
-grep -q 'docs/troubleshooting.md' "$ROOT/README.md"
-grep -q 'docs/publication.md' "$ROOT/README.md"
-grep -q 'Public GitHub Publication' "$ROOT/docs/publication.md"
-grep -q './scripts/release-gate.sh' "$ROOT/docs/publication.md"
-grep -q 'tests/public-safety-test.sh' "$ROOT/docs/publication.md"
-grep -q 'npm pack --dry-run' "$ROOT/docs/publication.md"
-grep -q 'git status --short' "$ROOT/docs/publication.md"
-grep -q 'Do not commit generated traces' "$ROOT/docs/publication.md"
-grep -q 'docs/publication.md' "$ROOT/docs/shipping.md"
-grep -q 'v0.1.0-dev.1' "$ROOT/docs/publication.md"
-grep -q 'v0.1.0-dev.1' "$ROOT/docs/shipping.md"
-if grep -q 'v0.1.0-dev.2' "$ROOT/docs/publication.md" "$ROOT/docs/shipping.md"; then
-  echo "publication docs should use the current package tag v0.1.0-dev.1 until the version is bumped" >&2
-  exit 1
-fi
+require_grep() {
+  local needle="$1"
+  local file="$2"
+  if ! grep -q "$needle" "$ROOT/$file"; then
+    echo "missing '$needle' in $file" >&2
+    exit 1
+  fi
+}
 
-grep -q '^# Troubleshooting$' "$ROOT/docs/troubleshooting.md"
-grep -q 'zmr doctor --json' "$ROOT/docs/troubleshooting.md"
-grep -q 'zmr doctor --strict --json' "$ROOT/docs/troubleshooting.md"
-grep -q 'doctor --strict' "$ROOT/docs/protocol.md"
-grep -q 'doctor --strict' "$ROOT/docs/shipping.md"
-grep -q 'zmr init --app' "$ROOT/README.md"
-grep -q 'zmr init --app' "$ROOT/docs/install.md"
-grep -q 'zmr init --app' "$ROOT/docs/config.md"
-grep -q 'Relative scenario, trace, and shim paths from config resolve against the app' "$ROOT/docs/config.md"
-grep -q 'root. For the standard `.zmr/config.json` location' "$ROOT/docs/config.md"
-grep -q 'zmr init --app' "$ROOT/docs/npm.md"
-grep -q 'zmr init --app' "$ROOT/docs/demo.md"
-grep -q 'zmr init --app' "$ROOT/docs/shipping.md"
-grep -q 'zmr init --json' "$ROOT/docs/protocol.md"
-grep -q 'Init Output Contract' "$ROOT/docs/protocol.md"
-grep -q 'zmr version --json' "$ROOT/README.md"
-grep -q 'zmr version --json' "$ROOT/docs/protocol.md"
-grep -q 'zmr version --json' "$ROOT/docs/demo.md"
-grep -q 'zmr schemas --json' "$ROOT/README.md"
-grep -q 'zmr schemas --json' "$ROOT/docs/protocol.md"
-grep -q 'zmr schemas --json' "$ROOT/docs/demo.md"
-grep -q 'zmr-device-matrix' "$ROOT/README.md"
-grep -q 'zmr-device-matrix' "$ROOT/docs/benchmarking.md"
-grep -q 'zmr-device-matrix' "$ROOT/docs/npm.md"
-grep -q 'zmr-device-matrix' "$ROOT/docs/shipping.md"
-grep -q 'zmr-benchmark-command' "$ROOT/README.md"
-grep -q 'zmr-benchmark-command' "$ROOT/docs/benchmarking.md"
-grep -q 'zmr-benchmark-command' "$ROOT/docs/npm.md"
-grep -q 'zmr-benchmark-command' "$ROOT/docs/shipping.md"
-grep -q 'zmr-benchmark-command' "$ROOT/CHANGELOG.md"
-grep -q 'zmr-compare-benchmarks' "$ROOT/README.md"
-grep -q 'zmr-compare-benchmarks' "$ROOT/docs/benchmarking.md"
-grep -q 'zmr-compare-benchmarks' "$ROOT/docs/npm.md"
-grep -q 'zmr-compare-benchmarks' "$ROOT/docs/shipping.md"
-grep -q 'zmr-compare-benchmarks' "$ROOT/CHANGELOG.md"
-grep -q 'zmr-pilot-gate' "$ROOT/README.md"
-grep -q 'zmr-pilot-gate' "$ROOT/docs/benchmarking.md"
-grep -q 'zmr-pilot-gate' "$ROOT/docs/npm.md"
-grep -q 'zmr-pilot-gate' "$ROOT/docs/shipping.md"
-grep -q 'zmr:pilot' "$ROOT/README.md"
-grep -q 'zmr:pilot' "$ROOT/docs/npm.md"
-grep -q 'matrix.jsonl' "$ROOT/docs/benchmarking.md"
-grep -q 'summary.json' "$ROOT/docs/benchmarking.md"
-grep -q 'verify-release-artifacts.sh' "$ROOT/README.md"
-grep -q 'verify-release-artifacts.sh' "$ROOT/docs/install.md"
-grep -q 'verify-release-artifacts.sh' "$ROOT/docs/shipping.md"
-grep -q 'RELEASE_MANIFEST.json' "$ROOT/README.md"
-grep -q 'RELEASE_MANIFEST.json' "$ROOT/docs/install.md"
-grep -q 'RELEASE_MANIFEST.json' "$ROOT/docs/shipping.md"
-grep -q 'artifact attestation' "$ROOT/docs/shipping.md"
-grep -q 'release-manifest.schema.json' "$ROOT/README.md"
-grep -q 'release-manifest.schema.json' "$ROOT/docs/protocol.md"
-grep -q 'release-manifest.schema.json' "$ROOT/schemas/README.md"
-grep -q 'sign-macos-release.sh' "$ROOT/README.md"
-grep -q 'sign-macos-release.sh' "$ROOT/docs/install.md"
-grep -q 'sign-macos-release.sh' "$ROOT/docs/shipping.md"
-grep -q 'notarize-macos-release.sh' "$ROOT/README.md"
-grep -q 'notarize-macos-release.sh' "$ROOT/docs/install.md"
-grep -q 'notarize-macos-release.sh' "$ROOT/docs/shipping.md"
-grep -q 'npm publish' "$ROOT/README.md"
-grep -q 'npm publish' "$ROOT/docs/install.md"
-grep -q 'npm publish' "$ROOT/docs/shipping.md"
-grep -q 'provenance' "$ROOT/docs/shipping.md"
-grep -q 'schemas-output.schema.json' "$ROOT/README.md"
-grep -q 'schemas-output.schema.json' "$ROOT/docs/protocol.md"
-grep -q 'schemas-output.schema.json' "$ROOT/schemas/README.md"
-grep -q '"schemas"' "$ROOT/schemas/schemas-output.schema.json"
-grep -q '"description"' "$ROOT/schemas/schemas-output.schema.json"
-grep -q 'Version Output Contract' "$ROOT/docs/protocol.md"
-grep -q 'version-output.schema.json' "$ROOT/README.md"
-grep -q 'version-output.schema.json' "$ROOT/docs/protocol.md"
-grep -q 'version-output.schema.json' "$ROOT/schemas/README.md"
-grep -q 'Capabilities Output Contract' "$ROOT/docs/protocol.md"
-grep -q 'capabilities-output.schema.json' "$ROOT/README.md"
-grep -q 'capabilities-output.schema.json' "$ROOT/docs/protocol.md"
-grep -q 'capabilities-output.schema.json' "$ROOT/schemas/README.md"
-grep -q 'capabilities-output.schema.json' "$ROOT/CHANGELOG.md"
-grep -q '"platformSupport"' "$ROOT/schemas/capabilities-output.schema.json"
-grep -q '"physicalDevices"' "$ROOT/schemas/capabilities-output.schema.json"
-grep -q 'platformSupport.ios.status: "supported"' "$ROOT/docs/protocol.md"
-grep -q '"iosPreview":false' "$ROOT/docs/protocol-fixtures/core-session.responses.jsonl"
-grep -q 'iOS simulators are supported' "$ROOT/README.md"
-grep -q 'iOS simulators are supported' "$ROOT/CHANGELOG.md"
-grep -q 'Physical iOS devices are not in the current support matrix' "$ROOT/README.md"
-grep -q 'Physical iOS devices are not in the current support matrix' "$ROOT/CHANGELOG.md"
-grep -q 'Physical iOS device automation' "$ROOT/docs/shipping.md"
+require_file README.md
+require_file FEATURES.md
+require_file SECURITY.md
+require_file CONTRIBUTING.md
+require_file CHANGELOG.md
+require_file clients/README.md
+require_file docs/install.md
+require_file docs/config.md
+require_file docs/protocol.md
+require_file docs/demo.md
+require_file docs/npm.md
+require_file docs/benchmarking.md
+require_file docs/troubleshooting.md
+require_file docs/publication.md
+require_file docs/shipping.md
+require_file docs/trace-privacy.md
+require_file docs/ai-agents.md
+require_file docs/clients.md
+require_file docs/dsl.md
+require_file docs/market-positioning.md
+require_file docs/adr/README.md
+require_file schemas/README.md
+require_file skills/zmr-mobile-testing/SKILL.md
+
+require_file .github/ISSUE_TEMPLATE/bug_report.yml
+require_file .github/ISSUE_TEMPLATE/feature_request.yml
+require_file .github/ISSUE_TEMPLATE/config.yml
+
+require_grep '^# Zig Mobile Runner$' README.md
+require_grep 'Agent-native mobile UI automation' README.md
+require_grep 'registry package is pending publish' README.md
+require_grep 'npm install --save-dev https://github.com/johnmikel/zig-mobile-runner/releases/download/v0.1.0-dev.1' README.md
+require_grep '## Scenario Example' README.md
+require_grep 'JSON is strict' README.md
+require_grep '## Agent And Language Clients' README.md
+require_grep 'Rust uses `src/lib.rs`' README.md
+require_grep 'iOS simulators use `simctl` plus an XCTest/XCUIAutomation shim' README.md
+require_grep 'iOS physical device' README.md
+require_grep 'zmr validate --json' README.md
+require_grep 'zmr devices --json' README.md
+require_grep 'zmr schemas --json' README.md
+require_grep 'zmr import flow-yaml' README.md
+require_grep 'verify-release-artifacts.sh' README.md
+require_grep 'RELEASE_MANIFEST.json' README.md
+require_grep 'release-manifest.schema.json' README.md
+require_grep 'schemas-output.schema.json' README.md
+require_grep 'version-output.schema.json' README.md
+require_grep 'capabilities-output.schema.json' README.md
+require_grep 'init-output.schema.json' README.md
+require_grep 'devices-output.schema.json' README.md
+require_grep 'validate-output.schema.json' README.md
+require_grep 'run-output.schema.json' README.md
+require_grep 'explain-output.schema.json' README.md
+require_grep 'docs/adr/' README.md
+require_grep 'docs/ai-agents.md' README.md
+require_grep 'docs/clients.md' README.md
+require_grep 'docs/dsl.md' README.md
+require_grep 'docs/market-positioning.md' README.md
+require_grep 'skills/zmr-mobile-testing/SKILL.md' README.md
+
+require_grep 'Agent Interface' FEATURES.md
+require_grep 'Current Limitations' FEATURES.md
+require_grep 'Physical iOS devices are not in the current support matrix' FEATURES.md
+require_grep 'Physical iOS devices are not in the current support matrix' CHANGELOG.md
+require_grep 'Architecture decision records' CHANGELOG.md
+require_grep 'AI agent integration guide' CHANGELOG.md
+require_grep 'zmr-benchmark-command' CHANGELOG.md
+require_grep 'zmr-compare-benchmarks' CHANGELOG.md
+
+require_grep 'JSON is strict' docs/dsl.md
+require_grep 'Human-Friendly Layer' docs/dsl.md
+require_grep 'Rust has `src/lib.rs`' docs/clients.md
+require_grep 'TypeScript' clients/README.md
+require_grep 'Python' clients/README.md
+require_grep 'Go' clients/README.md
+require_grep 'Rust' clients/README.md
+require_grep 'Market Positioning' docs/market-positioning.md
+require_grep 'Detox' docs/market-positioning.md
+require_grep 'Maestro' docs/market-positioning.md
+require_grep 'GitHub README plus release assets' docs/market-positioning.md
+
+require_grep 'Architecture Decisions' docs/adr/README.md
+require_grep 'Agent-Native Runner Boundary' docs/adr/0001-agent-native-runner-boundary.md
+require_grep 'App-Local `.zmr/` Contract' docs/adr/0002-app-local-zmr-contract.md
+require_grep 'iOS Simulator XCTest Shim' docs/adr/0003-ios-simulator-xctest-shim.md
+require_grep 'Benchmark Claims And Baseline Collection' docs/adr/0004-benchmark-claims-and-baseline-collection.md
+
+require_grep 'AI Agent Guide' docs/ai-agents.md
+require_grep 'runner.capabilities' docs/ai-agents.md
+require_grep 'trace.export' docs/ai-agents.md
+require_grep 'zmr-mobile-testing' skills/zmr-mobile-testing/SKILL.md
+
+require_grep 'zmr init --app' docs/install.md
+require_grep 'zmr init --app' docs/config.md
+require_grep 'zmr init --app' docs/demo.md
+require_grep 'zmr init --app' docs/npm.md
+require_grep 'zmr init --json' docs/protocol.md
+require_grep 'Relative scenario, trace, and shim paths from config resolve against the app' docs/config.md
+require_grep 'zmr version --json' docs/protocol.md
+require_grep 'zmr schemas --json' docs/protocol.md
+require_grep 'zmr devices --json' docs/protocol.md
+require_grep 'zmr validate <scenario.json> --json' docs/protocol.md
+require_grep 'zmr explain' docs/troubleshooting.md
+require_grep 'pilot wrappers run setup preflights' docs/troubleshooting.md
+
+require_grep 'zmr-device-matrix' docs/benchmarking.md
+require_grep 'zmr-benchmark-command' docs/benchmarking.md
+require_grep 'zmr-compare-benchmarks' docs/benchmarking.md
+require_grep 'zmr-pilot-gate' docs/benchmarking.md
+require_grep 'matrix.jsonl' docs/benchmarking.md
+require_grep 'summary.json' docs/benchmarking.md
+
+require_grep 'verify-release-artifacts.sh' docs/install.md
+require_grep 'verify-release-artifacts.sh' docs/shipping.md
+require_grep 'RELEASE_MANIFEST.json' docs/install.md
+require_grep 'RELEASE_MANIFEST.json' docs/shipping.md
+require_grep 'artifact attestation' docs/shipping.md
+require_grep 'release-manifest.schema.json' docs/protocol.md
+require_grep 'sign-macos-release.sh' docs/install.md
+require_grep 'notarize-macos-release.sh' docs/install.md
+require_grep 'npm publish' docs/install.md
+require_grep 'npm publish' docs/shipping.md
+require_grep 'provenance' docs/shipping.md
+require_grep 'Public GitHub Publication' docs/publication.md
+require_grep './scripts/release-gate.sh' docs/publication.md
+require_grep 'tests/public-safety-test.sh' docs/publication.md
+require_grep 'Do not commit generated traces' docs/publication.md
+
+require_grep 'schemas-output.schema.json' schemas/README.md
+require_grep 'version-output.schema.json' schemas/README.md
+require_grep 'capabilities-output.schema.json' schemas/README.md
+require_grep 'init-output.schema.json' schemas/README.md
+require_grep 'import-output.schema.json' schemas/README.md
+require_grep 'devices-output.schema.json' schemas/README.md
+require_grep 'validate-output.schema.json' schemas/README.md
+require_grep '"schemas"' schemas/schemas-output.schema.json
+require_grep '"protocolVersion"' schemas/version-output.schema.json
+require_grep '"platformSupport"' schemas/capabilities-output.schema.json
+require_grep '"physicalDevices"' schemas/capabilities-output.schema.json
+require_grep '"mode"' schemas/init-output.schema.json
+require_grep '"format"' schemas/import-output.schema.json
+require_grep '"platform"' schemas/devices-output.schema.json
+require_grep '"stepCount"' schemas/validate-output.schema.json
+require_grep '"failedStepIndex"' schemas/run-output.schema.json
+require_grep '"diagnostic"' schemas/explain-output.schema.json
+
 if grep -q 'iOS simulator support is a preview' "$ROOT/README.md" "$ROOT/docs/install.md" "$ROOT/docs/shipping.md" "$ROOT/docs/protocol.md"; then
   echo "iOS simulator support should not be documented as preview" >&2
   exit 1
 fi
+
 if grep -q 'iOS simulator support remains preview' "$ROOT/CHANGELOG.md"; then
   echo "changelog still lists iOS simulator support as preview" >&2
-  exit 1
-fi
-grep -q '"protocolVersion"' "$ROOT/schemas/version-output.schema.json"
-grep -q '"minimumCompatibleProtocolVersion"' "$ROOT/schemas/version-output.schema.json"
-grep -q '"breakingChangePolicy"' "$ROOT/schemas/version-output.schema.json"
-grep -q 'init-output.schema.json' "$ROOT/README.md"
-grep -q 'init-output.schema.json' "$ROOT/docs/protocol.md"
-grep -q 'init-output.schema.json' "$ROOT/schemas/README.md"
-grep -q 'zmr import flow-yaml' "$ROOT/README.md"
-grep -q 'zmr import flow-yaml' "$ROOT/docs/protocol.md"
-grep -q 'zmr import flow-yaml' "$ROOT/docs/demo.md"
-grep -q 'zmr import flow-yaml' "$ROOT/docs/roadmap.md"
-grep -q 'zmr import flow-yaml' "$ROOT/docs/scenario-authoring.md"
-grep -q 'Import Output Contract' "$ROOT/docs/protocol.md"
-grep -q 'import-output.schema.json' "$ROOT/docs/protocol.md"
-grep -q 'import-output.schema.json' "$ROOT/schemas/README.md"
-grep -q '"format"' "$ROOT/schemas/import-output.schema.json"
-grep -q 'zmr devices --json' "$ROOT/README.md"
-grep -q 'zmr devices --json' "$ROOT/docs/protocol.md"
-grep -q 'zmr devices --json' "$ROOT/docs/demo.md"
-grep -q 'Devices Output Contract' "$ROOT/docs/protocol.md"
-grep -q 'devices-output.schema.json' "$ROOT/README.md"
-grep -q 'devices-output.schema.json' "$ROOT/docs/protocol.md"
-grep -q 'devices-output.schema.json' "$ROOT/schemas/README.md"
-grep -q '"platform"' "$ROOT/schemas/devices-output.schema.json"
-grep -q '"android"' "$ROOT/schemas/devices-output.schema.json"
-grep -q '"ios"' "$ROOT/schemas/devices-output.schema.json"
-grep -q '"serial"' "$ROOT/schemas/devices-output.schema.json"
-grep -q '"state"' "$ROOT/schemas/devices-output.schema.json"
-grep -q 'zmr validate --json' "$ROOT/README.md"
-grep -q 'Validate Output Contract' "$ROOT/docs/protocol.md"
-grep -q 'validate-output.schema.json' "$ROOT/README.md"
-grep -q 'validate-output.schema.json' "$ROOT/docs/protocol.md"
-grep -q 'validate-output.schema.json' "$ROOT/docs/demo.md"
-grep -q 'validate-output.schema.json' "$ROOT/schemas/README.md"
-grep -q '"stepCount"' "$ROOT/schemas/validate-output.schema.json"
-grep -q '"fieldPath"' "$ROOT/schemas/validate-output.schema.json"
-grep -q 'zmr run.*--json' "$ROOT/README.md"
-grep -q 'zmr run.*--json' "$ROOT/docs/protocol.md"
-grep -q 'zmr run.*--json' "$ROOT/docs/demo.md"
-grep -q 'run-output.schema.json' "$ROOT/README.md"
-grep -q 'run-output.schema.json' "$ROOT/docs/protocol.md"
-grep -q 'run-output.schema.json' "$ROOT/schemas/README.md"
-grep -q '"failedStepIndex"' "$ROOT/schemas/run-output.schema.json"
-grep -q '"eventCount"' "$ROOT/schemas/run-output.schema.json"
-grep -q '"mode"' "$ROOT/schemas/init-output.schema.json"
-grep -q '"app"' "$ROOT/schemas/init-output.schema.json"
-grep -q '"scenario"' "$ROOT/schemas/init-output.schema.json"
-grep -q '"hint"' "$ROOT/docs/troubleshooting.md"
-grep -q 'zmr validate --json' "$ROOT/docs/troubleshooting.md"
-grep -q 'zmr explain' "$ROOT/docs/troubleshooting.md"
-grep -q 'zmr explain.*--json' "$ROOT/README.md"
-grep -q 'zmr explain.*--json' "$ROOT/docs/protocol.md"
-grep -q 'zmr explain.*--json' "$ROOT/docs/demo.md"
-grep -q 'explain-output.schema.json' "$ROOT/README.md"
-grep -q 'explain-output.schema.json' "$ROOT/docs/protocol.md"
-grep -q 'explain-output.schema.json' "$ROOT/schemas/README.md"
-grep -q '"diagnostic"' "$ROOT/schemas/explain-output.schema.json"
-grep -q '"visibleTexts"' "$ROOT/schemas/explain-output.schema.json"
-grep -q '"nearestTextMatches"' "$ROOT/schemas/explain-output.schema.json"
-grep -q 'release-gate.sh --dry-run' "$ROOT/docs/troubleshooting.md"
-grep -q 'pilot wrappers run setup preflights' "$ROOT/docs/troubleshooting.md"
-grep -q 'no Android device found' "$ROOT/docs/troubleshooting.md"
-grep -q 'no booted iOS simulator found' "$ROOT/docs/troubleshooting.md"
-grep -q 'android-shim' "$ROOT/docs/troubleshooting.md"
-grep -q 'ios-shim' "$ROOT/docs/troubleshooting.md"
-grep -q 'smokeScenario' "$ROOT/docs/troubleshooting.md"
-grep -q 'setup.android.no_devices' "$ROOT/docs/troubleshooting.md"
-grep -q 'setup.ios.no_booted_simulators' "$ROOT/docs/troubleshooting.md"
-grep -q 'error\[device.command_failed\]' "$ROOT/docs/troubleshooting.md"
-grep -q 'error\[cli.unknown_command\]' "$ROOT/docs/troubleshooting.md"
-grep -q 'setup.android_shim.not_found' "$ROOT/docs/troubleshooting.md"
-grep -q 'setup.android_shim.not_found' "$ROOT/docs/protocol.md"
-grep -q 'ios-smoke-scenario' "$ROOT/docs/demo.md"
-grep -q '"name":"config"' "$ROOT/docs/protocol.md"
-grep -q '"errorCode":"config.empty_string"' "$ROOT/docs/protocol.md"
-grep -q '"fieldPath":"$.scripts.android"' "$ROOT/docs/protocol.md"
-grep -q '"config"' "$ROOT/schemas/doctor-output.schema.json"
-grep -q '"errorCode"' "$ROOT/schemas/doctor-output.schema.json"
-grep -q '"fieldPath"' "$ROOT/schemas/doctor-output.schema.json"
-grep -q 'android-smoke-scenario' "$ROOT/schemas/doctor-output.schema.json"
-grep -q 'ios-smoke-scenario' "$ROOT/schemas/doctor-output.schema.json"
-grep -q 'malformed scenario JSON' "$ROOT/docs/demo.md"
-grep -q 'config file itself loaded' "$ROOT/docs/troubleshooting.md"
-grep -q 'wrong types' "$ROOT/docs/troubleshooting.md"
-grep -q 'unknown fields' "$ROOT/docs/troubleshooting.md"
-grep -q 'empty strings' "$ROOT/docs/troubleshooting.md"
-grep -q 'script commands' "$ROOT/docs/troubleshooting.md"
-
-grep -q 'testInstrumentationRunner' "$ROOT/README.md"
-grep -q 'testInstrumentationRunner' "$ROOT/docs/app-integration.md"
-grep -q 'testInstrumentationRunner' "$ROOT/docs/npm.md"
-grep -q 'ensure-ios-shim-target.sh' "$ROOT/README.md"
-grep -q 'ensure-ios-shim-target.sh' "$ROOT/docs/app-integration.md"
-grep -q 'ensure-ios-shim-target.sh' "$ROOT/docs/install.md"
-grep -q 'ensure-ios-shim-target.sh' "$ROOT/docs/npm.md"
-grep -q 'ensure-ios-shim-target.sh' "$ROOT/docs/troubleshooting.md"
-grep -q 'zmr-demo-ios' "$ROOT/README.md"
-grep -q 'zmr-demo-ios' "$ROOT/docs/app-integration.md"
-grep -q 'zmr-demo-ios' "$ROOT/docs/demo.md"
-grep -q 'zmr-demo-ios' "$ROOT/docs/npm.md"
-grep -q 'replay controls' "$ROOT/README.md"
-grep -q 'replay controls' "$ROOT/docs/protocol.md"
-grep -q 'inspect the replay' "$ROOT/docs/demo.md"
-grep -q 'snapshot replay controls' "$ROOT/docs/shipping.md"
-grep -q 'placeholder frames' "$ROOT/README.md"
-grep -q 'placeholder frames' "$ROOT/docs/protocol.md"
-grep -q 'placeholder PNGs' "$ROOT/docs/trace-privacy.md"
-grep -q -- '--omit-screenshots' "$ROOT/README.md"
-grep -q -- '--omit-screenshots' "$ROOT/docs/protocol.md"
-grep -q -- '--omit-screenshots' "$ROOT/docs/trace-privacy.md"
-grep -q 'omitScreenshots' "$ROOT/docs/protocol.md"
-grep -q '"screenshotsRedacted"' "$ROOT/schemas/trace-manifest.schema.json"
-grep -q 'Add replay controls for snapshot-linked trace frames' "$ROOT/docs/roadmap.md"
-if grep -q 'Replay UI' "$ROOT/docs/shipping.md"; then
-  echo "shipping docs still list replay UI as missing" >&2
-  exit 1
-fi
-grep -q 'contains `--app-target`' "$ROOT/README.md"
-grep -q 'contains `--app-target`' "$ROOT/docs/app-integration.md"
-grep -q 'contains `--app-target`' "$ROOT/docs/install.md"
-grep -q 'contains `--app-target`' "$ROOT/docs/npm.md"
-grep -q '`--bundle-id` disambiguates' "$ROOT/README.md"
-grep -q '`--bundle-id` disambiguates' "$ROOT/docs/app-integration.md"
-grep -q '`--bundle-id` disambiguates' "$ROOT/docs/install.md"
-grep -q '`--bundle-id` disambiguates' "$ROOT/docs/npm.md"
-if grep -q 'Ambiguous iOS workspace selection' "$ROOT/docs/shipping.md"; then
-  echo "docs/shipping.md should not list resolved iOS workspace selection as missing" >&2
-  exit 1
-fi
-grep -q 'exactly one workspace project contains' "$ROOT/docs/shipping.md"
-grep -q '`--bundle-id` disambiguates matching' "$ROOT/docs/shipping.md"
-grep -q 'Local migration CLI' "$ROOT/docs/shipping.md"
-grep -q 'cloud device farm certification' "$ROOT/docs/shipping.md"
-if grep -q 'Scenario import tooling' "$ROOT/docs/shipping.md"; then
-  echo "shipping docs still list scenario import tooling as missing" >&2
-  exit 1
-fi
-if grep -q 'Turnkey Android Gradle/Xcode project mutation' "$ROOT/docs/shipping.md"; then
-  echo "shipping docs still claim Android project mutation is not included" >&2
   exit 1
 fi

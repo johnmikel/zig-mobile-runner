@@ -1,0 +1,41 @@
+name: Bug report
+description: Report a reproducible ZMR bug.
+title: "[bug]: "
+labels: ["bug"]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What failed, and what did you expect?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction
+      description: Include commands, platform, and a minimal scenario when possible.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Paste `zmr version --json`, `zmr doctor --json`, and `zmr explain --json <trace-dir>` output. Redact secrets.
+      render: json
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Android emulator
+        - Android physical device
+        - iOS simulator
+        - CLI/protocol
+        - packaging/docs
+    validations:
+      required: true

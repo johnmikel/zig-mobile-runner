@@ -25,6 +25,8 @@ All notable changes to Zig Mobile Runner are tracked here.
 - Feature catalog in `FEATURES.md`.
 - Architecture decision records under `docs/adr/`.
 - AI agent integration guide in `docs/ai-agents.md`.
+- Simplified market-facing README plus dedicated DSL, client, and positioning docs.
+- GitHub issue templates for bug reports and feature requests.
 - Reusable `zmr-mobile-testing` agent skill under `skills/`.
 - `trace.events` JSON-RPC cursor polling for live trace events during long-running agent sessions.
 - Field, line, and column diagnostics in `zmr validate --json` for invalid scenarios.

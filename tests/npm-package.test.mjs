@@ -28,6 +28,7 @@ test("package exposes zmr bin and public files for npm publishing", () => {
   assert.equal(pkg.bin["zmr-demo-ios"], "scripts/demo-ios-real.sh");
   assert.equal(pkg.main, "npm/index.mjs");
   assert.ok(pkg.files.includes("npm/"));
+  assert.ok(pkg.files.includes("clients/README.md"));
   assert.ok(pkg.files.includes("clients/typescript/"));
   assert.ok(pkg.files.includes("clients/python/zmr_client.py"));
   assert.ok(pkg.files.includes("clients/go/"));
@@ -324,6 +325,7 @@ test("packed npm package installs in a temp app and drives zmr through .zmr", ()
     assert.match(tarList.stdout, /package\/scripts\/notarize-macos-release\.sh/);
     assert.match(tarList.stdout, /package\/scripts\/pilot-gate\.sh/);
     assert.match(tarList.stdout, /package\/schemas\/release-manifest\.schema\.json/);
+    assert.match(tarList.stdout, /package\/clients\/README\.md/);
     assert.match(tarList.stdout, /package\/skills\/zmr-mobile-testing\/SKILL\.md/);
     assert.doesNotMatch(tarList.stdout, /__pycache__|\.pyc/);
 

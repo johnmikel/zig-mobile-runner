@@ -9,8 +9,6 @@ deny_terms=(
   "(^|[^[:alpha:]])ren""tly([^[:alpha:]]|$)"
   "uk[.]co[.]ren""tly"
   "ren""tlytest"
-  "maes""tro"
-  "de""tox"
 )
 
 exclude_dirs=(

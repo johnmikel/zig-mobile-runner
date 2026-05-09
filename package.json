@@ -27,6 +27,7 @@
   },
   "files": [
     "npm/",
+    "clients/README.md",
     "clients/typescript/",
     "clients/python/README.md",
     "clients/python/zmr_client.py",
