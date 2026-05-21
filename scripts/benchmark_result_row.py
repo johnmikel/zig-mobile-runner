@@ -11,6 +11,11 @@ def parse_args():
     parser.add_argument("--command-status", required=True, type=int)
     parser.add_argument("--duration-ms", required=True, type=int)
     parser.add_argument("--trace-dir", required=True)
+    parser.add_argument("--platform")
+    parser.add_argument("--device")
+    parser.add_argument("--app-id")
+    parser.add_argument("--scenario")
+    parser.add_argument("--app-build")
     return parser.parse_args()
 
 
@@ -64,6 +69,14 @@ def main():
         "durationMs": args.duration_ms,
         "traceDir": args.trace_dir,
     }
+    metadata = {
+        "platform": args.platform,
+        "device": args.device,
+        "appId": args.app_id,
+        "scenario": args.scenario,
+        "appBuild": args.app_build,
+    }
+    row.update({key: value for key, value in metadata.items() if value})
 
     if args.tool == "zmr":
         row.update(read_zmr_trace(args.trace_dir))

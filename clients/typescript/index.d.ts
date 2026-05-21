@@ -99,11 +99,18 @@ export interface Capabilities {
   methods: string[];
 }
 
+export interface DeviceInfo {
+  serial: string;
+  state: string;
+  ready: boolean;
+}
+
 export interface ZmrClient {
   request<T = unknown>(method: string, params?: Record<string, unknown>): Promise<T>;
   capabilities(): Promise<Capabilities>;
   createSession(): Promise<{ sessionId: string }>;
   closeSession(): Promise<boolean>;
+  devices(): Promise<DeviceInfo[]>;
   launch(): Promise<boolean>;
   stop(): Promise<boolean>;
   clearState(): Promise<boolean>;
@@ -122,6 +129,7 @@ export interface ZmrClient {
   waitGone(selector: Selector, options?: { timeoutMs?: number }): Promise<boolean>;
   assertVisible(selector: Selector, options?: { timeoutMs?: number }): Promise<boolean>;
   assertNotVisible(selector: Selector, options?: { timeoutMs?: number }): Promise<boolean>;
+  assertHealthy(options?: { timeoutMs?: number }): Promise<boolean>;
   exportTrace(out: string, options?: { redact?: boolean; omitScreenshots?: boolean }): Promise<Record<string, unknown>>;
   traceEvents(afterSeq?: number, options?: { limit?: number }): Promise<Record<string, unknown>>;
   close(): Promise<void>;

@@ -89,6 +89,9 @@ state, and writes deterministic traces. It does not embed an LLM.
 - Release archive builder with checksums, SPDX SBOM, third-party notices,
   generated Homebrew formula, and `RELEASE_MANIFEST.json`.
 - npm package tarball generation with bundled prebuilt binaries.
+- `zmr-release-readiness` checks release-candidate evidence for dev-preview,
+  production, or market-claim readiness before maintainers publish or make
+  competitive claims.
 - Tagged release workflow with artifact attestation and optional npm
   provenance publishing.
 - Security, contribution, trace privacy, troubleshooting, protocol versioning,
@@ -97,10 +100,10 @@ state, and writes deterministic traces. It does not embed an LLM.
 
 ## Current Limitations
 
-- Current release status is `0.1.0-dev`, a public developer preview rather than
+- Current release status is `0.1.0-dev.2`, a public developer preview rather than
   a production-stable `1.0.0`.
-- Physical iOS screenshot/log capture is still simulator-first; physical iOS
-  selector traces rely on the XCTest/XCUIAutomation shim hierarchy.
+- Physical iOS log capture is still simulator-first. Physical iOS screenshots
+  are available when the XCTest/XCUIAutomation shim is configured.
 - Broad cloud device farm certification is out of scope for this preview.
 - Public benchmark fixtures are generic. Performance claims for a real app
   should come from equivalent app-local candidate and baseline runs.

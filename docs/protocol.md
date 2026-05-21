@@ -2,7 +2,7 @@
 
 ZMR exposes newline-delimited JSON-RPC 2.0 over stdio or localhost TCP in v1. Each request is one JSON object followed by `\n`. Each response is one JSON object followed by `\n`.
 
-Current runner version: `0.1.0-dev.1`.
+Current runner version: `0.1.0-dev.2`.
 
 Current protocol version: `2026-04-28`.
 
@@ -25,6 +25,7 @@ Public schemas:
 - `schemas/explain-output.schema.json`
 - `schemas/run-output.schema.json`
 - `schemas/release-manifest.schema.json`
+- `schemas/release-readiness-output.schema.json`
 - `schemas/schemas-output.schema.json`
 
 Compatibility fixtures live under `docs/protocol-fixtures/`. The Zig unit suite
@@ -35,6 +36,14 @@ methods.
 form for setup scripts, generated clients, and editor integrations. The
 response is covered by `schemas/schemas-output.schema.json`.
 
+`zmr-release-readiness --json` checks one or more release/pilot evidence files
+for dev-preview, production, or market-claim gates. The output is covered by
+`schemas/release-readiness-output.schema.json`:
+
+```json
+{"ok":false,"target":"market-claim","status":"blocked","evidence":"traces/release-candidate/run/evidence.jsonl","evidenceFiles":["traces/release-candidate/run/evidence.jsonl"],"passed":["local release gate","public Android emulator demo","public iOS simulator demo"],"satisfied":["local release gate","public Android demo","public iOS simulator demo"],"failed":[],"planned":[],"missing":["physical iOS readiness","Android hardware pilot","iOS simulator hardware pilot","iOS physical hardware pilot","competitive benchmark comparison"],"insufficient":[],"blocked":["physical iOS readiness","Android hardware pilot","iOS simulator hardware pilot","iOS physical hardware pilot","competitive benchmark comparison"],"requirements":[{"name":"local release gate","status":"satisfied","evidenceName":"local release gate"},{"name":"public Android demo","status":"satisfied","evidenceName":"public Android emulator demo"},{"name":"public iOS simulator demo","status":"satisfied","evidenceName":"public iOS simulator demo"},{"name":"physical iOS readiness","status":"missing","reason":"no matching passed evidence row"},{"name":"Android hardware pilot","status":"missing","reason":"no matching passed evidence row"},{"name":"iOS simulator hardware pilot","status":"missing","reason":"no matching passed evidence row"},{"name":"iOS physical hardware pilot","status":"missing","reason":"no matching passed evidence row"},{"name":"competitive benchmark comparison","status":"missing","reason":"no matching passed evidence row"}],"nextSteps":[{"requirement":"Android hardware pilot + iOS simulator hardware pilot","command":"zmr-pilot-gate --android --ios --android-app-root /path/to/mobile-app --android-app-id <android-app-id> --android-device <android-serial> --ios-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --ios-app-id <ios-app-id> --ios-device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl","commands":["zmr-pilot-gate --android --ios --android-app-root /path/to/mobile-app --android-app-id <android-app-id> --android-device <android-serial> --ios-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --ios-app-id <ios-app-id> --ios-device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl"],"covers":["Android hardware pilot","iOS simulator hardware pilot"]},{"requirement":"physical iOS readiness + iOS physical hardware pilot","command":"zmr-pilot-gate --ios --ios-device-type physical --ios-device <physical-device-id> --ios-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Release-iphoneos/Sample.ipa --ios-app-id <ios-app-id> --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl","commands":["zmr-pilot-gate --ios --ios-device-type physical --ios-device <physical-device-id> --ios-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Release-iphoneos/Sample.ipa --ios-app-id <ios-app-id> --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl"],"covers":["physical iOS readiness","iOS physical hardware pilot"]},{"requirement":"competitive benchmark comparison","command":"zmr-benchmark --zmr .zmr/android-smoke.json --platform <platform> --device <device-id> --app-id <app-id> --app-build <build-id-or-artifact> --runs 20 --trace-root traces/bench-comparison/zmr --results traces/bench-comparison/results.jsonl --replace --min-pass-rate 100 --max-failures 0 && zmr-benchmark-command --tool <baseline-name> --platform <platform> --device <device-id> --app-id <app-id> --scenario .zmr/android-smoke.json --app-build <build-id-or-artifact> --runs 20 --trace-root traces/bench-comparison/baseline --results traces/bench-comparison/results.jsonl -- <baseline command> && zmr-compare-benchmarks --results traces/bench-comparison/results.jsonl --candidate zmr --baseline <baseline-name> --min-candidate-pass-rate 100 --max-candidate-failures 0 --min-mean-speedup 1.25 --min-p95-speedup 1.25 --out traces/bench-comparison/report.md --evidence-out traces/bench-comparison/evidence.jsonl","commands":["zmr-benchmark --zmr .zmr/android-smoke.json --platform <platform> --device <device-id> --app-id <app-id> --app-build <build-id-or-artifact> --runs 20 --trace-root traces/bench-comparison/zmr --results traces/bench-comparison/results.jsonl --replace --min-pass-rate 100 --max-failures 0","zmr-benchmark-command --tool <baseline-name> --platform <platform> --device <device-id> --app-id <app-id> --scenario .zmr/android-smoke.json --app-build <build-id-or-artifact> --runs 20 --trace-root traces/bench-comparison/baseline --results traces/bench-comparison/results.jsonl -- <baseline command>","zmr-compare-benchmarks --results traces/bench-comparison/results.jsonl --candidate zmr --baseline <baseline-name> --min-candidate-pass-rate 100 --max-candidate-failures 0 --min-mean-speedup 1.25 --min-p95-speedup 1.25 --out traces/bench-comparison/report.md --evidence-out traces/bench-comparison/evidence.jsonl"],"covers":["competitive benchmark comparison"]}],"recommendedWording":"Do not publish the market claim yet. Missing evidence: physical iOS readiness, Android hardware pilot, iOS simulator hardware pilot, iOS physical hardware pilot, competitive benchmark comparison.","claimLimitations":["missing evidence"]}
+```
+
 Zero-dependency TypeScript, standard-library Python, standard-library Go, and
 Rust reference clients live under `clients/typescript/`, `clients/python/`,
 `clients/go/`, and `clients/rust/`; all are exercised by the no-device demo.
@@ -43,7 +52,7 @@ Rust reference clients live under `clients/typescript/`, `clients/python/`,
 
 `zmr run ... --trace-dir <dir>` writes a run manifest to `<dir>/trace.json` and newline-delimited events to `<dir>/events.jsonl`. Each event has `seq`, `timestampMs`, `kind`, and `payload`.
 
-`trace.json` is the stable bundle entrypoint for agents and viewers. It includes `schemaVersion`, `runnerVersion`, `protocolVersion`, `scenarioName`, `appId`, `status`, start/end/duration timestamps, failure metadata, `eventsPath`, `artifactsDir`, event/snapshot counts, and `reportPath` when `zmr report` has generated a single-trace HTML report.
+`trace.json` is the stable bundle entrypoint for agents and viewers. It includes `schemaVersion`, `runnerVersion`, `protocolVersion`, `scenarioName`, `appId`, `status`, start/end/duration timestamps, failure metadata, `eventsPath`, `artifactsDir`, event/snapshot counts, partial failure count, and `reportPath` when `zmr report` has generated a single-trace HTML report.
 
 `zmr export <trace-dir> --out <bundle.zmrtrace>` writes a deterministic tar archive with relative paths only. V1 bundles include `trace.json`, `events.jsonl`, optional `report.html`, and every regular file under `artifacts/`.
 
@@ -71,14 +80,29 @@ Clients should read the last `scenario.end` event as the authoritative trace out
 `zmr run <scenario.json> --json` returns a terminal run summary after the
 scenario completes. For traced runs it mirrors the authoritative `trace.json`
 terminal fields, including trace paths, event/snapshot counts, failed step, and
-stable error name. Failed scenarios still exit non-zero after writing the JSON
+stable error name. Traced summaries also include `nextCommands` so agents can
+immediately render an HTML report, explain the failure, or export a redacted
+trace bundle. Failed scenarios still exit non-zero after writing the JSON
 summary. The response is covered by `schemas/run-output.schema.json`:
 
 ```json
-{"ok":false,"status":"failed","scenario":"login smoke","appId":"com.example.mobiletest","traceDir":"traces/login-smoke","eventsPath":"events.jsonl","artifactsDir":"artifacts","durationMs":100,"eventCount":4,"snapshotCount":1,"failedStepIndex":2,"error":"WaitTimeout"}
+{"ok":false,"status":"failed","scenario":"login smoke","appId":"com.example.mobiletest","traceDir":"traces/login-smoke","eventsPath":"events.jsonl","artifactsDir":"artifacts","durationMs":100,"eventCount":4,"snapshotCount":1,"failedStepIndex":2,"error":"WaitTimeout","nextCommands":["zmr report traces/login-smoke --out traces/login-smoke/report.html","zmr explain traces/login-smoke --json","zmr export traces/login-smoke --out traces/login-smoke.zmrtrace --redact"]}
 ```
 
-Selector miss and wait timeout payloads include diagnostic fields intended for agents and humans: `visibleTexts`, `hiddenCandidates`, `disabledCandidates`, `offscreenCandidates`, and `nearestTextMatches`. Tap actions only target nodes that are visible, enabled, and inside the viewport; disabled or offscreen exact selector matches are reported as diagnostics instead of being tapped.
+When a run captures useful artifacts but a non-terminal enrichment fails, such
+as an iOS screenshot succeeding while XCTest hierarchy extraction fails, the
+terminal status is `partial` and `partialFailureCount` is greater than zero.
+The event stream includes a structured event such as
+`observe.snapshot.semanticExtraction` with `artifactStatus: "captured"` and
+`semanticStatus: "failed"`. `zmr run --json` also includes the last
+`partialFailure` object so agents can report that visual proof exists while
+semantic extraction failed:
+
+```json
+{"ok":false,"status":"partial","scenario":"ios screenshot smoke","appId":"com.example.mobiletest","traceDir":"traces/ios-smoke","eventsPath":"events.jsonl","artifactsDir":"artifacts","durationMs":120,"eventCount":5,"snapshotCount":1,"partialFailureCount":1,"partialFailure":{"kind":"observe.snapshot.semanticExtraction","status":"failed","artifactStatus":"captured","semanticStatus":"failed","error":"CommandFailed","screenshotArtifact":"traces/ios-smoke/artifacts/snapshot-1.png","source":"ios-xctest-shim"}}
+```
+
+Selector miss and wait timeout payloads include diagnostic fields intended for agents and humans: `visibleTexts`, `hiddenCandidates`, `disabledCandidates`, `offscreenCandidates`, and `nearestTextMatches`. Native selector waits, including iOS XCTest-shim waits, capture one final snapshot on timeout and include the same diagnostic fields with `strategy: "nativeSelector"` when snapshot capture is available. Tap actions only target nodes that are visible, enabled, and inside the viewport; disabled or offscreen exact selector matches are reported as diagnostics instead of being tapped.
 
 For terminal triage without opening the HTML report or static viewer, run:
 
@@ -86,15 +110,21 @@ For terminal triage without opening the HTML report or static viewer, run:
 zmr explain traces/android-app-auth-probe
 ```
 
-The text summary includes the terminal status, failed step, stable error, last diagnostic event, snapshot id, active app context, visible text, and nearest text matches.
+The text summary includes the terminal status, failed step, stable error, last diagnostic event, snapshot id or screenshot artifact, active app context, visible text, and nearest text matches.
 
-`zmr explain <trace-dir> --json` returns the same failure triage fields in a
-stable machine-readable shape for agents and CI. The response is covered by
+`zmr explain <trace-dir> --json` or `zmr explain --json <trace-dir>` returns
+the same failure triage fields in a stable machine-readable shape for agents
+and CI. It also includes `traceDir` and `nextCommands` for rendering an HTML
+report or exporting a redacted bundle. The response is covered by
 `schemas/explain-output.schema.json`:
 
 ```json
-{"ok":true,"scenario":"login smoke","status":"failed","appId":"com.example.mobiletest","durationMs":100,"eventCount":4,"snapshotCount":1,"failedStepIndex":2,"error":"WaitTimeout","diagnostic":{"kind":"wait.visible","status":"timeout","snapshotId":"snapshot-7","activePackage":"com.example.mobiletest","activeActivity":".MainActivity","visibleTexts":["Sign in","Try again"],"nearestTextMatches":["Dashboards (score 1)"]},"lastEvent":"scenario.end"}
+{"ok":true,"traceDir":"traces/login-smoke","scenario":"login smoke","status":"failed","appId":"com.example.mobiletest","durationMs":100,"eventCount":4,"snapshotCount":1,"failedStepIndex":2,"error":"WaitTimeout","diagnostic":{"kind":"wait.visible","status":"timeout","snapshotId":"snapshot-7","activePackage":"com.example.mobiletest","activeActivity":".MainActivity","visibleTexts":["Sign in","Try again"],"nearestTextMatches":["Dashboards (score 1)"]},"lastEvent":"scenario.end","nextCommands":["zmr report traces/login-smoke --out traces/login-smoke/report.html","zmr export traces/login-smoke --out traces/login-smoke.zmrtrace --redact"]}
 ```
+
+For partial visual captures, `diagnostic.kind` is
+`observe.snapshot.semanticExtraction` and includes `artifactStatus`,
+`semanticStatus`, `error`, `screenshotArtifact`, and `source`.
 
 ## Version Output Contract
 
@@ -103,7 +133,7 @@ installers, setup scripts, and generated clients. The response is covered by
 `schemas/version-output.schema.json`:
 
 ```json
-{"name":"zmr","version":"0.1.0-dev.1","protocolVersion":"2026-04-28","minimumCompatibleProtocolVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"}
+{"name":"zmr","version":"0.1.0-dev.2","protocolVersion":"2026-04-28","minimumCompatibleProtocolVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"}
 ```
 
 ## Capabilities Output Contract
@@ -115,7 +145,7 @@ and method inventory for JSON-RPC clients. The result object is covered by
 iOS simulator, or physical iOS workflows are available.
 
 ```json
-{"name":"zmr","version":"0.1.0-dev.1","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator","physical"],"automation":["simctl","devicectl","xctest-shim"],"physicalDevices":true}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list","observe.snapshot","observe.semanticSnapshot"]}
+{"name":"zmr","version":"0.1.0-dev.2","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator","physical"],"automation":["simctl","devicectl","xctest-shim"],"physicalDevices":true}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list","observe.snapshot","observe.semanticSnapshot"]}
 ```
 
 ## Doctor Output Contract
@@ -129,11 +159,25 @@ response is covered by `schemas/doctor-output.schema.json`:
 ```
 
 ```json
-{"ok":false,"checks":[{"name":"config","status":"warning","errorCode":"config.empty_string","detail":".zmr/config.json: ConfigFieldMustBeNonEmptyString","fieldPath":"$.scripts.android","hint":"Fix the config file or regenerate it with npx zmr-wizard, then run zmr doctor --config again."}]}
+{"ok":false,"checks":[{"name":"config","status":"warning","errorCode":"config.empty_string","detail":".zmr/config.json: ConfigFieldMustBeNonEmptyString","fieldPath":"$.scripts.android","hint":"Fix the config file or regenerate it with npx zmr-wizard, then run zmr doctor --strict --json --config .zmr/config.json."}]}
 ```
 
 ```json
 {"ok":false,"checks":[{"name":"ios-smoke-scenario","status":"missing","errorCode":"scenario.file_not_found","detail":"./missing-ios-smoke.json: FileNotFound","hint":"Run npx zmr-wizard, create the iOS smoke scenario, or update ios.smokeScenario in .zmr/config.json."}]}
+```
+
+Physical iOS readiness is reported independently from simulator readiness:
+
+```json
+{"ok":false,"checks":[{"name":"ios-physical-devices","status":"warning","errorCode":"setup.ios.no_physical_devices","detail":"0 physical iOS device(s)","hint":"Connect and trust an iPhone, enable Developer Mode, confirm zmr devices --json --platform ios --ios-device-type physical reports ready:true, then pass --ios-device-type physical --device <physical-device-id>."}]}
+```
+
+If physical devices are listed but none are connected/available, the same check
+uses `setup.ios.no_ready_physical_devices` and includes the listed count plus a
+state breakdown:
+
+```json
+{"ok":false,"checks":[{"name":"ios-physical-devices","status":"warning","errorCode":"setup.ios.no_ready_physical_devices","detail":"0 ready physical iOS device(s); 2 listed (disconnected=1, unavailable=1)","hint":"Connect and trust an iPhone, enable Developer Mode, confirm zmr devices --json --platform ios --ios-device-type physical reports ready:true, then pass --ios-device-type physical --device <physical-device-id>."}]}
 ```
 
 Healthy checks omit `hint` and `errorCode`. Missing or warning checks include a
@@ -146,18 +190,29 @@ should fail before device orchestration starts.
 
 ## Init Output Contract
 
-`zmr init --json` returns machine-readable bootstrap output for setup scripts.
-The response is covered by `schemas/init-output.schema.json`. In app mode it
-lists every generated app-local file plus the next strict doctor command:
+`zmr init --json`, `zmr-init --json`, and `zmr-wizard --json` return
+machine-readable bootstrap output for setup scripts and AI agents. The response
+is covered by `schemas/init-output.schema.json`. In app mode it lists every
+generated app-local file, direct paths for the config/scenario/matrix/agent
+files, first-run commands, and the generated script names:
 
 ```json
-{"ok":true,"mode":"app","dir":".","appId":"com.example.mobiletest","created":["./.zmr/config.json","./.zmr/android-smoke.json","./.zmr/ios-smoke.json"],"next":"zmr doctor --strict --json --config ./.zmr/config.json"}
+{"ok":true,"mode":"app","dir":".","appId":"com.example.mobiletest","created":["./.zmr/config.json","./.zmr/android-smoke.json","./.zmr/ios-smoke.json","./.zmr/device-matrix.json","./.zmr/AGENTS.md"],"configPath":"./.zmr/config.json","androidScenarioPath":"./.zmr/android-smoke.json","iosScenarioPath":"./.zmr/ios-smoke.json","deviceMatrixPath":"./.zmr/device-matrix.json","agentInstructionsPath":"./.zmr/AGENTS.md","next":"zmr doctor --strict --json --config ./.zmr/config.json","nextCommands":["zmr doctor --strict --json --config ./.zmr/config.json","zmr schemas --json","zmr validate --json ./.zmr/android-smoke.json","zmr validate --json ./.zmr/ios-smoke.json"],"smokeCommands":["zmr run ./.zmr/android-smoke.json --device emulator-5554 --trace-dir ./traces/zmr-android","zmr run ./.zmr/ios-smoke.json --platform ios --device booted --trace-dir ./traces/zmr-ios"],"scriptCount":16,"scriptNames":["doctor","schemas","validate","android","androidReport","androidReliability","ios","iosReport","iosReliability","matrix","pilotGate","readiness","serve","mcp","explain","exportTrace"]}
 ```
+
+Agents should read `agentInstructionsPath` for the app-local operating note and
+run `nextCommands` in order before attempting longer smoke, matrix, or pilot
+runs. After validation passes and devices are available, agents can run
+`smokeCommands` for direct Android and iOS smoke runs.
+
+When Expo dev-client scenarios are generated, app mode also includes
+`androidDevClientScenarioPath` and `iosDevClientScenarioPath` and includes those
+files in the generated validation command.
 
 Single-scenario mode reports the created scenario and next validation command:
 
 ```json
-{"ok":true,"mode":"scenario","appId":"com.example.mobiletest","created":["zmr-scenario.json"],"next":"zmr validate zmr-scenario.json"}
+{"ok":true,"mode":"scenario","appId":"com.example.mobiletest","created":["zmr-scenario.json"],"next":"zmr validate zmr-scenario.json","nextCommands":["zmr validate --json zmr-scenario.json","zmr run zmr-scenario.json --json --trace-dir traces/zmr-run"]}
 ```
 
 ## Import Output Contract
@@ -167,12 +222,12 @@ supported subset of mobile-flow YAML into native ZMR scenario JSON. The
 response is covered by `schemas/import-output.schema.json`:
 
 ```json
-{"ok":true,"format":"flow-yaml","source":"flows/login.yaml","out":".zmr/login-smoke.json","name":"Imported login smoke","appId":"com.example.mobiletest","stepCount":10,"next":"zmr validate .zmr/login-smoke.json"}
+{"ok":true,"format":"flow-yaml","source":"flows/login.yaml","out":".zmr/login-smoke.json","name":"Imported login smoke","appId":"com.example.mobiletest","stepCount":10,"next":"zmr validate .zmr/login-smoke.json","nextCommands":["zmr validate --json .zmr/login-smoke.json","zmr run .zmr/login-smoke.json --json --trace-dir traces/zmr-run"]}
 ```
 
 The importer is intentionally a migration helper, not a runtime dependency.
 After import, agents and CI should treat the generated `.zmr/*.json` file as
-the source of truth and run `zmr validate` before `zmr run`.
+the source of truth and run `nextCommands` in order.
 
 ## Validate Output Contract
 
@@ -181,7 +236,7 @@ preflight diagnostics without touching a device. The response is covered by
 `schemas/validate-output.schema.json`:
 
 ```json
-{"ok":true,"path":"examples/demo-fake.json","name":"ZMR fake Android auth probe demo","stepCount":4}
+{"ok":true,"path":"examples/demo-fake.json","name":"ZMR fake Android auth probe demo","appId":"com.example.mobiletest","stepCount":4,"nextCommands":["zmr run examples/demo-fake.json --json --trace-dir traces/zmr-run"]}
 ```
 
 Invalid scenarios exit non-zero after writing the JSON object:
@@ -194,10 +249,11 @@ Invalid scenarios exit non-zero after writing the JSON object:
 
 `zmr devices --json` returns a stable platform, count, and device list for setup
 scripts that need to choose a target before starting `zmr run` or `zmr serve`.
-The response is covered by `schemas/devices-output.schema.json`:
+Each device includes `ready`, a portable boolean for agent setup logic. The
+response is covered by `schemas/devices-output.schema.json`:
 
 ```json
-{"platform":"android","count":1,"devices":[{"serial":"emulator-5554","state":"device"}]}
+{"platform":"android","count":1,"devices":[{"serial":"emulator-5554","state":"device","ready":true}]}
 ```
 
 For iOS simulators, use `zmr devices --json --platform ios`; states come from
@@ -208,7 +264,10 @@ zmr devices --json --platform ios --ios-device-type physical
 ```
 
 Physical-device states come from `devicectl` connection data, for example
-`connected`, `disconnected`, or `paired`.
+`connected`, `disconnected`, or `paired`. For iOS physical devices, `ready` is
+true only for `connected` or `available`.
+The `serial` field is the commandable CoreDevice identifier to pass back to
+`--device`.
 
 ## Start
 
@@ -216,11 +275,11 @@ Physical-device states come from `devicectl` connection data, for example
 zmr serve --transport stdio --device emulator-5554 --app-id com.example.mobiletest --trace-dir traces/agent-session
 zmr serve --transport tcp --port 8765 --device emulator-5554 --app-id com.example.mobiletest --trace-dir traces/agent-session
 zmr serve --transport stdio --platform ios --device <sim-udid> --app-id com.example.mobiletest --trace-dir traces/ios-agent-session
-zmr serve --transport stdio --platform ios --ios-device-type physical --device <device-udid> --app-id com.example.mobiletest --trace-dir traces/ios-physical-agent-session
+zmr serve --transport stdio --platform ios --ios-device-type physical --device <physical-device-id> --app-id com.example.mobiletest --trace-dir traces/ios-physical-agent-session
 zmr mcp --config .zmr/config.json --trace-dir traces/mcp-agent-session
 ```
 
-`runner.capabilities` reports `platforms: ["android","ios"]`, `platformSupport.ios.status: "supported"`, and legacy `iosPreview: false`. Android supports emulators and connected devices. iOS simulators use `simctl` for discovery, install, launch, stop, clear-state-by-uninstall, deep links, screenshots, logs, and snapshots. Physical iOS devices use `devicectl` for discovery, install, launch, deep-link launch, clear-state-by-uninstall, and best-effort stop. Selector-grade `ui.*` methods on iOS require a configured XCTest/XCUIAutomation shim command; without one they return `IosXCTestShimRequired`. With the shim configured, single-field `ui.tap`, selector-scoped `ui.type`, and selector-scoped `ui.eraseText` can execute directly through XCTest; compound selectors continue to use the portable snapshot-matching fallback. Physical iOS screenshot/log capture is intentionally limited in this release.
+`runner.capabilities` reports `platforms: ["android","ios"]`, `platformSupport.ios.status: "supported"`, and legacy `iosPreview: false`. Android supports emulators and connected devices. iOS simulators use `simctl` for discovery, install, launch, stop, clear-state-by-uninstall, deep links, screenshots, logs, and snapshots. Physical iOS devices use `devicectl` for discovery, install, launch, deep-link launch, clear-state-by-uninstall, and best-effort stop. Selector-grade `ui.*` methods on iOS require a configured XCTest/XCUIAutomation shim command; without one they return `IosXCTestShimRequired`. With the shim configured, single-field `ui.tap`, selector-scoped `ui.type`, selector-scoped `ui.eraseText`, `wait.*`, and `assert.*` can execute directly through XCTest. Compound selectors continue to use the portable snapshot-matching fallback. iOS snapshot responses are bounded to common XCTest element families so traces stay usable on large apps. Physical iOS screenshot artifacts use the XCTest shim; physical-device log capture is intentionally limited in this release.
 
 ## Core Methods
 
@@ -247,6 +306,7 @@ zmr mcp --config .zmr/config.json --trace-dir traces/mcp-agent-session
 - `wait.gone` with `{ "selector": { "textContains": "Loading" }, "timeoutMs": 10000 }`
 - `assert.visible`
 - `assert.notVisible`
+- `assert.healthy`
 - `trace.events`
 - `trace.export`
 
@@ -287,7 +347,7 @@ Request:
 Response:
 
 ```json
-{"jsonrpc":"2.0","id":1,"result":{"name":"zmr","version":"0.1.0-dev.1","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator","physical"],"automation":["simctl","devicectl","xctest-shim"],"physicalDevices":true}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list","session.create","session.close","app.install","app.launch","app.stop","app.openLink","app.clearState","observe.snapshot","observe.semanticSnapshot","ui.tap","ui.type","ui.eraseText","ui.hideKeyboard","ui.swipe","ui.pressBack","ui.scrollUntilVisible","wait.until","wait.any","wait.gone","assert.visible","assert.notVisible","trace.events","trace.export"]}}
+{"jsonrpc":"2.0","id":1,"result":{"name":"zmr","version":"0.1.0-dev.2","protocolVersion":"2026-04-28","protocol":{"version":"2026-04-28","minimumCompatibleVersion":"2026-04-28","stability":"dev-preview","breakingChangePolicy":"version-and-changelog"},"platforms":["android","ios"],"platformSupport":{"android":{"status":"supported","deviceTypes":["emulator","physical"],"automation":["adb","uiautomator","android-shim"]},"ios":{"status":"supported","deviceTypes":["simulator","physical"],"automation":["simctl","devicectl","xctest-shim"],"physicalDevices":true}},"iosPreview":false,"transports":["stdio","tcp"],"methods":["runner.capabilities","device.list","session.create","session.close","app.install","app.launch","app.stop","app.openLink","app.clearState","observe.snapshot","observe.semanticSnapshot","ui.tap","ui.type","ui.eraseText","ui.hideKeyboard","ui.swipe","ui.pressBack","ui.scrollUntilVisible","wait.until","wait.any","wait.gone","assert.visible","assert.notVisible","assert.healthy","trace.events","trace.export"]}}
 ```
 
 ### `trace.events`
@@ -318,7 +378,7 @@ passed back as `afterSeq`.
 Response:
 
 ```json
-{"jsonrpc":"2.0","id":2,"result":[{"serial":"emulator-5554","state":"device"}]}
+{"jsonrpc":"2.0","id":2,"result":[{"serial":"emulator-5554","state":"device","ready":true}]}
 ```
 
 For `--platform ios`, states come from `simctl`, for example `Booted`.
@@ -491,6 +551,8 @@ Scenario JSON supports additional orchestration primitives for agent-grade mobil
 - `whenVisible`
 - `repeat`
 - `scrollUntilVisible`
+- `assertNoneVisible`
+- `assertHealthy`
 - `eraseText`
 - `hideKeyboard`
 - `"optional": true` on any step

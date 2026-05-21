@@ -3,7 +3,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ZMR="$ROOT/zig-out/bin/zmr"
-TRACE_DIR="$ROOT/traces/test-explain-json"
+TRACE_DIR="$ROOT/traces/test-explain-json trace"
 
 rm -rf "$TRACE_DIR"
 mkdir -p "$TRACE_DIR"
@@ -19,6 +19,11 @@ fi
 
 OUTPUT="$("$ZMR" explain "$TRACE_DIR" --json)"
 grep -q '"ok":true' <<< "$OUTPUT"
+if ! grep -q '"traceDir":"'"$TRACE_DIR"'"' <<< "$OUTPUT"; then
+  echo "explain --json should include traceDir" >&2
+  echo "$OUTPUT" >&2
+  exit 1
+fi
 grep -q '"scenario":"ZMR fake failure explanation demo"' <<< "$OUTPUT"
 grep -q '"status":"failed"' <<< "$OUTPUT"
 grep -q '"appId":"com.example.mobiletest"' <<< "$OUTPUT"
@@ -30,3 +35,12 @@ grep -q '"activePackage":"com.example.mobiletest"' <<< "$OUTPUT"
 grep -q '"visibleTexts":' <<< "$OUTPUT"
 grep -q '"nearestTextMatches":' <<< "$OUTPUT"
 grep -q '"lastEvent":"scenario.end"' <<< "$OUTPUT"
+if ! grep -q "\"nextCommands\":\[\"zmr report '$TRACE_DIR' --out '$TRACE_DIR/report.html'\",\"zmr export '$TRACE_DIR' --out '$TRACE_DIR.zmrtrace' --redact\"\]" <<< "$OUTPUT"; then
+  echo "explain --json should include executable trace follow-up commands" >&2
+  echo "$OUTPUT" >&2
+  exit 1
+fi
+
+PREFIX_OUTPUT="$("$ZMR" explain --json "$TRACE_DIR")"
+grep -q '"ok":true' <<< "$PREFIX_OUTPUT"
+grep -q '"error":"WaitTimeout"' <<< "$PREFIX_OUTPUT"

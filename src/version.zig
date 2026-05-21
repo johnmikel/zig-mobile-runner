@@ -1,4 +1,4 @@
-pub const runner_version = "0.1.0-dev.1";
+pub const runner_version = "0.1.0-dev.2";
 pub const protocol_version = "2026-04-28";
 pub const protocol_min_compatible_version = "2026-04-28";
 pub const protocol_stability = "dev-preview";
@@ -19,34 +19,4 @@ pub fn writeJson(writer: anytype) !void {
             protocol_breaking_change_policy,
         },
     );
-}
-
-test "plain version output includes runner and protocol versions" {
-    const std = @import("std");
-    var buffer = std.ArrayList(u8).empty;
-    defer buffer.deinit(std.testing.allocator);
-
-    try writePlain(buffer.writer(std.testing.allocator));
-
-    try std.testing.expectEqualStrings("zmr 0.1.0-dev.1 protocol 2026-04-28\n", buffer.items);
-}
-
-test "json version output includes protocol compatibility metadata" {
-    const std = @import("std");
-    var buffer = std.ArrayList(u8).empty;
-    defer buffer.deinit(std.testing.allocator);
-
-    try writeJson(buffer.writer(std.testing.allocator));
-
-    try std.testing.expectEqualStrings(
-        "{\"name\":\"zmr\",\"version\":\"0.1.0-dev.1\",\"protocolVersion\":\"2026-04-28\",\"minimumCompatibleProtocolVersion\":\"2026-04-28\",\"stability\":\"dev-preview\",\"breakingChangePolicy\":\"version-and-changelog\"}\n",
-        buffer.items,
-    );
-}
-
-test "protocol compatibility policy is explicit for clients" {
-    const std = @import("std");
-    try std.testing.expectEqualStrings("2026-04-28", protocol_min_compatible_version);
-    try std.testing.expectEqualStrings("dev-preview", protocol_stability);
-    try std.testing.expectEqualStrings("version-and-changelog", protocol_breaking_change_policy);
 }

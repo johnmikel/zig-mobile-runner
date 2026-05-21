@@ -21,6 +21,7 @@ try {
   const capabilities = await zmr.capabilities();
   await zmr.createSession();
   await zmr.openLink("exampleapp://e2e-auth?probe=1");
+  await zmr.assertHealthy({ timeoutMs: 100 });
   const snapshot = await zmr.snapshot();
   const events = await zmr.traceEvents(0, { limit: 20 });
   await zmr.exportTrace("traces/demo-typescript-client-redacted.zmrtrace", { redact: true, omitScreenshots: true });

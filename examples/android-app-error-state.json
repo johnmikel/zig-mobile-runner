@@ -7,6 +7,7 @@
     { "action": "waitAny", "selectors": [{ "textContains": "Try again" }, { "textContains": "offline" }, { "textContains": "Something went wrong" }], "timeoutMs": 15000 },
     { "action": "snapshot" },
     { "action": "tap", "selector": { "textContains": "Try again" }, "optional": true },
-    { "action": "waitNotVisible", "selector": { "textContains": "Loading" }, "timeoutMs": 10000 }
+    { "action": "waitNotVisible", "selector": { "textContains": "Loading" }, "timeoutMs": 10000 },
+    { "action": "assertHealthy" }
   ]
 }

@@ -1,11 +1,11 @@
 const std = @import("std");
-const bundle = @import("bundle.zig");
 const errors = @import("errors.zig");
+const mcp_protocol = @import("mcp_protocol.zig");
+const mcp_trace = @import("mcp_trace.zig");
 const runner = @import("runner.zig");
 const selector = @import("selector.zig");
 const semantic = @import("semantic.zig");
 const trace = @import("trace.zig");
-const version = @import("version.zig");
 
 pub fn serveStdioWithTrace(allocator: std.mem.Allocator, device: anytype, live_trace: ?*trace.TraceWriter) !void {
     var stdin = std.fs.File.stdin().deprecatedReader();
@@ -13,7 +13,7 @@ pub fn serveStdioWithTrace(allocator: std.mem.Allocator, device: anytype, live_t
 
     while (true) {
         const line = stdin.readUntilDelimiterOrEofAlloc(allocator, '\n', 16 * 1024 * 1024) catch |err| {
-            try writeError(stdout, null, -32700, @errorName(err));
+            try mcp_protocol.writeError(stdout, null, -32700, @errorName(err));
             continue;
         };
         const owned_line = line orelse break;
@@ -32,29 +32,29 @@ fn dispatchLine(
     live_trace: ?*trace.TraceWriter,
 ) !void {
     const parsed = std.json.parseFromSlice(std.json.Value, allocator, line, .{}) catch |err| {
-        try writeError(writer, null, -32700, @errorName(err));
+        try mcp_protocol.writeError(writer, null, -32700, @errorName(err));
         return;
     };
     defer parsed.deinit();
 
     if (parsed.value != .object) {
-        try writeError(writer, null, -32600, "request must be an object");
+        try mcp_protocol.writeError(writer, null, -32600, "request must be an object");
         return;
     }
     const object = parsed.value.object;
     const id = object.get("id");
     const method_value = object.get("method") orelse {
-        try writeError(writer, id, -32600, "missing method");
+        try mcp_protocol.writeError(writer, id, -32600, "missing method");
         return;
     };
     if (method_value != .string) {
-        try writeError(writer, id, -32600, "method must be a string");
+        try mcp_protocol.writeError(writer, id, -32600, "method must be a string");
         return;
     }
 
     dispatchMethod(allocator, device, method_value.string, object.get("params"), id, writer, live_trace) catch |err| {
         const classified = errors.classify(err);
-        try writeErrorWithPublicCode(writer, id, -32000, @errorName(err), classified.code);
+        try mcp_protocol.writeErrorWithPublicCode(writer, id, -32000, @errorName(err), classified.code);
         return;
     };
 }
@@ -70,23 +70,17 @@ fn dispatchMethod(
 ) !void {
     if (std.mem.eql(u8, method, "initialize")) {
         const protocol_version = optionalParamString(params, "protocolVersion") orelse "2024-11-05";
-        try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":");
-        try writeId(writer, id);
-        try writer.writeAll(",\"result\":{\"protocolVersion\":");
-        try trace.writeJsonString(writer, protocol_version);
-        try writer.writeAll(",\"capabilities\":{\"tools\":{}},\"serverInfo\":{\"name\":\"zmr\",\"version\":");
-        try trace.writeJsonString(writer, version.runner_version);
-        try writer.writeAll("}}}\n");
+        try mcp_protocol.writeInitializeResult(writer, id, protocol_version);
         return;
     }
 
     if (std.mem.eql(u8, method, "ping")) {
-        try writeResultRaw(writer, id, "{}");
+        try mcp_protocol.writeResultRaw(writer, id, "{}");
         return;
     }
 
     if (std.mem.eql(u8, method, "tools/list")) {
-        try writeResultRaw(writer, id, "{\"tools\":[{\"name\":\"snapshot\",\"description\":\"Capture the current mobile observation snapshot as JSON.\",\"inputSchema\":{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{}}},{\"name\":\"semantic_snapshot\",\"description\":\"Capture an agent-optimized mobile semantic tree with roles, names, selectors, bounds, and recommended actions.\",\"inputSchema\":{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{}}},{\"name\":\"tap\",\"description\":\"Tap a visible element by selector.\",\"inputSchema\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"selector\"],\"properties\":{\"selector\":{\"type\":\"object\"}}}},{\"name\":\"type\",\"description\":\"Type text, optionally after focusing an element by selector.\",\"inputSchema\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"text\"],\"properties\":{\"selector\":{\"type\":\"object\"},\"text\":{\"type\":\"string\"}}}},{\"name\":\"press_back\",\"description\":\"Press Android back or the platform-equivalent navigation action.\",\"inputSchema\":{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{}}},{\"name\":\"open_link\",\"description\":\"Open a deep link URL in the target app.\",\"inputSchema\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"url\"],\"properties\":{\"url\":{\"type\":\"string\"}}}},{\"name\":\"wait_visible\",\"description\":\"Wait for an element selector to become visible.\",\"inputSchema\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"selector\"],\"properties\":{\"selector\":{\"type\":\"object\"},\"timeoutMs\":{\"type\":\"integer\",\"minimum\":0}}}},{\"name\":\"trace_events\",\"description\":\"Read live trace events from a traced MCP session.\",\"inputSchema\":{\"type\":\"object\",\"additionalProperties\":false,\"properties\":{\"afterSeq\":{\"type\":\"integer\",\"minimum\":0},\"limit\":{\"type\":\"integer\",\"minimum\":1}}}},{\"name\":\"trace_export\",\"description\":\"Export the active trace directory as a .zmrtrace bundle.\",\"inputSchema\":{\"type\":\"object\",\"additionalProperties\":false,\"required\":[\"out\"],\"properties\":{\"out\":{\"type\":\"string\"},\"redact\":{\"type\":\"boolean\"},\"omitScreenshots\":{\"type\":\"boolean\"}}}}]}");
+        try mcp_protocol.writeToolListResult(writer, id);
         return;
     }
 
@@ -97,7 +91,7 @@ fn dispatchMethod(
         return;
     }
 
-    try writeError(writer, id, -32601, "method not found");
+    try mcp_protocol.writeError(writer, id, -32601, "method not found");
 }
 
 fn callTool(
@@ -115,7 +109,7 @@ fn callTool(
         var payload = std.ArrayList(u8).empty;
         defer payload.deinit(allocator);
         try trace.writeSnapshotJson(payload.writer(allocator), snap);
-        try writeToolTextResult(writer, id, payload.items);
+        try mcp_protocol.writeToolTextResult(writer, id, payload.items);
         return;
     }
 
@@ -130,7 +124,7 @@ fn callTool(
         var payload = std.ArrayList(u8).empty;
         defer payload.deinit(allocator);
         try semantic.writeSemanticSnapshotJson(payload.writer(allocator), snap);
-        try writeToolTextResult(writer, id, payload.items);
+        try mcp_protocol.writeToolTextResult(writer, id, payload.items);
         return;
     }
 
@@ -138,7 +132,7 @@ fn callTool(
         const wanted = try parseArgumentsSelector(allocator, arguments);
         defer wanted.deinit(allocator);
         try runner.tapSelector(device, wanted, live_trace, .{});
-        try writeToolTextResult(writer, id, "{\"ok\":true}");
+        try mcp_protocol.writeToolTextResult(writer, id, "{\"ok\":true}");
         return;
     }
 
@@ -151,19 +145,19 @@ fn callTool(
         } else {
             try device.typeText(text);
         }
-        try writeToolTextResult(writer, id, "{\"ok\":true}");
+        try mcp_protocol.writeToolTextResult(writer, id, "{\"ok\":true}");
         return;
     }
 
     if (std.mem.eql(u8, tool_name, "press_back")) {
         try device.pressBack();
-        try writeToolTextResult(writer, id, "{\"ok\":true}");
+        try mcp_protocol.writeToolTextResult(writer, id, "{\"ok\":true}");
         return;
     }
 
     if (std.mem.eql(u8, tool_name, "open_link")) {
         try device.openLink(try requiredParamString(arguments, "url"));
-        try writeToolTextResult(writer, id, "{\"ok\":true}");
+        try mcp_protocol.writeToolTextResult(writer, id, "{\"ok\":true}");
         return;
     }
 
@@ -173,7 +167,7 @@ fn callTool(
         const timeout_ms = try optionalParamU64(arguments, "timeoutMs", 5000);
         const visible = try runner.waitUntilVisible(device, wanted, timeout_ms, live_trace, .{});
         try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":");
-        try writeId(writer, id);
+        try mcp_protocol.writeId(writer, id);
         try writer.writeAll(",\"result\":{\"content\":[{\"type\":\"text\",\"text\":\"{\\\"visible\\\":");
         try writer.writeAll(if (visible) "true" else "false");
         try writer.writeAll("}\"}]}}\n");
@@ -181,134 +175,24 @@ fn callTool(
     }
 
     if (std.mem.eql(u8, tool_name, "trace_events")) {
-        try writeTraceEventsToolResult(allocator, writer, id, live_trace, try optionalParamU64(arguments, "afterSeq", 0), @min(try optionalParamU64(arguments, "limit", 100), 1000));
+        try mcp_trace.writeEventsToolResult(allocator, writer, id, live_trace, try optionalParamU64(arguments, "afterSeq", 0), @min(try optionalParamU64(arguments, "limit", 100), 1000));
         return;
     }
 
     if (std.mem.eql(u8, tool_name, "trace_export")) {
-        const tw = live_trace orelse {
-            try writeToolTextResult(writer, id, "{\"traceDir\":null,\"message\":\"start zmr mcp with --trace-dir to enable export\"}");
-            return;
-        };
         const out_path = try requiredParamString(arguments, "out");
         const omit_screenshots = try optionalParamBool(arguments, "omitScreenshots", false);
         const redact = try optionalParamBool(arguments, "redact", false) or omit_screenshots;
-        try tw.flushManifest();
-        try bundle.exportTraceBundleWithOptions(allocator, tw.root_dir, out_path, .{
-            .redact = redact,
-            .omit_screenshots = omit_screenshots,
-        });
-        var payload = std.ArrayList(u8).empty;
-        defer payload.deinit(allocator);
-        const payload_writer = payload.writer(allocator);
-        try payload_writer.writeAll("{\"traceDir\":");
-        try trace.writeJsonString(payload_writer, tw.root_dir);
-        try payload_writer.writeAll(",\"out\":");
-        try trace.writeJsonString(payload_writer, out_path);
-        try payload_writer.print(",\"redacted\":{},\"omitScreenshots\":{}}}", .{ redact, omit_screenshots });
-        try writeToolTextResult(writer, id, payload.items);
+        try mcp_trace.writeExportToolResult(allocator, writer, id, live_trace, out_path, redact, omit_screenshots);
         return;
     }
 
-    try writeError(writer, id, -32602, "unknown tool");
+    try mcp_protocol.writeError(writer, id, -32602, "unknown tool");
 }
 
 fn parseArgumentsSelector(allocator: std.mem.Allocator, arguments: ?std.json.Value) !selector.Selector {
     const selector_value = paramField(arguments, "selector") orelse return error.MissingSelector;
     return try selector.parseFromJson(allocator, selector_value);
-}
-
-fn writeTraceEventsToolResult(
-    allocator: std.mem.Allocator,
-    writer: anytype,
-    id: ?std.json.Value,
-    live_trace: ?*trace.TraceWriter,
-    after_seq: u64,
-    limit: u64,
-) !void {
-    const tw = live_trace orelse {
-        try writeToolTextResult(writer, id, "{\"traceDir\":null,\"events\":[]}");
-        return;
-    };
-
-    const events_path = try std.fs.path.join(allocator, &.{ tw.root_dir, "events.jsonl" });
-    defer allocator.free(events_path);
-    const content = std.fs.cwd().readFileAlloc(allocator, events_path, 64 * 1024 * 1024) catch |err| switch (err) {
-        error.FileNotFound => try allocator.dupe(u8, ""),
-        else => return err,
-    };
-    defer allocator.free(content);
-
-    var payload = std.ArrayList(u8).empty;
-    defer payload.deinit(allocator);
-    const payload_writer = payload.writer(allocator);
-    try payload_writer.writeAll("{\"traceDir\":");
-    try trace.writeJsonString(payload_writer, tw.root_dir);
-    try payload_writer.print(",\"afterSeq\":{d},\"events\":[", .{after_seq});
-    var emitted: u64 = 0;
-    var lines = std.mem.splitScalar(u8, content, '\n');
-    while (lines.next()) |raw_line| {
-        if (emitted >= limit) break;
-        const line = std.mem.trim(u8, raw_line, " \t\r\n");
-        if (line.len == 0) continue;
-        const parsed = std.json.parseFromSlice(std.json.Value, allocator, line, .{}) catch continue;
-        defer parsed.deinit();
-        if (parsed.value != .object) continue;
-        const seq_value = parsed.value.object.get("seq") orelse continue;
-        if (seq_value != .integer or seq_value.integer <= 0) continue;
-        const seq = @as(u64, @intCast(seq_value.integer));
-        if (seq <= after_seq) continue;
-        if (emitted > 0) try payload_writer.writeAll(",");
-        try payload_writer.writeAll(line);
-        emitted += 1;
-    }
-    try payload_writer.writeAll("]}");
-    try writeToolTextResult(writer, id, payload.items);
-}
-
-fn writeToolTextResult(writer: anytype, id: ?std.json.Value, text: []const u8) !void {
-    try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":");
-    try writeId(writer, id);
-    try writer.writeAll(",\"result\":{\"content\":[{\"type\":\"text\",\"text\":");
-    try trace.writeJsonString(writer, text);
-    try writer.writeAll("}]}}\n");
-}
-
-fn writeResultRaw(writer: anytype, id: ?std.json.Value, raw_json: []const u8) !void {
-    try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":");
-    try writeId(writer, id);
-    try writer.writeAll(",\"result\":");
-    try writer.writeAll(raw_json);
-    try writer.writeAll("}\n");
-}
-
-fn writeError(writer: anytype, id: ?std.json.Value, code: i32, message: []const u8) !void {
-    try writeErrorWithPublicCode(writer, id, code, message, null);
-}
-
-fn writeErrorWithPublicCode(writer: anytype, id: ?std.json.Value, code: i32, message: []const u8, public_code: ?[]const u8) !void {
-    try writer.writeAll("{\"jsonrpc\":\"2.0\",\"id\":");
-    try writeId(writer, id);
-    try writer.print(",\"error\":{{\"code\":{d},\"message\":", .{code});
-    try trace.writeJsonString(writer, message);
-    if (public_code) |value| {
-        try writer.writeAll(",\"publicCode\":");
-        try trace.writeJsonString(writer, value);
-    }
-    try writer.writeAll("}}\n");
-}
-
-fn writeId(writer: anytype, id: ?std.json.Value) !void {
-    const value = id orelse {
-        try writer.writeAll("null");
-        return;
-    };
-    switch (value) {
-        .null => try writer.writeAll("null"),
-        .string => |actual| try trace.writeJsonString(writer, actual),
-        .integer => |actual| try writer.print("{d}", .{actual}),
-        else => try writer.writeAll("null"),
-    }
 }
 
 fn paramField(params: ?std.json.Value, key: []const u8) ?std.json.Value {

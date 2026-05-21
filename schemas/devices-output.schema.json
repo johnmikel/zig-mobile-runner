@@ -13,10 +13,11 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["serial", "state"],
+        "required": ["serial", "state", "ready"],
         "properties": {
           "serial": { "type": "string", "minLength": 1 },
-          "state": { "type": "string", "minLength": 1 }
+          "state": { "type": "string", "minLength": 1 },
+          "ready": { "type": "boolean" }
         }
       }
     }

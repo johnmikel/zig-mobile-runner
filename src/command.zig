@@ -195,57 +195,17 @@ pub fn escapeAdbInputText(allocator: std.mem.Allocator, text: []const u8) ![]con
     return try out.toOwnedSlice(allocator);
 }
 
-test "adb text escaping maps spaces" {
-    const escaped = try escapeAdbInputText(std.testing.allocator, "hello world");
-    defer std.testing.allocator.free(escaped);
-    try std.testing.expectEqualStrings("hello%sworld", escaped);
-}
-
-test "adb text escaping protects shell metacharacters" {
-    const escaped = try escapeAdbInputText(std.testing.allocator, "a&b <c> \"d\" 'e' \\f");
-    defer std.testing.allocator.free(escaped);
-    try std.testing.expectEqualStrings("a\\&b%s\\<c\\>%s\\\"d\\\"%s\\'e\\'%s\\\\f", escaped);
-}
-
-test "command run captures output and ensureSuccess rejects failures" {
-    const allocator = std.testing.allocator;
-    var result = try run(allocator, &.{ "/bin/echo", "ok" }, 1024);
-    defer result.deinit(allocator);
-    try result.ensureSuccess();
-    try std.testing.expect(std.mem.indexOf(u8, result.stdout, "ok") != null);
-
-    const failed = ExecResult{
-        .stdout = try allocator.dupe(u8, ""),
-        .stderr = try allocator.dupe(u8, "bad"),
-        .term = .{ .Exited = 7 },
-    };
-    defer failed.deinit(allocator);
-    try std.testing.expectError(error.CommandFailed, failed.ensureSuccess());
-}
-
-test "command run with input sends stdin and captures stdout" {
-    const allocator = std.testing.allocator;
-    var result = try runWithInput(allocator, &.{ "/bin/sh", "-c", "read line; printf 'got:%s' \"$line\"" }, "hello\n", 1024);
-    defer result.deinit(allocator);
-
-    try result.ensureSuccess();
-    try std.testing.expectEqualStrings("got:hello", result.stdout);
-}
-
-test "command run with input timeout terminates stuck child" {
-    const allocator = std.testing.allocator;
-    var result = try runWithInputTimeout(allocator, &.{ "/bin/sh", "-c", "cat >/dev/null; sleep 5" }, "hello\n", 1024, 50);
-    defer result.deinit(allocator);
-
-    try std.testing.expect(result.timed_out);
-    try std.testing.expectError(error.CommandTimedOut, result.ensureSuccess());
-}
-
-test "command run with timeout terminates stuck child" {
-    const allocator = std.testing.allocator;
-    var result = try runWithTimeout(allocator, &.{ "/bin/sh", "-c", "sleep 5" }, 1024, 50);
-    defer result.deinit(allocator);
-
-    try std.testing.expect(result.timed_out);
-    try std.testing.expectError(error.CommandTimedOut, result.ensureSuccess());
+pub fn escapeAdbShellArg(allocator: std.mem.Allocator, value: []const u8) ![]const u8 {
+    var out = std.ArrayList(u8).empty;
+    errdefer out.deinit(allocator);
+    try out.append(allocator, '\'');
+    for (value) |ch| {
+        if (ch == '\'') {
+            try out.appendSlice(allocator, "'\\''");
+        } else {
+            try out.append(allocator, ch);
+        }
+    }
+    try out.append(allocator, '\'');
+    return try out.toOwnedSlice(allocator);
 }

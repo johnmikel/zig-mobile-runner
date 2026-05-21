@@ -11,10 +11,14 @@ if err != nil {
 defer client.Close()
 
 snapshot, err := client.Snapshot(ctx)
+healthy, err := client.AssertHealthy(ctx, 1000)
 ```
 
 Run the fake-session example from the repository root:
 
 ```sh
-go run ./clients/go/examples/fake-session --server tests/fake-json-rpc-server.mjs
+go run ./clients/go/examples/fake-session \
+  --zmr ./zig-out/bin/zmr \
+  --adb ./tests/fake-adb.sh \
+  --trace-dir traces/demo-go-client
 ```

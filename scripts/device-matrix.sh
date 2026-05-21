@@ -1,10 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SOURCE" ]]; do
+  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  if [[ "$SOURCE" != /* ]]; then
+    SOURCE="$SOURCE_DIR/$SOURCE"
+  fi
+done
+
+ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
+CALLER_CWD="$(pwd -P)"
 ZMR_BIN="${ZMR_BIN:-$(command -v zmr 2>/dev/null || printf '%s' "$ROOT/zig-out/bin/zmr")}"
 MATRIX=""
-TRACE_ROOT="${TRACE_ROOT:-$ROOT/traces/matrix-$(date +%Y%m%d-%H%M%S)}"
+TRACE_ROOT="${TRACE_ROOT:-$CALLER_CWD/traces/matrix-$(date +%Y%m%d-%H%M%S)}"
 MIN_PASS_RATE="${MIN_PASS_RATE:-}"
 MAX_FAILURES="${MAX_FAILURES:-}"
 
@@ -12,6 +22,8 @@ usage() {
   cat <<'USAGE'
 Usage:
   scripts/device-matrix.sh --matrix <matrix.json> [--trace-root <dir>] [gate options]
+
+Omit --trace-root to write under traces/matrix-<timestamp> in the caller directory.
 
 Gate options:
   --min-pass-rate <pct>  Minimum total pass rate percentage.
@@ -33,7 +45,17 @@ Matrix format:
       {
         "name": "ios-18",
         "platform": "ios",
+        "iosDeviceType": "simulator",
         "serial": "booted",
+        "scenario": ".zmr/ios-smoke.json",
+        "xcrun": "xcrun",
+        "iosShim": ".zmr/ios-shim"
+      },
+      {
+        "name": "ios-physical",
+        "platform": "ios",
+        "iosDeviceType": "physical",
+        "serial": "<physical-device-id>",
         "scenario": ".zmr/ios-smoke.json",
         "xcrun": "xcrun",
         "iosShim": ".zmr/ios-shim"
@@ -43,22 +65,36 @@ Matrix format:
 USAGE
 }
 
+die() {
+  echo "error: $*" >&2
+  exit 2
+}
+
+require_value() {
+  local flag="$1"
+  local value="${2-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    die "$flag requires a value"
+  fi
+  printf '%s\n' "$value"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --matrix)
-      MATRIX="${2:-}"
+      MATRIX="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --trace-root)
-      TRACE_ROOT="${2:-}"
+      TRACE_ROOT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --min-pass-rate)
-      MIN_PASS_RATE="${2:-}"
+      MIN_PASS_RATE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --max-failures)
-      MAX_FAILURES="${2:-}"
+      MAX_FAILURES="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     -h|--help)
@@ -66,27 +102,23 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "unknown argument: $1" >&2
-      usage >&2
-      exit 2
+      die "unknown argument: $1"
       ;;
   esac
 done
 
 if [[ -z "$MATRIX" ]]; then
-  echo "--matrix is required" >&2
+  echo "error: --matrix is required" >&2
   usage >&2
   exit 2
 fi
 
 if [[ ! -f "$MATRIX" ]]; then
-  echo "matrix file not found: $MATRIX" >&2
-  exit 2
+  die "matrix file not found: $MATRIX"
 fi
 
 if [[ ! -x "$ZMR_BIN" ]]; then
-  echo "zmr binary is not executable: $ZMR_BIN" >&2
-  exit 2
+  die "zmr binary is not executable: $ZMR_BIN"
 fi
 
 validate_optional_number() {
@@ -136,6 +168,7 @@ if not isinstance(devices, list) or not devices:
 fields = [
     "name",
     "platform",
+    "iosDeviceType",
     "serial",
     "scenario",
     "appId",
@@ -151,6 +184,7 @@ for index, device in enumerate(devices):
     row = {}
     row["name"] = device.get("name") or device.get("serial") or f"device-{index + 1}"
     row["platform"] = device.get("platform", "android")
+    row["iosDeviceType"] = device.get("iosDeviceType", "")
     row["serial"] = device.get("serial", "")
     row["scenario"] = device.get("scenario", "")
     row["appId"] = device.get("appId", default_app_id)
@@ -160,12 +194,17 @@ for index, device in enumerate(devices):
     row["iosShim"] = device.get("iosShim", "")
     if row["platform"] not in {"android", "ios"}:
         raise SystemExit(f"matrix.devices[{index}].platform must be android or ios")
+    if row["iosDeviceType"] and row["iosDeviceType"] not in {"simulator", "physical"}:
+        raise SystemExit(f"matrix.devices[{index}].iosDeviceType must be simulator or physical")
     if not row["serial"]:
         raise SystemExit(f"matrix.devices[{index}].serial is required")
     if not row["scenario"]:
         raise SystemExit(f"matrix.devices[{index}].scenario is required")
     for run in range(1, runs + 1):
-        values = [str(run)] + [str(row[field]).replace("\t", " ") for field in fields]
+        values = [str(run)]
+        for field in fields:
+            value = str(row[field]).replace("\t", " ")
+            values.append(value if value else "__ZMR_EMPTY__")
         print("\t".join(values))
 PY
 
@@ -173,7 +212,26 @@ slugify() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9._-]+/-/g; s/^-+//; s/-+$//'
 }
 
-while IFS=$'\t' read -r run device_name platform serial scenario app_id adb android_shim xcrun ios_shim; do
+decode_matrix_field() {
+  if [[ "$1" == "__ZMR_EMPTY__" ]]; then
+    printf ''
+  else
+    printf '%s' "$1"
+  fi
+}
+
+while IFS=$'\t' read -r run device_name platform ios_device_type serial scenario app_id adb android_shim xcrun ios_shim; do
+  device_name="$(decode_matrix_field "$device_name")"
+  platform="$(decode_matrix_field "$platform")"
+  ios_device_type="$(decode_matrix_field "$ios_device_type")"
+  serial="$(decode_matrix_field "$serial")"
+  scenario="$(decode_matrix_field "$scenario")"
+  app_id="$(decode_matrix_field "$app_id")"
+  adb="$(decode_matrix_field "$adb")"
+  android_shim="$(decode_matrix_field "$android_shim")"
+  xcrun="$(decode_matrix_field "$xcrun")"
+  ios_shim="$(decode_matrix_field "$ios_shim")"
+
   safe_name="$(slugify "$device_name")"
   if [[ -z "$safe_name" ]]; then
     safe_name="device"
@@ -182,6 +240,9 @@ while IFS=$'\t' read -r run device_name platform serial scenario app_id adb andr
   mkdir -p "$trace_dir"
 
   zmr_args=(run "$scenario" --platform "$platform" --device "$serial" --trace-dir "$trace_dir")
+  if [[ -n "$ios_device_type" ]]; then
+    zmr_args+=(--ios-device-type "$ios_device_type")
+  fi
   if [[ -n "$app_id" ]]; then
     zmr_args+=(--app-id "$app_id")
   fi

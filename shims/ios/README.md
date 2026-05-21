@@ -1,10 +1,11 @@
 # ZMR iOS Shim
 
-This directory contains the simulator-only XCTest/XCUIAutomation shim scaffold.
+This directory contains the XCTest/XCUIAutomation shim scaffold used for
+selector-grade iOS automation.
 
 The public ZMR API remains the scenario file and JSON-RPC protocol. The shim
-protocol is an internal local transport between the Zig runner and a simulator
-test runner.
+protocol is an internal local transport between the Zig runner and an app-local
+UI test runner.
 
 Current status:
 
@@ -19,20 +20,31 @@ Current status:
   files under `.zmr/ios-shim-state/`. Set `ZMR_IOS_SHIM_FORCE_REBUILD=1` to
   refresh the cached test bundle, or `ZMR_IOS_SHIM_ONESHOT=1` to force the
   slower one-command XCTest fallback for debugging.
-- The existing iOS adapter still uses `xcrun simctl` for install, launch,
-  terminate, open link, screenshots, and logs.
+- The iOS adapter still uses `xcrun simctl` for simulator install, launch,
+  terminate, open link, screenshots, and logs. It uses `xcrun devicectl` for
+  physical-device lifecycle where Apple exposes a supported local command, and
+  uses the XCTest shim for physical-device screenshot artifacts.
 - `.zmr/ensure-ios-shim-target.sh` can create or update the UI test target for
   common Xcode project/workspace layouts through the Ruby `xcodeproj` gem.
   Users can still add the generated Swift files manually when their project
   layout needs custom handling.
 - ZMR uses the shim as a native selector fast path for single-field tap, type,
-  and erase-text actions. Compound selectors stay on the portable Zig
-  observe-and-match path.
+  erase-text, and wait/assert queries. Compound selectors stay on the portable
+  Zig observe-and-match path.
+- Snapshot capture is intentionally bounded to common XCTest element families
+  and at most 256 nodes. This keeps traces fast and predictable for large
+  React Native, SwiftUI, and UIKit trees while preserving the controls agents
+  normally need for follow-up actions.
 
-V1 target:
+Support target:
 
-- Simulators only.
-- XCTest/XCUIAutomation hierarchy snapshots mapped into `UiNode`.
+- iOS simulators for full local artifacts: lifecycle, screenshots, logs,
+  selector actions, native selector waits, and bounded snapshots.
+- Physical iOS devices for lifecycle and selector-grade XCTest automation,
+  subject to local signing, provisioning, Developer Mode, and Apple
+  `devicectl` availability. Screenshots use the XCTest shim; log artifact
+  capture remains simulator-first.
+- XCTest/XCUIAutomation snapshots mapped into `UiNode`.
 - Selector actions: tap, type, erase text, hide keyboard, swipe, and home/back
   equivalent navigation.
-- Clear state means uninstall and reinstall the simulator app.
+- Clear state means best-effort app uninstall by bundle id.

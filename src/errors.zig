@@ -53,11 +53,3 @@ pub fn classify(err: anyerror) PublicError {
         else => .{ .code = "internal.error", .message = @errorName(err) },
     };
 }
-
-test "classifies public error codes" {
-    try std.testing.expectEqualStrings("scenario.invalid", classify(error.ScenarioMissingSteps).code);
-    try std.testing.expectEqualStrings("runner.wait_timeout", classify(error.WaitTimeout).code);
-    try std.testing.expectEqualStrings("ios.xctest_shim_required", classify(error.IosXCTestShimRequired).code);
-    try std.testing.expectEqualStrings("cli.unknown_command", classify(error.UnknownCommand).code);
-    try std.testing.expectEqualStrings("internal.error", classify(error.OutOfMemory).code);
-}

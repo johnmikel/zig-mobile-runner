@@ -4,7 +4,7 @@
 
 **Product Thesis:** ZMR should feel like Playwright for mobile agents: fast typed control, rich observations, deterministic traces, and reliable isolation. It should beat shell-driven mobile automation by moving orchestration, waits, retries, traces, and protocol handling into a small Zig core while delegating platform-specific state and interaction to focused native adapters.
 
-**Current State:** `0.1.0-dev.1` local dev preview. Android pilot flows exist. iOS simulator lifecycle, snapshot, and selector actions are supported through `simctl` plus the XCTest shim. Coverage gate is above 90%. Demo traces can be generated without an emulator.
+**Current State:** `0.1.0-dev.2` local dev preview. Android pilot flows exist. iOS simulator lifecycle, snapshot, and selector actions are supported through `simctl` plus the XCTest shim. Coverage gate is above 90%. Demo traces can be generated without an emulator.
 
 ---
 
@@ -103,6 +103,8 @@ Work:
 - [x] Map XCUIElement snapshots into `UiNode` with stable ids, labels, identifiers, values, enabled/visible flags, and bounds.
 - [x] Add iOS selector tests using fake shim responses.
 - [x] Add real simulator E2E smoke scenario with install/launch/openLink/snapshot/tap/type using the generated XCTest shim.
+- [x] Add `examples/ios-dev-client-open-link.json` for Expo dev-client
+  simulator flows that need to open a local Metro bundle before selector waits.
 - [x] Decide and document iOS clear-state semantics: best-effort app uninstall by bundle id; a missing app is already clean.
 
 Acceptance:
@@ -233,7 +235,7 @@ Acceptance:
 
 ## Suggested Release Milestones
 
-### `v0.1.0-dev.1`: Public Dev Preview
+### `v0.1.0-dev.2`: Public Dev Preview
 
 Scope:
 - Current Android runner.

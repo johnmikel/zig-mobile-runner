@@ -66,6 +66,10 @@ export class ZmrClient {
     return this.request("session.close", {});
   }
 
+  devices() {
+    return this.request("device.list", {});
+  }
+
   launch() {
     return this.request("app.launch", {});
   }
@@ -136,6 +140,10 @@ export class ZmrClient {
 
   assertNotVisible(selector, options = {}) {
     return this.request("assert.notVisible", { selector, ...options });
+  }
+
+  assertHealthy(options = {}) {
+    return this.request("assert.healthy", options);
   }
 
   exportTrace(out, options = {}) {

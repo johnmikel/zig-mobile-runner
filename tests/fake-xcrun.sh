@@ -30,7 +30,7 @@ if [[ "${1:-}" == "devicectl" ]]; then
     list)
       if [[ "${2:-}" == "devices" && -n "$json_output" ]]; then
         cat > "$json_output" <<'JSON'
-{"result":{"devices":[{"identifier":"physical-ios-1","connectionProperties":{"pairingState":"paired","tunnelState":"connected"},"deviceProperties":{"name":"Fake iPhone"},"hardwareProperties":{"platform":"iOS","reality":"physical","udid":"fake-physical-ios-1"}}]}}
+{"result":{"devices":[{"identifier":"fake-physical-ios-1","connectionProperties":{"pairingState":"paired","tunnelState":"connected"},"deviceProperties":{"name":"Fake iPhone"},"hardwareProperties":{"platform":"iOS","reality":"physical","udid":"fake-hardware-udid-1"}}]}}
 JSON
       else
         echo "unsupported devicectl list command: $*" >&2

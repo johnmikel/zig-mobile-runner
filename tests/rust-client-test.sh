@@ -16,6 +16,7 @@ cargo run --quiet \
   --manifest-path "$ROOT/clients/rust/Cargo.toml" \
   --example fake_session \
   -- \
-  --server "$ROOT/tests/fake-json-rpc-server.mjs" \
-  --node "$(command -v node)" \
+  --zmr "$ROOT/zig-out/bin/zmr" \
+  --adb "$ROOT/tests/fake-adb.sh" \
+  --trace-dir "$ROOT/traces/demo-rust-client" \
   --trace-out "$ROOT/traces/demo-rust-client-redacted.zmrtrace"

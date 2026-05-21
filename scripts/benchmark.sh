@@ -1,12 +1,33 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SOURCE" ]]; do
+  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  if [[ "$SOURCE" != /* ]]; then
+    SOURCE="$SOURCE_DIR/$SOURCE"
+  fi
+done
+
+ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
+CALLER_CWD="$(pwd -P)"
+
+# Some sandboxed environments do not allow writing to the default temp directory
+# (/var/folders, /tmp). Use a repo-local TMPDIR so adb/xcrun/mktemp/heredocs work.
+if [[ -z "${TMPDIR:-}" || ! -w "${TMPDIR:-/nonexistent}" ]]; then
+  TMPDIR="$ROOT/traces/tmp"
+  mkdir -p "$TMPDIR"
+  export TMPDIR
+fi
+
 ZMR_BIN="${ZMR_BIN:-$(command -v zmr 2>/dev/null || printf '%s' "$ROOT/zig-out/bin/zmr")}"
 RUNS="${RUNS:-5}"
 DEVICE="${DEVICE:-}"
-TRACE_ROOT="${TRACE_ROOT:-$ROOT/traces/bench-$(date +%Y%m%d-%H%M%S)}"
-RESULTS="$TRACE_ROOT/results.jsonl"
+TRACE_ROOT="${TRACE_ROOT:-$CALLER_CWD/traces/bench-$(date +%Y%m%d-%H%M%S)}"
+RESULTS=""
+RESULTS_EXPLICIT=0
+REPLACE=0
 ZMR_SCENARIO=""
 PLATFORM="${PLATFORM:-}"
 APP_ID="${APP_ID:-}"
@@ -14,6 +35,8 @@ ADB="${ADB:-}"
 ANDROID_SHIM="${ANDROID_SHIM:-}"
 XCRUN="${XCRUN:-}"
 IOS_SHIM="${IOS_SHIM:-}"
+IOS_DEVICE_TYPE="${IOS_DEVICE_TYPE:-}"
+APP_BUILD="${APP_BUILD:-}"
 MIN_PASS_RATE="${MIN_PASS_RATE:-}"
 MAX_FAILURES="${MAX_FAILURES:-}"
 MAX_MEAN_MS="${MAX_MEAN_MS:-}"
@@ -22,13 +45,18 @@ MAX_P95_MS="${MAX_P95_MS:-}"
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/benchmark.sh --zmr <scenario.json> --device <serial> [--runs 10] [--trace-root <dir>] [gate options]
+  scripts/benchmark.sh --zmr <scenario.json> --device <serial> [--runs 10] [--trace-root <dir>] [--results <path>] [gate options]
 
 Gate options:
   --min-pass-rate <pct>  Minimum pass rate percentage, for example 100.
   --max-failures <n>     Maximum allowed failed runs.
   --max-mean-ms <ms>     Maximum allowed mean run duration.
   --max-p95-ms <ms>      Maximum allowed p95 run duration.
+
+Output options:
+  --results <path>       Results JSONL path. Defaults to <trace-root>/results.jsonl.
+                         Explicit results paths are appended by default.
+  --replace              Truncate --results before writing.
 
 Forwarded ZMR options:
   --platform <android|ios>
@@ -37,76 +65,108 @@ Forwarded ZMR options:
   --android-shim <path>
   --xcrun <path>
   --ios-shim <path>
+  --ios-device-type <simulator|physical>
+  --app-build <id>       App build fingerprint, artifact path, or CI build id for comparison context.
 
 Environment:
   ZMR_BIN       Path to zmr binary. Defaults to ./zig-out/bin/zmr.
   RUNS          Default run count when --runs is omitted.
   DEVICE        Default Android serial when --device is omitted.
-  TRACE_ROOT    Default benchmark output root.
-  PLATFORM, APP_ID, ADB, ANDROID_SHIM, XCRUN, IOS_SHIM
+  TRACE_ROOT    Default benchmark output root. Otherwise traces/bench-<timestamp> in the caller directory.
+  PLATFORM, APP_ID, ADB, ANDROID_SHIM, XCRUN, IOS_SHIM, IOS_DEVICE_TYPE, APP_BUILD
                 Default forwarded ZMR options when matching flags are omitted.
   MIN_PASS_RATE, MAX_FAILURES, MAX_MEAN_MS, MAX_P95_MS
                 Default gate thresholds when matching flags are omitted.
 USAGE
 }
 
+die() {
+  echo "error: $*" >&2
+  exit 2
+}
+
+require_value() {
+  local flag="$1"
+  local value="${2-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    die "$flag requires a value"
+  fi
+  printf '%s\n' "$value"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --zmr)
-      ZMR_SCENARIO="${2:-}"
+      ZMR_SCENARIO="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --device)
-      DEVICE="${2:-}"
+      DEVICE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --runs)
-      RUNS="${2:-}"
+      RUNS="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --trace-root)
-      TRACE_ROOT="${2:-}"
-      RESULTS="$TRACE_ROOT/results.jsonl"
+      TRACE_ROOT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
+    --results)
+      RESULTS="$(require_value "$1" "${2-}")"
+      RESULTS_EXPLICIT=1
+      shift 2
+      ;;
+    --replace)
+      REPLACE=1
+      shift
+      ;;
     --platform)
-      PLATFORM="${2:-}"
+      PLATFORM="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --app-id)
-      APP_ID="${2:-}"
+      APP_ID="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --adb)
-      ADB="${2:-}"
+      ADB="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --android-shim)
-      ANDROID_SHIM="${2:-}"
+      ANDROID_SHIM="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --xcrun)
-      XCRUN="${2:-}"
+      XCRUN="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --ios-shim)
-      IOS_SHIM="${2:-}"
+      IOS_SHIM="$(require_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --ios-device-type)
+      IOS_DEVICE_TYPE="$(require_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --app-build)
+      APP_BUILD="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --min-pass-rate)
-      MIN_PASS_RATE="${2:-}"
+      MIN_PASS_RATE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --max-failures)
-      MAX_FAILURES="${2:-}"
+      MAX_FAILURES="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --max-mean-ms)
-      MAX_MEAN_MS="${2:-}"
+      MAX_MEAN_MS="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --max-p95-ms)
-      MAX_P95_MS="${2:-}"
+      MAX_P95_MS="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     -h|--help)
@@ -114,33 +174,29 @@ while [[ $# -gt 0 ]]; do
       exit 0
       ;;
     *)
-      echo "unknown argument: $1" >&2
-      usage >&2
-      exit 2
+      die "unknown argument: $1"
       ;;
   esac
 done
 
 if [[ -z "$ZMR_SCENARIO" ]]; then
-  echo "--zmr is required" >&2
+  echo "error: --zmr is required" >&2
   usage >&2
   exit 2
 fi
 
 if [[ -z "$DEVICE" ]]; then
-  echo "--device or DEVICE is required" >&2
+  echo "error: --device or DEVICE is required" >&2
   usage >&2
   exit 2
 fi
 
 if [[ ! "$RUNS" =~ ^[0-9]+$ || "$RUNS" -lt 1 ]]; then
-  echo "--runs must be a positive integer" >&2
-  exit 2
+  die "--runs must be a positive integer"
 fi
 
 if [[ ! -x "$ZMR_BIN" ]]; then
-  echo "zmr binary is not executable: $ZMR_BIN" >&2
-  exit 2
+  die "zmr binary is not executable: $ZMR_BIN"
 fi
 
 validate_optional_number() {
@@ -165,9 +221,21 @@ validate_optional_number "--min-pass-rate" "$MIN_PASS_RATE"
 validate_optional_integer "--max-failures" "$MAX_FAILURES"
 validate_optional_integer "--max-mean-ms" "$MAX_MEAN_MS"
 validate_optional_integer "--max-p95-ms" "$MAX_P95_MS"
+if [[ -n "$IOS_DEVICE_TYPE" && "$IOS_DEVICE_TYPE" != "simulator" && "$IOS_DEVICE_TYPE" != "physical" ]]; then
+  echo "--ios-device-type must be simulator or physical" >&2
+  exit 2
+fi
 
 mkdir -p "$TRACE_ROOT"
-: > "$RESULTS"
+if [[ -z "$RESULTS" ]]; then
+  RESULTS="$TRACE_ROOT/results.jsonl"
+fi
+mkdir -p "$(dirname "$RESULTS")"
+if [[ "$REPLACE" -eq 1 || "$RESULTS_EXPLICIT" -eq 0 ]]; then
+  : > "$RESULTS"
+else
+  touch "$RESULTS"
+fi
 
 run_one() {
   local tool="$1"
@@ -175,6 +243,7 @@ run_one() {
   local command_status=0
   local start_ms end_ms duration_ms trace_dir
   local -a zmr_args=()
+  local -a metadata_args=()
 
   trace_dir="$TRACE_ROOT/$tool-$run"
   mkdir -p "$trace_dir"
@@ -196,6 +265,24 @@ run_one() {
   if [[ -n "$IOS_SHIM" ]]; then
     zmr_args+=(--ios-shim "$IOS_SHIM")
   fi
+  if [[ -n "$IOS_DEVICE_TYPE" ]]; then
+    zmr_args+=(--ios-device-type "$IOS_DEVICE_TYPE")
+  fi
+  if [[ -n "$PLATFORM" ]]; then
+    metadata_args+=(--platform "$PLATFORM")
+  fi
+  if [[ -n "$DEVICE" ]]; then
+    metadata_args+=(--device "$DEVICE")
+  fi
+  if [[ -n "$APP_ID" ]]; then
+    metadata_args+=(--app-id "$APP_ID")
+  fi
+  if [[ -n "$ZMR_SCENARIO" ]]; then
+    metadata_args+=(--scenario "$ZMR_SCENARIO")
+  fi
+  if [[ -n "$APP_BUILD" ]]; then
+    metadata_args+=(--app-build "$APP_BUILD")
+  fi
   start_ms="$(python3 -c 'import time; print(int(time.time() * 1000))')"
   if [[ "${#zmr_args[@]}" -gt 0 ]]; then
     "$ZMR_BIN" run "$ZMR_SCENARIO" --device "$DEVICE" "${zmr_args[@]}" --trace-dir "$trace_dir" || command_status=$?
@@ -206,12 +293,22 @@ run_one() {
   end_ms="$(python3 -c 'import time; print(int(time.time() * 1000))')"
   duration_ms=$((end_ms - start_ms))
 
-  "$ROOT/scripts/benchmark_result_row.py" \
-    --tool "$tool" \
-    --run "$run" \
-    --command-status "$command_status" \
-    --duration-ms "$duration_ms" \
-    --trace-dir "$trace_dir" >> "$RESULTS"
+  if [[ "${#metadata_args[@]}" -gt 0 ]]; then
+    "$ROOT/scripts/benchmark_result_row.py" \
+      --tool "$tool" \
+      --run "$run" \
+      --command-status "$command_status" \
+      --duration-ms "$duration_ms" \
+      --trace-dir "$trace_dir" \
+      "${metadata_args[@]}" >> "$RESULTS"
+  else
+    "$ROOT/scripts/benchmark_result_row.py" \
+      --tool "$tool" \
+      --run "$run" \
+      --command-status "$command_status" \
+      --duration-ms "$duration_ms" \
+      --trace-dir "$trace_dir" >> "$RESULTS"
+  fi
 
   return "$command_status"
 }

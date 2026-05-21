@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SOURCE" ]]; do
+  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  if [[ "$SOURCE" != /* ]]; then
+    SOURCE="$SOURCE_DIR/$SOURCE"
+  fi
+done
+
+ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
 APP_ROOT=""
 SCHEME=""
 TEST_TARGET=""
@@ -54,58 +63,67 @@ die() {
   exit 2
 }
 
+require_value() {
+  local flag="$1"
+  local value="${2-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    die "$flag requires a value"
+  fi
+  printf '%s\n' "$value"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --app-root)
-      APP_ROOT="${2:-}"
+      APP_ROOT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --scheme)
-      SCHEME="${2:-}"
+      SCHEME="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --bundle-id)
-      BUNDLE_ID="${2:-}"
+      BUNDLE_ID="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --app-target)
-      APP_TARGET="${2:-}"
+      APP_TARGET="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --test-bundle-id)
-      TEST_BUNDLE_ID="${2:-}"
+      TEST_BUNDLE_ID="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --workspace)
-      WORKSPACE="${2:-}"
+      WORKSPACE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --project)
-      PROJECT="${2:-}"
+      PROJECT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --derived-data-path)
-      DERIVED_DATA_PATH="${2:-}"
+      DERIVED_DATA_PATH="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --test-target)
-      TEST_TARGET="${2:-}"
+      TEST_TARGET="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --device)
-      DEVICE="${2:-}"
+      DEVICE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --device-type)
-      DEVICE_TYPE="${2:-}"
+      DEVICE_TYPE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --configuration)
-      CONFIGURATION="${2:-}"
+      CONFIGURATION="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --deployment-target)
-      DEPLOYMENT_TARGET="${2:-}"
+      DEPLOYMENT_TARGET="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --patch-xcodeproj)
@@ -142,7 +160,7 @@ if [[ "$DEVICE_TYPE" != "simulator" && "$DEVICE_TYPE" != "physical" ]]; then
   die "--device-type must be simulator or physical"
 fi
 if [[ "$DEVICE_TYPE" == "physical" && "$DEVICE" == "booted" ]]; then
-  die "--device-type physical requires --device <physical-device-udid>"
+  die "--device-type physical requires --device <physical-device-id>"
 fi
 
 mkdir -p "$APP_ROOT"
@@ -368,7 +386,7 @@ send_request() {
   cp "\$STDIN_FILE" "\$tmp_request"
   mv "\$tmp_request" "\$request_file"
 
-  deadline=\$((SECONDS + \${ZMR_IOS_SHIM_RESPONSE_TIMEOUT_SECONDS:-45}))
+  deadline=\$((SECONDS + \${ZMR_IOS_SHIM_RESPONSE_TIMEOUT_SECONDS:-180}))
   while (( SECONDS < deadline )); do
     if [[ -f "\$response_file" ]]; then
       cat "\$response_file"
@@ -401,6 +419,30 @@ chmod +x "$APP_ROOT/.zmr/ios-shim"
 shell_quote() {
   printf '%q' "$1"
 }
+
+patch_zmr_config() {
+  local config_file="$APP_ROOT/.zmr/config.json"
+  ruby -rjson -e '
+    path = ARGV.fetch(0)
+    app_id = ARGV.fetch(1)
+    config = if File.exist?(path)
+      JSON.parse(File.read(path))
+    else
+      { "schemaVersion" => 1, "appId" => app_id }
+    end
+    abort "error: .zmr/config.json must be a JSON object" unless config.is_a?(Hash)
+    config["schemaVersion"] ||= 1
+    config["appId"] ||= app_id unless app_id.empty?
+    tools = config["tools"]
+    abort "error: .zmr/config.json tools must be a JSON object" if tools && !tools.is_a?(Hash)
+    tools ||= {}
+    tools["iosShimPath"] = "./.zmr/ios-shim"
+    config["tools"] = tools
+    File.write(path, "#{JSON.pretty_generate(config)}\n")
+  ' "$config_file" "$BUNDLE_ID"
+}
+
+patch_zmr_config
 
 cat > "$APP_ROOT/.zmr/ensure-ios-shim-target.sh" <<EOF
 #!/usr/bin/env bash

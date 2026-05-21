@@ -11,7 +11,7 @@ rl.on("line", (line) => {
   if (method === "runner.capabilities") {
     result = {
       name: "zmr",
-      version: "0.1.0-dev.1",
+      version: "0.1.0-dev.2",
       protocolVersion: "2026-04-28",
       protocol: {
         version: "2026-04-28",
@@ -26,13 +26,76 @@ rl.on("line", (line) => {
       },
       iosPreview: false,
       transports: ["stdio", "tcp"],
-      methods: ["runner.capabilities", "session.create", "app.openLink", "observe.snapshot", "observe.semanticSnapshot", "wait.until", "trace.events", "trace.export"],
+      methods: [
+        "runner.capabilities",
+        "device.list",
+        "session.create",
+        "session.close",
+        "app.launch",
+        "app.stop",
+        "app.openLink",
+        "app.clearState",
+        "observe.snapshot",
+        "observe.semanticSnapshot",
+        "ui.tap",
+        "ui.type",
+        "ui.eraseText",
+        "ui.hideKeyboard",
+        "ui.swipe",
+        "ui.pressBack",
+        "ui.scrollUntilVisible",
+        "wait.until",
+        "wait.any",
+        "wait.gone",
+        "assert.visible",
+        "assert.notVisible",
+        "assert.healthy",
+        "trace.events",
+        "trace.export",
+      ],
     };
+  } else if (method === "device.list") {
+    result = [
+      { serial: "fake-device-1", state: "device", ready: true },
+      { serial: "fake-ios-disconnected", state: "disconnected", ready: false },
+    ];
   } else if (method === "session.create") {
     result = { sessionId: "default" };
+  } else if (method === "session.close") {
+    result = true;
+  } else if (method === "app.launch") {
+    result = true;
+  } else if (method === "app.stop") {
+    result = true;
   } else if (method === "app.openLink") {
     result = true;
+  } else if (method === "app.clearState") {
+    result = true;
+  } else if (method === "ui.tap") {
+    result = true;
+  } else if (method === "ui.type") {
+    result = true;
+  } else if (method === "ui.eraseText") {
+    result = true;
+  } else if (method === "ui.hideKeyboard") {
+    result = true;
+  } else if (method === "ui.swipe") {
+    result = true;
+  } else if (method === "ui.pressBack") {
+    result = true;
+  } else if (method === "ui.scrollUntilVisible") {
+    result = true;
   } else if (method === "wait.until") {
+    result = true;
+  } else if (method === "wait.any") {
+    result = true;
+  } else if (method === "wait.gone") {
+    result = true;
+  } else if (method === "assert.visible") {
+    result = true;
+  } else if (method === "assert.notVisible") {
+    result = true;
+  } else if (method === "assert.healthy") {
     result = true;
   } else if (method === "observe.snapshot") {
     result = {

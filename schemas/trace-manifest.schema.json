@@ -20,6 +20,7 @@
     "artifactsDir",
     "eventCount",
     "snapshotCount",
+    "partialFailureCount",
     "reportPath"
   ],
   "properties": {
@@ -28,7 +29,7 @@
     "protocolVersion": { "type": "string", "minLength": 1 },
     "scenarioName": { "type": "string", "minLength": 1 },
     "appId": { "type": ["string", "null"] },
-    "status": { "enum": ["running", "passed", "failed"] },
+    "status": { "enum": ["running", "passed", "failed", "partial"] },
     "startedAtMs": { "type": "integer" },
     "endedAtMs": { "type": ["integer", "null"] },
     "durationMs": { "type": ["integer", "null"], "minimum": 0 },
@@ -38,6 +39,7 @@
     "artifactsDir": { "const": "artifacts" },
     "eventCount": { "type": "integer", "minimum": 0 },
     "snapshotCount": { "type": "integer", "minimum": 0 },
+    "partialFailureCount": { "type": "integer", "minimum": 0 },
     "reportPath": { "type": ["string", "null"] },
     "redaction": {
       "type": "object",

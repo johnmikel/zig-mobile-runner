@@ -111,6 +111,29 @@ final class ZMRShimUITestCase: XCTestCase {
                 "status": "ok",
                 "nodes": ZMRShim.snapshot(app: app).map { $0.json }
             ]
+        case "screenshot":
+            let screenshot = XCUIScreen.main.screenshot()
+            return [
+                "status": "ok",
+                "format": "png",
+                "base64": screenshot.pngRepresentation.base64EncodedString()
+            ]
+        case "query":
+            guard let selector = command.selector else {
+                return error("invalid.query", "query requires selector")
+            }
+            guard let parts = selectorParts(selector) else {
+                return error("selector.unsupported", "unsupported selector: \(selector)")
+            }
+            guard isFastQueryable(parts: parts) else {
+                return error("selector.unsupported", "unsupported query selector: \(selector)")
+            }
+            let element = resolveFastElement(selector: selector, app: app, preferredTypes: [])
+            return [
+                "status": "ok",
+                "exists": element?.exists ?? false,
+                "hittable": element?.isHittable ?? false
+            ]
         case "tap":
             if let selector = command.selector {
                 return tap(selector: selector, app: app)
@@ -161,6 +184,8 @@ final class ZMRShimUITestCase: XCTestCase {
             return ok()
         case "appState":
             return ["status": "ok", "state": app.state.rawValue]
+        case "acceptSystemAlert":
+            return acceptSystemAlert(buttonText: command.text ?? "Open")
         default:
             return error("unknown.command", "unsupported command: \(command.cmd)")
         }
@@ -172,6 +197,41 @@ final class ZMRShimUITestCase: XCTestCase {
 
     private func error(_ code: String, _ message: String) -> [String: Any] {
         ["status": "error", "code": code, "message": message]
+    }
+
+    private func acceptSystemAlert(buttonText: String) -> [String: Any] {
+        let springboard = XCUIApplication(bundleIdentifier: "com.apple.springboard")
+        var labels = [buttonText, "Open", "Allow", "OK", "Continue"]
+        labels = labels.reduce(into: [String]()) { unique, label in
+            if !label.isEmpty && !unique.contains(label) {
+                unique.append(label)
+            }
+        }
+
+        var acceptedCount = 0
+        var lastAcceptedLabel = ""
+        for _ in 0..<3 {
+            var tapped = false
+            for label in labels {
+                let button = springboard.buttons[label].firstMatch
+                if button.waitForExistence(timeout: 2), button.isHittable {
+                    button.tap()
+                    acceptedCount += 1
+                    lastAcceptedLabel = label
+                    tapped = true
+                    Thread.sleep(forTimeInterval: 1.0)
+                    break
+                }
+            }
+            if !tapped {
+                break
+            }
+        }
+
+        if acceptedCount > 0 {
+            return ["status": "ok", "accepted": true, "label": lastAcceptedLabel, "count": acceptedCount]
+        }
+        return ["status": "ok", "accepted": false, "count": 0]
     }
 
     private func tap(selector: String, app: XCUIApplication) -> [String: Any] {
@@ -221,6 +281,10 @@ final class ZMRShimUITestCase: XCTestCase {
     }
 
     private func resolveElement(selector: String, app: XCUIApplication, preferredTypes: [XCUIElement.ElementType] = []) -> XCUIElement? {
+        if let fast = resolveFastElement(selector: selector, app: app, preferredTypes: preferredTypes), fast.exists {
+            return fast
+        }
+
         let matchedElements = app.descendants(matching: .any).allElementsBoundByIndex.filter { element in
             matches(selector: selector, element: element)
         }
@@ -234,6 +298,87 @@ final class ZMRShimUITestCase: XCTestCase {
             return hittable
         }
         return matchedElements.first
+    }
+
+    private func resolveFastElement(selector: String, app: XCUIApplication, preferredTypes: [XCUIElement.ElementType]) -> XCUIElement? {
+        guard let parts = selectorParts(selector) else {
+            return nil
+        }
+
+        switch parts.field {
+        case "text", "label":
+            let queries = fastTextQueries(app: app, preferredTypes: preferredTypes)
+            if parts.contains {
+                let predicate = NSPredicate(format: "label CONTAINS[c] %@", parts.value)
+                return firstExistingElement(queries: queries.map { $0.matching(predicate) })
+            }
+            let predicate = NSPredicate(format: "label == %@", parts.value)
+            return firstExistingElement(queries: queries.map { $0.matching(predicate) })
+        case "identifier", "resourceId":
+            let queries = fastIdentifierQueries(app: app, preferredTypes: preferredTypes, contains: parts.contains)
+            if parts.contains {
+                let predicate = NSPredicate(format: "identifier CONTAINS[c] %@", parts.value)
+                return firstExistingElement(queries: queries.map { $0.matching(predicate) })
+            }
+            return firstExistingElement(queries: queries.map { $0.matching(identifier: parts.value) })
+        case "value":
+            let queries = fastTextQueries(app: app, preferredTypes: preferredTypes)
+            let predicate = parts.contains
+                ? NSPredicate(format: "value CONTAINS[c] %@", parts.value)
+                : NSPredicate(format: "value == %@", parts.value)
+            return firstExistingElement(queries: queries.map { $0.matching(predicate) })
+        case "type", "id":
+            return nil
+        default:
+            return nil
+        }
+    }
+
+    private func fastTextQueries(app: XCUIApplication, preferredTypes: [XCUIElement.ElementType]) -> [XCUIElementQuery] {
+        var queries: [XCUIElementQuery] = []
+        if !preferredTypes.isEmpty {
+            queries.append(contentsOf: preferredTypes.map { app.descendants(matching: $0) })
+        }
+        queries.append(contentsOf: [
+            app.buttons,
+            app.staticTexts,
+            app.textFields,
+            app.secureTextFields,
+            app.textViews,
+            app.images
+        ])
+        return queries
+    }
+
+    private func fastIdentifierQueries(
+        app: XCUIApplication,
+        preferredTypes: [XCUIElement.ElementType],
+        contains: Bool
+    ) -> [XCUIElementQuery] {
+        var queries = fastTextQueries(app: app, preferredTypes: preferredTypes)
+        if !contains {
+            queries.append(app.otherElements)
+        }
+        return queries
+    }
+
+    private func firstExistingElement(queries: [XCUIElementQuery]) -> XCUIElement? {
+        for query in queries {
+            let element = query.firstMatch
+            if element.exists {
+                return element
+            }
+        }
+        return nil
+    }
+
+    private func isFastQueryable(parts: (field: String, value: String, contains: Bool)) -> Bool {
+        switch parts.field {
+        case "text", "label", "identifier", "resourceId", "value":
+            return true
+        default:
+            return false
+        }
     }
 
     private func matches(selector: String, element: XCUIElement) -> Bool {

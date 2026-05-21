@@ -5,6 +5,35 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
+for args in "--app-root" "--scheme" "--bundle-id" "--app-target" "--test-target" "--test-bundle-id" "--workspace" "--project" "--derived-data-path" "--device" "--device-type" "--configuration" "--deployment-target"; do
+  set +e
+  missing_value_output="$("$ROOT/scripts/install-ios-shim.sh" $args 2>&1)"
+  missing_value_status=$?
+  set -e
+  if [[ "$missing_value_status" -ne 2 ]]; then
+    echo "install-ios-shim should exit 2 for missing value: $args" >&2
+    exit 1
+  fi
+  grep -q -- "$args requires a value" <<< "$missing_value_output"
+done
+
+mkdir -p "$TMPDIR/app/.zmr"
+cat > "$TMPDIR/app/.zmr/config.json" <<'JSON'
+{
+  "schemaVersion": 1,
+  "appId": "com.example.mobiletest",
+  "ios": {
+    "enabled": true,
+    "defaultDevice": "booted",
+    "smokeScenario": ".zmr/ios-smoke.json",
+    "traceDir": "traces/zmr-ios"
+  },
+  "scripts": {
+    "ios": "zmr run .zmr/ios-smoke.json --platform ios --device booted --trace-dir traces/zmr-ios"
+  }
+}
+JSON
+
 "$ROOT/scripts/install-ios-shim.sh" \
   --app-root "$TMPDIR/app" \
   --scheme SampleUITests \
@@ -20,6 +49,11 @@ test -x "$TMPDIR/app/.zmr/ios-shim"
 test -f "$TMPDIR/app/.zmr/ZMRShimUITestCase.swift"
 test -f "$TMPDIR/app/.zmr/ZMRShimUITests-Info.plist"
 bash -n "$TMPDIR/app/.zmr/ios-shim"
+ruby -rjson -e '
+  config = JSON.parse(File.read(ARGV.fetch(0)))
+  abort "missing tools.iosShimPath" unless config.dig("tools", "iosShimPath") == "./.zmr/ios-shim"
+  abort "lost appId" unless config["appId"] == "com.example.mobiletest"
+' "$TMPDIR/app/.zmr/config.json"
 
 grep -q 'xcodebuild test' "$TMPDIR/app/.zmr/ios-shim"
 grep -q 'cd "'"$TMPDIR/app"'"' "$TMPDIR/app/.zmr/ios-shim"

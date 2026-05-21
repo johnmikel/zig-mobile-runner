@@ -39,6 +39,16 @@ func TestClientDrivesFakeSession(t *testing.T) {
 	if iosSupport.Status != "supported" || len(iosSupport.DeviceTypes) != 2 || iosSupport.DeviceTypes[0] != "simulator" || iosSupport.DeviceTypes[1] != "physical" || !iosSupport.PhysicalDevices {
 		t.Fatalf("unexpected iOS platform support: %+v", iosSupport)
 	}
+	foundAssertHealthy := false
+	for _, method := range capabilities.Methods {
+		if method == "assert.healthy" {
+			foundAssertHealthy = true
+			break
+		}
+	}
+	if !foundAssertHealthy {
+		t.Fatalf("capabilities missing assert.healthy: %+v", capabilities.Methods)
+	}
 
 	session, err := client.CreateSession(ctx)
 	if err != nil {
@@ -47,15 +57,78 @@ func TestClientDrivesFakeSession(t *testing.T) {
 	if session.SessionID != "default" {
 		t.Fatalf("session id = %q", session.SessionID)
 	}
+	if ok, err := client.CloseSession(ctx); err != nil || !ok {
+		t.Fatalf("close session ok=%v err=%v", ok, err)
+	}
+
+	devices, err := client.Devices(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(devices) != 2 || devices[0].Serial != "fake-device-1" || devices[0].State != "device" || !devices[0].Ready || devices[1].Serial != "fake-ios-disconnected" || devices[1].State != "disconnected" || devices[1].Ready {
+		t.Fatalf("unexpected devices: %+v", devices)
+	}
 
 	ok, err := client.OpenLink(ctx, "exampleapp://go-client")
 	if err != nil || !ok {
 		t.Fatalf("open link ok=%v err=%v", ok, err)
 	}
+	for name, call := range map[string]func(context.Context) (bool, error){
+		"launch":      client.Launch,
+		"stop":        client.Stop,
+		"clear_state": client.ClearState,
+		"hide":        client.HideKeyboard,
+		"back":        client.PressBack,
+	} {
+		ok, err := call(ctx)
+		if err != nil || !ok {
+			t.Fatalf("%s ok=%v err=%v", name, ok, err)
+		}
+	}
+	ok, err = client.Tap(ctx, map[string]interface{}{"text": "Home"})
+	if err != nil || !ok {
+		t.Fatalf("tap ok=%v err=%v", ok, err)
+	}
+	ok, err = client.TypeText(ctx, "agent@example.com", map[string]interface{}{"resourceId": "email"})
+	if err != nil || !ok {
+		t.Fatalf("type text ok=%v err=%v", ok, err)
+	}
+	ok, err = client.EraseText(ctx, map[string]interface{}{"resourceId": "email"}, 32)
+	if err != nil || !ok {
+		t.Fatalf("erase text ok=%v err=%v", ok, err)
+	}
+	ok, err = client.Swipe(ctx, 10, 100, 10, 20, 250)
+	if err != nil || !ok {
+		t.Fatalf("swipe ok=%v err=%v", ok, err)
+	}
+	ok, err = client.ScrollUntilVisible(ctx, map[string]interface{}{"text": "Settings"}, "down", 1000)
+	if err != nil || !ok {
+		t.Fatalf("scroll ok=%v err=%v", ok, err)
+	}
 
 	ok, err = client.WaitUntil(ctx, map[string]interface{}{"text": "Home"}, 1000)
 	if err != nil || !ok {
 		t.Fatalf("wait ok=%v err=%v", ok, err)
+	}
+	ok, err = client.WaitAny(ctx, []map[string]interface{}{{"text": "Home"}, {"text": "Dashboard"}}, 1000)
+	if err != nil || !ok {
+		t.Fatalf("wait any ok=%v err=%v", ok, err)
+	}
+	ok, err = client.WaitGone(ctx, map[string]interface{}{"text": "Loading"}, 1000)
+	if err != nil || !ok {
+		t.Fatalf("wait gone ok=%v err=%v", ok, err)
+	}
+	ok, err = client.AssertVisible(ctx, map[string]interface{}{"text": "Home"}, 1000)
+	if err != nil || !ok {
+		t.Fatalf("assert visible ok=%v err=%v", ok, err)
+	}
+	ok, err = client.AssertNotVisible(ctx, map[string]interface{}{"text": "Application has crashed"}, 1000)
+	if err != nil || !ok {
+		t.Fatalf("assert not visible ok=%v err=%v", ok, err)
+	}
+	ok, err = client.AssertHealthy(ctx, 1000)
+	if err != nil || !ok {
+		t.Fatalf("assert healthy ok=%v err=%v", ok, err)
 	}
 
 	snapshot, err := client.Snapshot(ctx)

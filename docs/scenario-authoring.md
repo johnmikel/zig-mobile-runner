@@ -30,6 +30,17 @@ Use assertions for product expectations, not for synchronization that is already
 covered by a wait. Prefer `waitAny` when either of two legitimate states can
 appear, such as an already-authenticated dashboard or a sign-in prompt.
 
+Add `assertHealthy` after launch, deep links, and major navigation steps to
+fail on common mobile crash overlays and development-server error screens that
+can coexist with otherwise valid UI:
+
+```json
+{ "action": "assertHealthy" }
+```
+
+Use `assertNoneVisible` when a flow needs app-specific negative assertions that
+are not part of ZMR's built-in health guard.
+
 ## Optional And Recovery Steps
 
 Use `"optional": true` only for dismissals or recovery actions that are not part
@@ -54,7 +65,8 @@ zmr validate .zmr/login-smoke.json
 
 The importer supports the common subset needed for smoke scenarios:
 `launchApp`, `stopApp`, `clearState`, `tapOn`, `inputText`, `eraseText`,
-`hideKeyboard`, `assertVisible`, `assertNotVisible`, `openLink`, `back`,
+`hideKeyboard`, `assertVisible`, `assertNotVisible`, `assertHealthy`,
+`openLink`, `back`,
 `scrollUntilVisible`, `takeScreenshot`, and simple wait commands. Review the
 generated JSON before committing it; native `.zmr/*.json` scenarios remain the
 runtime contract for agents and CI.
@@ -68,6 +80,8 @@ The example directory includes templates for common app flows:
 - `examples/android-app-onboarding.json`
 - `examples/android-app-referral-deep-link.json`
 - `examples/android-app-error-state.json`
+- `examples/ios-dev-client-open-link.json`
+- `examples/ios-dev-client-route-snapshot.json`
 
 Run `zmr validate --json <scenario.json>` before touching a device. Invalid
 scenarios report `fieldPath`, `line`, and `column` when ZMR can identify the

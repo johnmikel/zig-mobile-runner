@@ -103,6 +103,13 @@ pub struct Session {
 }
 
 #[derive(Debug, Deserialize)]
+pub struct DeviceInfo {
+    pub serial: String,
+    pub state: String,
+    pub ready: bool,
+}
+
+#[derive(Debug, Deserialize)]
 pub struct Snapshot {
     pub id: String,
     #[serde(rename = "timestampMs")]
@@ -255,6 +262,26 @@ impl Client {
         self.request("session.create", json!({}))
     }
 
+    pub fn close_session(&mut self) -> Result<bool, Error> {
+        self.request("session.close", json!({}))
+    }
+
+    pub fn devices(&mut self) -> Result<Vec<DeviceInfo>, Error> {
+        self.request("device.list", json!({}))
+    }
+
+    pub fn launch(&mut self) -> Result<bool, Error> {
+        self.request("app.launch", json!({}))
+    }
+
+    pub fn stop(&mut self) -> Result<bool, Error> {
+        self.request("app.stop", json!({}))
+    }
+
+    pub fn clear_state(&mut self) -> Result<bool, Error> {
+        self.request("app.clearState", json!({}))
+    }
+
     pub fn open_link(&mut self, url: &str) -> Result<bool, Error> {
         self.request("app.openLink", json!({ "url": url }))
     }
@@ -267,12 +294,130 @@ impl Client {
         self.request("observe.semanticSnapshot", json!({}))
     }
 
+    pub fn tap(&mut self, selector: Value) -> Result<bool, Error> {
+        self.request("ui.tap", json!({ "selector": selector }))
+    }
+
+    pub fn type_text(&mut self, text: &str, selector: Option<Value>) -> Result<bool, Error> {
+        let mut params = json!({ "text": text });
+        if let Some(selector) = selector {
+            params["selector"] = selector;
+        }
+        self.request("ui.type", params)
+    }
+
+    pub fn erase_text(
+        &mut self,
+        selector: Option<Value>,
+        max_chars: Option<i64>,
+    ) -> Result<bool, Error> {
+        let mut params = json!({});
+        if let Some(selector) = selector {
+            params["selector"] = selector;
+        }
+        if let Some(max_chars) = max_chars {
+            params["maxChars"] = json!(max_chars);
+        }
+        self.request("ui.eraseText", params)
+    }
+
+    pub fn hide_keyboard(&mut self) -> Result<bool, Error> {
+        self.request("ui.hideKeyboard", json!({}))
+    }
+
+    pub fn swipe(
+        &mut self,
+        x1: i64,
+        y1: i64,
+        x2: i64,
+        y2: i64,
+        duration_ms: Option<i64>,
+    ) -> Result<bool, Error> {
+        let mut params = json!({ "x1": x1, "y1": y1, "x2": x2, "y2": y2 });
+        if let Some(duration_ms) = duration_ms {
+            params["durationMs"] = json!(duration_ms);
+        }
+        self.request("ui.swipe", params)
+    }
+
+    pub fn press_back(&mut self) -> Result<bool, Error> {
+        self.request("ui.pressBack", json!({}))
+    }
+
+    pub fn scroll_until_visible(
+        &mut self,
+        selector: Value,
+        direction: Option<&str>,
+        timeout_ms: Option<i64>,
+    ) -> Result<bool, Error> {
+        let mut params = json!({ "selector": selector });
+        if let Some(direction) = direction {
+            params["direction"] = json!(direction);
+        }
+        if let Some(timeout_ms) = timeout_ms {
+            params["timeoutMs"] = json!(timeout_ms);
+        }
+        self.request("ui.scrollUntilVisible", params)
+    }
+
     pub fn wait_until(&mut self, selector: Value, timeout_ms: Option<i64>) -> Result<bool, Error> {
         let mut params = json!({ "visible": selector });
         if let Some(timeout_ms) = timeout_ms {
             params["timeoutMs"] = json!(timeout_ms);
         }
         self.request("wait.until", params)
+    }
+
+    pub fn wait_any(
+        &mut self,
+        selectors: Vec<Value>,
+        timeout_ms: Option<i64>,
+    ) -> Result<bool, Error> {
+        let mut params = json!({ "selectors": selectors });
+        if let Some(timeout_ms) = timeout_ms {
+            params["timeoutMs"] = json!(timeout_ms);
+        }
+        self.request("wait.any", params)
+    }
+
+    pub fn wait_gone(&mut self, selector: Value, timeout_ms: Option<i64>) -> Result<bool, Error> {
+        let mut params = json!({ "selector": selector });
+        if let Some(timeout_ms) = timeout_ms {
+            params["timeoutMs"] = json!(timeout_ms);
+        }
+        self.request("wait.gone", params)
+    }
+
+    pub fn assert_visible(
+        &mut self,
+        selector: Value,
+        timeout_ms: Option<i64>,
+    ) -> Result<bool, Error> {
+        let mut params = json!({ "selector": selector });
+        if let Some(timeout_ms) = timeout_ms {
+            params["timeoutMs"] = json!(timeout_ms);
+        }
+        self.request("assert.visible", params)
+    }
+
+    pub fn assert_not_visible(
+        &mut self,
+        selector: Value,
+        timeout_ms: Option<i64>,
+    ) -> Result<bool, Error> {
+        let mut params = json!({ "selector": selector });
+        if let Some(timeout_ms) = timeout_ms {
+            params["timeoutMs"] = json!(timeout_ms);
+        }
+        self.request("assert.notVisible", params)
+    }
+
+    pub fn assert_healthy(&mut self, timeout_ms: Option<i64>) -> Result<bool, Error> {
+        let mut params = json!({});
+        if let Some(timeout_ms) = timeout_ms {
+            params["timeoutMs"] = json!(timeout_ms);
+        }
+        self.request("assert.healthy", params)
     }
 
     pub fn export_trace(

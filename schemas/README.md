@@ -20,6 +20,7 @@ This directory contains draft 2020-12 JSON Schemas for public ZMR file and proto
 - `explain-output.schema.json`: machine-readable `zmr explain --json` failure triage output for agents and CI
 - `run-output.schema.json`: machine-readable `zmr run --json` terminal run summary output
 - `release-manifest.schema.json`: machine-readable `RELEASE_MANIFEST.json` emitted with release archives
+- `release-readiness-output.schema.json`: machine-readable `zmr-release-readiness --json` release evidence gate output
 - `schemas-output.schema.json`: machine-readable `zmr schemas --json` index of public schema names, paths, ids, and descriptions
 
 The Zig test suite verifies these files parse as JSON. Full schema validation is intentionally left to client tooling for now.

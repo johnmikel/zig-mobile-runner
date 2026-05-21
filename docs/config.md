@@ -109,12 +109,17 @@ CLI `--android-shim <path>` takes precedence over the config value for
 
 ## iOS Shim
 
-Set `tools.iosShimPath` when an app repo has built or installed a simulator
+Set `tools.iosShimPath` when an app repo has built or installed an
 XCTest/XCUIAutomation shim command. ZMR sends one JSON command to the shim over
 stdin and reads one JSON response from stdout. The public scenario and JSON-RPC
 interfaces stay unchanged. The generated shim command may cache the XCTest
 `build-for-testing` output and use `test-without-building` internally; ZMR still
 treats it as a simple command transport.
+
+With the shim configured, iOS waits and assertions use native XCTest selector
+queries for single-field selectors before falling back to portable snapshot
+matching. `observe.snapshot` uses a bounded XCTest snapshot so large native or
+React Native trees remain fast enough for interactive agent loops.
 
 CLI `--ios-shim <path>` takes precedence over the config value for `zmr run`,
 `zmr serve`, and `zmr doctor`.
@@ -161,6 +166,7 @@ zmr init --app --json --dir . --app-id com.example.mobiletest
 zmr run --config .zmr/config.json
 zmr run .zmr/android-smoke.json --device emulator-5554
 zmr serve --transport stdio --config .zmr/config.json
+zmr mcp --config .zmr/config.json --trace-dir traces/zmr-agent
 zmr doctor --strict --json --config .zmr/config.json
 ```
 

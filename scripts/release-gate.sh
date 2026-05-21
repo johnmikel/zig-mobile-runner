@@ -74,14 +74,20 @@ run "zig build-exe src/main.zig -target $HOST_ZIG_TARGET -O Debug -femit-bin=zig
 run "bash tests/benchmark-results-test.sh"
 run "bash tests/device-matrix-test.sh"
 run "bash tests/android-emulator-script-test.sh"
+run "bash tests/android-demo-app-script-test.sh"
+run "bash tests/android-real-demo-script-test.sh"
 run "bash tests/android-shim-install-script-test.sh"
 run "bash tests/android-pilot-script-test.sh"
 run "bash tests/pilot-gate-script-test.sh"
 run "bash tests/ios-demo-app-script-test.sh"
 run "bash tests/ios-real-demo-script-test.sh"
+run "bash tests/ios-shim-source-test.sh"
 run "bash tests/ios-shim-install-script-test.sh"
 run "bash tests/ios-shim-target-helper-test.sh"
 run "bash tests/ios-pilot-script-test.sh"
+run "bash tests/release-candidate-script-test.sh"
+run "bash tests/release-readiness-script-test.sh"
+run "bash tests/coverage-script-test.sh"
 run "bash tests/release-gate-script-test.sh"
 run "bash tests/ci-gate-script-test.sh"
 run "bash tests/release-metadata-test.sh"
@@ -93,9 +99,12 @@ run "bash tests/homebrew-formula-test.sh"
 run "bash tests/docs-readiness-test.sh"
 run "bash tests/workflow-readiness-test.sh"
 run "bash tests/demo-script-test.sh"
+run "bash tests/mcp-server-test.sh"
 run "node --test tests/npm-package.test.mjs"
 run "bash tests/go-client-test.sh"
 run "bash tests/rust-client-test.sh"
+run "if command -v swift >/dev/null 2>&1; then swift test --package-path clients/swift; else echo 'skip swift test: swift not found'; fi"
+run "if command -v gradle >/dev/null 2>&1; then gradle -p clients/kotlin test; else echo 'skip kotlin test: gradle not found'; fi"
 run "bash tests/public-safety-test.sh"
 run "node --test tests/viewer-parser.test.mjs"
 run "zig test src/main.zig -target $HOST_ZIG_TARGET"
@@ -124,7 +133,7 @@ run "npm pack --dry-run"
 cat <<'EOF'
 
 External pilot gates not run by default:
-+ ./scripts/pilot-gate.sh --android --ios --android-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0
-+ ./scripts/run-android-pilot.sh --app-root /path/to/mobile-app --device emulator-5554 --runs 20 --min-pass-rate 100 --max-failures 0 --max-p95-ms 30000
-+ ./scripts/run-ios-pilot.sh --app-root /path/to/mobile-app --app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --max-p95-ms 45000
++ ./scripts/pilot-gate.sh --android --android-app-root /path/to/mobile-app --android-app-id com.example.mobiletest --android-device emulator-5554 --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl
++ ./scripts/pilot-gate.sh --ios --ios-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --ios-app-id com.example.mobiletest --ios-device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl
++ ./scripts/pilot-gate.sh --ios --ios-device-type physical --ios-device <physical-device-id> --ios-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Release-iphoneos/Sample.ipa --ios-app-id com.example.mobiletest --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl
 EOF

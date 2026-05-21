@@ -31,6 +31,7 @@ with ZmrClient(
     capabilities = zmr.capabilities()
     zmr.create_session()
     zmr.open_link("exampleapp://e2e-auth?probe=1")
+    zmr.assert_healthy(timeout_ms=100)
     snapshot = zmr.snapshot()
     events = zmr.trace_events(0, limit=20)
     zmr.export_trace("traces/demo-python-client-redacted.zmrtrace", redact=True, omit_screenshots=True)

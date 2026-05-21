@@ -6,10 +6,13 @@ Most app teams should install ZMR as a dev dependency:
 
 ```bash
 npm install --save-dev zig-mobile-runner
-npx zmr-wizard --app-id com.example.mobiletest
+npx zmr-wizard --app-id com.example.mobiletest --package-json
 ```
 
 That keeps scenarios and app scripts in the app repo while the runner remains versioned through npm.
+For Expo development builds, add `--expo-dev-client-scheme <scheme>` to scaffold
+Android and iOS open-link smoke scenarios that load Metro before selector
+assertions run.
 
 ## What The App Provides
 
@@ -78,8 +81,9 @@ project contains `--app-target`, or when `--bundle-id` disambiguates matching
 app targets. Pass `--project ios/Sample.xcodeproj` explicitly for
 still-ambiguous multi-project workspaces or project-only apps.
 
-The generated `.zmr/ios-shim` executable is the value to pass to `--ios-shim` or
-`tools.iosShimPath`. It caches `build-for-testing` output and uses
+The generated `.zmr/ios-shim` executable is written into
+`tools.iosShimPath` in `.zmr/config.json`, and can still be passed explicitly
+with `--ios-shim`. It caches `build-for-testing` output and uses
 `test-without-building` for selector commands through `.zmr/ios-shim-state/`.
 Set `ZMR_IOS_SHIM_FORCE_REBUILD=1` after app-side target changes, or
 `ZMR_IOS_SHIM_ONESHOT=1` when you need to debug the slower cold-start path.
@@ -101,7 +105,7 @@ mobile-app/
 
 Keep app-owned scenarios and ZMR defaults in `.zmr/` when they are app-specific. Keep generic examples in the ZMR repo. ZMR auto-discovers `.zmr/config.json` from the app repo; explicit CLI flags still override config defaults.
 
-## Android Demo Command
+## Android App Pilot Command
 
 ```bash
 /path/to/zig-mobile-runner/scripts/run-android-pilot.sh \
@@ -143,6 +147,30 @@ The Android wrapper expects the default APK path under the app root. Override it
   --device emulator-5554
 ```
 
+## Public Android Demo Command
+
+For a generic public Android app:
+
+```bash
+npx zmr-demo-android --out /tmp/zmr-android-demo --device emulator-5554 --avd <avd-name>
+```
+
+This writes a signed debug APK plus `.zmr/android-smoke.json` without Gradle or
+network access, then installs and runs it on the requested Android target. For
+manual inspection or customization:
+
+```bash
+npx zmr-create-android-demo-app --out /tmp/zmr-android-demo
+adb install -r /tmp/zmr-android-demo/build/app-debug.apk
+/path/to/zig-mobile-runner/zig-out/bin/zmr run /tmp/zmr-android-demo/.zmr/android-smoke.json \
+  --device emulator-5554 \
+  --app-id com.example.mobiletest \
+  --trace-dir /tmp/zmr-android-demo/traces/android-demo
+```
+
+Use this path to prove local Android install, launch, selector action, typing,
+snapshot, and trace capture before wiring ZMR into a private app.
+
 ## iOS Demo Command
 
 For a generic public demo app with the shim already installed:
@@ -151,9 +179,9 @@ For a generic public demo app with the shim already installed:
 npx zmr-demo-ios --out /tmp/zmr-ios-demo --device booted
 ```
 
-That command creates the demo app, builds it, runs the iOS pilot, and writes
-redacted trace bundles. To inspect or customize the generated app before
-running the pilot manually:
+That command creates the demo app, boots an available simulator when needed,
+builds it, runs the iOS pilot, and writes redacted trace bundles. To inspect or
+customize the generated app before running the pilot manually:
 
 ```bash
 npx zmr-create-ios-demo-app --out /tmp/zmr-ios-demo
@@ -186,9 +214,37 @@ Build the app for an iOS simulator, boot a simulator, then run:
 Without `--ios-shim`, the iOS path is a smoke demo: install, launch/open-link,
 screenshot, logs, trace, report, and redacted export. With `--ios-shim`, ZMR
 also runs `examples/ios-shim-smoke.json`, producing a second report and
-redacted bundle for selector-grade wait/tap/type/snapshot actions.
+redacted bundle for selector-grade native waits, tap, type, and bounded
+snapshot actions. If a selector wait times out, ZMR records a final XCTest
+snapshot when possible so reports and agents can see the active app context,
+visible labels, hidden/disabled/offscreen candidates, and nearest text matches.
+When the app is already running, ZMR uses the shim `appState` response as an
+idempotent launch confirmation if `simctl launch` itself returns an error.
 
 On iOS simulators, `clearState` means best-effort app uninstall by bundle id.
+For physical iOS devices, lifecycle commands go through `devicectl` and
+selector commands go through the same app-local XCTest shim, subject to signing,
+provisioning, Developer Mode, and local Xcode availability. Screenshot
+artifacts use the XCTest shim; log artifact capture is simulator-first in this
+release.
+Use a simulator-built `iphonesimulator` `.app` for simulator runs. A signed
+device `.ipa` must be run with `--ios-device-type physical`; the pilot wrapper
+rejects device IPAs on simulator runs before installing anything.
+Use `--ios-device-type physical` with a concrete device identifier from
+`zmr devices` for physical pilot runs:
+
+```bash
+/path/to/zig-mobile-runner/scripts/run-ios-pilot.sh \
+  --app-root /path/to/mobile-app \
+  --app-path /path/to/mobile-app/build/Release-iphoneos/Sample.ipa \
+  --ios-device-type physical \
+  --device <physical-device-id> \
+  --ios-shim /path/to/mobile-app/.zmr/ios-shim \
+  --runs 20 \
+  --min-pass-rate 100 \
+  --max-failures 0
+```
+
 If the app is already missing, ZMR treats the simulator as clean and continues.
 Install the simulator `.app` again before launch/open-link steps that need it.
 
@@ -224,10 +280,12 @@ zmr run .zmr/ios-shim-smoke.json \
 
 ## Agent JSON-RPC Use
 
-Start a local server next to the device:
+Start a local server next to the device. App repos scaffolded by
+`zmr-wizard --package-json` can use the generated scripts:
 
 ```bash
-zmr serve --transport stdio --device emulator-5554 --app-id com.example.mobiletest --trace-dir traces/agent-session
+npm run zmr:serve
+npm run zmr:mcp
 ```
 
 External agents can call:

@@ -7,7 +7,7 @@
   "required": ["ok", "status"],
   "properties": {
     "ok": { "type": "boolean" },
-    "status": { "enum": ["passed", "failed"] },
+    "status": { "enum": ["passed", "failed", "partial"] },
     "scenario": { "type": "string", "minLength": 1 },
     "appId": { "type": "string", "minLength": 1 },
     "traceDir": { "type": "string", "minLength": 1 },
@@ -16,8 +16,28 @@
     "durationMs": { "type": "integer", "minimum": 0 },
     "eventCount": { "type": "integer", "minimum": 0 },
     "snapshotCount": { "type": "integer", "minimum": 0 },
+    "partialFailureCount": { "type": "integer", "minimum": 0 },
+    "partialFailure": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["kind"],
+      "properties": {
+        "kind": { "type": "string", "minLength": 1 },
+        "status": { "type": "string", "minLength": 1 },
+        "artifactStatus": { "type": "string", "minLength": 1 },
+        "semanticStatus": { "type": "string", "minLength": 1 },
+        "error": { "type": "string", "minLength": 1 },
+        "screenshotArtifact": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 }
+      }
+    },
     "failedStepIndex": { "type": "integer", "minimum": 0 },
     "error": { "type": "string", "minLength": 1 },
-    "reportPath": { "type": "string", "minLength": 1 }
+    "reportPath": { "type": "string", "minLength": 1 },
+    "nextCommands": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
   }
 }

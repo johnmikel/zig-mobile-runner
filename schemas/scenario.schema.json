@@ -51,6 +51,8 @@
             "waitAny",
             "assertVisible",
             "assertNotVisible",
+            "assertNoneVisible",
+            "assertHealthy",
             "optional",
             "whenVisible",
             "repeat",
@@ -94,6 +96,10 @@
         },
         {
           "if": { "properties": { "action": { "const": "waitAny" } } },
+          "then": { "required": ["selectors"] }
+        },
+        {
+          "if": { "properties": { "action": { "const": "assertNoneVisible" } } },
           "then": { "required": ["selectors"] }
         },
         {

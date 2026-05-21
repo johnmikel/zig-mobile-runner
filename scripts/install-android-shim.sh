@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SOURCE" ]]; do
+  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  if [[ "$SOURCE" != /* ]]; then
+    SOURCE="$SOURCE_DIR/$SOURCE"
+  fi
+done
+
+ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
 APP_ROOT=""
 TEST_PACKAGE=""
 RUNNER="androidx.test.runner.AndroidJUnitRunner"
@@ -40,31 +49,40 @@ die() {
   exit 2
 }
 
+require_value() {
+  local flag="$1"
+  local value="${2-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    die "$flag requires a value"
+  fi
+  printf '%s\n' "$value"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --app-root)
-      APP_ROOT="${2:-}"
+      APP_ROOT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --test-package)
-      TEST_PACKAGE="${2:-}"
+      TEST_PACKAGE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --runner)
-      RUNNER="${2:-}"
+      RUNNER="$(require_value "$1" "${2-}")"
       RUNNER_PROVIDED=1
       shift 2
       ;;
     --device)
-      DEVICE="${2:-}"
+      DEVICE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --android-module)
-      ANDROID_MODULE="${2:-}"
+      ANDROID_MODULE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --gradle-file)
-      GRADLE_FILE="${2:-}"
+      GRADLE_FILE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     -h|--help)

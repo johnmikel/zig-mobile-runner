@@ -10,7 +10,64 @@ VALID_OUTPUT="$("$ZMR" validate "$ROOT/examples/demo-fake.json" --json)"
 grep -q '"ok":true' <<< "$VALID_OUTPUT"
 grep -q '"path":"'"$ROOT"'/examples/demo-fake.json"' <<< "$VALID_OUTPUT"
 grep -q '"name":"ZMR fake Android auth probe demo"' <<< "$VALID_OUTPUT"
+if ! grep -q '"appId":"com.example.mobiletest"' <<< "$VALID_OUTPUT"; then
+  echo "validate --json should include appId for valid scenarios" >&2
+  echo "$VALID_OUTPUT" >&2
+  exit 1
+fi
 grep -q '"stepCount":4' <<< "$VALID_OUTPUT"
+grep -q '"nextCommands":\["zmr run '"$ROOT"'/examples/demo-fake.json --json --trace-dir traces/zmr-run"\]' <<< "$VALID_OUTPUT"
+
+mkdir -p "$TMPDIR/agent handoff"
+cat > "$TMPDIR/agent handoff/login smoke.json" <<'JSON'
+{
+  "name": "login smoke",
+  "appId": "com.example.mobiletest",
+  "steps": [
+    { "action": "assertHealthy", "timeoutMs": 0 }
+  ]
+}
+JSON
+
+HANDOFF_OUTPUT="$("$ZMR" validate "$TMPDIR/agent handoff/login smoke.json" --json)"
+if ! grep -q "\"nextCommands\":\[\"zmr run '$TMPDIR/agent handoff/login smoke.json' --json --trace-dir traces/zmr-run\"\]" <<< "$HANDOFF_OUTPUT"; then
+  echo "validate --json should include a shell-quoted run handoff for paths with spaces" >&2
+  echo "$HANDOFF_OUTPUT" >&2
+  exit 1
+fi
+
+cat > "$TMPDIR/assert-none-visible.json" <<'JSON'
+{
+  "name": "guard app errors",
+  "steps": [
+    {
+      "action": "assertNoneVisible",
+      "selectors": [
+        { "textContains": "Uncaught Error" },
+        { "textContains": "Application has crashed" }
+      ],
+      "timeoutMs": 0
+    }
+  ]
+}
+JSON
+
+ASSERT_NONE_OUTPUT="$("$ZMR" validate "$TMPDIR/assert-none-visible.json" --json)"
+grep -q '"ok":true' <<< "$ASSERT_NONE_OUTPUT"
+grep -q '"name":"guard app errors"' <<< "$ASSERT_NONE_OUTPUT"
+
+cat > "$TMPDIR/assert-healthy.json" <<'JSON'
+{
+  "name": "guard app health",
+  "steps": [
+    { "action": "assertHealthy", "timeoutMs": 0 }
+  ]
+}
+JSON
+
+ASSERT_HEALTHY_OUTPUT="$("$ZMR" validate "$TMPDIR/assert-healthy.json" --json)"
+grep -q '"ok":true' <<< "$ASSERT_HEALTHY_OUTPUT"
+grep -q '"name":"guard app health"' <<< "$ASSERT_HEALTHY_OUTPUT"
 
 cat > "$TMPDIR/bad.json" <<'JSON'
 {"name":"bad"}

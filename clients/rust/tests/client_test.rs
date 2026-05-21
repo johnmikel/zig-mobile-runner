@@ -21,6 +21,10 @@ fn client_drives_fake_session() {
         .methods
         .iter()
         .any(|method| method == "observe.snapshot"));
+    assert!(capabilities
+        .methods
+        .iter()
+        .any(|method| method == "assert.healthy"));
     assert!(!capabilities.ios_preview);
     let ios_support = capabilities.platform_support.get("ios").unwrap();
     assert_eq!(ios_support.status, "supported");
@@ -29,11 +33,53 @@ fn client_drives_fake_session() {
 
     let session = client.create_session().unwrap();
     assert_eq!(session.session_id, "default");
+    assert!(client.close_session().unwrap());
+
+    let devices = client.devices().unwrap();
+    assert_eq!(devices.len(), 2);
+    assert_eq!(devices[0].serial, "fake-device-1");
+    assert_eq!(devices[0].state, "device");
+    assert!(devices[0].ready);
+    assert_eq!(devices[1].serial, "fake-ios-disconnected");
+    assert_eq!(devices[1].state, "disconnected");
+    assert!(!devices[1].ready);
 
     assert!(client.open_link("exampleapp://rust-client").unwrap());
+    assert!(client.launch().unwrap());
+    assert!(client.stop().unwrap());
+    assert!(client.clear_state().unwrap());
+    assert!(client.tap(json!({ "text": "Home" })).unwrap());
+    assert!(client
+        .type_text("agent@example.com", Some(json!({ "resourceId": "email" })))
+        .unwrap());
+    assert!(client
+        .erase_text(Some(json!({ "resourceId": "email" })), Some(32))
+        .unwrap());
+    assert!(client.hide_keyboard().unwrap());
+    assert!(client.swipe(10, 100, 10, 20, Some(250)).unwrap());
+    assert!(client.press_back().unwrap());
+    assert!(client
+        .scroll_until_visible(json!({ "text": "Settings" }), Some("down"), Some(1000))
+        .unwrap());
     assert!(client
         .wait_until(json!({ "text": "Home" }), Some(1000))
         .unwrap());
+    assert!(client
+        .wait_any(
+            vec![json!({ "text": "Home" }), json!({ "text": "Dashboard" })],
+            Some(1000)
+        )
+        .unwrap());
+    assert!(client
+        .wait_gone(json!({ "text": "Loading" }), Some(1000))
+        .unwrap());
+    assert!(client
+        .assert_visible(json!({ "text": "Home" }), Some(1000))
+        .unwrap());
+    assert!(client
+        .assert_not_visible(json!({ "text": "Application has crashed" }), Some(1000))
+        .unwrap());
+    assert!(client.assert_healthy(Some(1000)).unwrap());
 
     let snapshot = client.snapshot().unwrap();
     assert_eq!(snapshot.active_package, "com.example.mobiletest");

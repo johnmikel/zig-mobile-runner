@@ -37,8 +37,25 @@ grep -q '"ok":true' "$TMPDIR/import.json"
 grep -q '"format":"flow-yaml"' "$TMPDIR/import.json"
 grep -q '"out":"'"$TMPDIR"'/.zmr/imported.json"' "$TMPDIR/import.json"
 grep -q '"stepCount":10' "$TMPDIR/import.json"
+grep -q '"nextCommands":\["zmr validate --json '"$TMPDIR"'/.zmr/imported.json","zmr run '"$TMPDIR"'/.zmr/imported.json --json --trace-dir traces/zmr-run"\]' "$TMPDIR/import.json"
+
+"$ZMR" import flow-yaml "$TMPDIR/flow.yaml" --out "$TMPDIR/.zmr/imported flow.json" --json > "$TMPDIR/import-space.json"
+if ! grep -q "\"nextCommands\":\[\"zmr validate --json '$TMPDIR/.zmr/imported flow.json'\",\"zmr run '$TMPDIR/.zmr/imported flow.json' --json --trace-dir traces/zmr-run\"\]" "$TMPDIR/import-space.json"; then
+  echo "import --json should include shell-quoted validate and run handoffs" >&2
+  cat "$TMPDIR/import-space.json" >&2
+  exit 1
+fi
 
 "$ZMR" validate "$TMPDIR/.zmr/imported.json"
+
+"$ZMR" import flow-yaml "$TMPDIR/flow.yaml" --out "$TMPDIR/.zmr/imported flow.json" --force > "$TMPDIR/import-plain.out"
+grep -q "wrote $TMPDIR/.zmr/imported flow.json" "$TMPDIR/import-plain.out"
+if ! grep -q "next: zmr validate '$TMPDIR/.zmr/imported flow.json'" "$TMPDIR/import-plain.out"; then
+  echo "plain import should print an executable next validation command" >&2
+  cat "$TMPDIR/import-plain.out" >&2
+  exit 1
+fi
+"$ZMR" validate "$TMPDIR/.zmr/imported flow.json"
 
 python3 - "$TMPDIR/.zmr/imported.json" <<'PY'
 import json

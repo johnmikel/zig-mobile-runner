@@ -41,6 +41,12 @@ Recommended flow:
 Do not parse screenshots or terminal text when the same fact is available from
 snapshot nodes, action results, CLI JSON, or trace events.
 
+If `zmr run --json` returns `status: "partial"`, inspect `partialFailure`.
+For iOS visual captures, `artifactStatus: "captured"` with
+`semanticStatus: "failed"` means screenshot proof exists but accessibility or
+XCTest hierarchy extraction failed. Use `zmr explain --json <trace-dir>` for
+the same diagnostic shape after the run.
+
 ## MCP Session
 
 Agents that support the Model Context Protocol can use ZMR directly as a local
@@ -105,19 +111,40 @@ those diagnostics as the source of truth before changing a selector.
 Use ZMR repeated runs first:
 
 ```bash
-zmr-benchmark --zmr .zmr/android-smoke.json --device emulator-5554 --runs 20 --trace-root traces/zmr-android-reliability --min-pass-rate 100 --max-failures 0
+zmr-benchmark --zmr .zmr/android-smoke.json --platform android --device emulator-5554 --app-id com.example.mobiletest --app-build <build-id-or-artifact> --runs 20 --trace-root traces/zmr-android-reliability --results traces/bench-comparison/results.jsonl --replace --min-pass-rate 100 --max-failures 0
 ```
 
 For a fair comparison with an app-local baseline command, collect normalized
 rows and compare them:
 
 ```bash
-zmr-benchmark-command --tool baseline --runs 20 --trace-root traces/baseline --results traces/baseline/results.jsonl -- <baseline command>
-zmr-compare-benchmarks --candidate traces/zmr-android-reliability/results.jsonl --baseline traces/baseline/results.jsonl --out traces/comparison
+zmr-benchmark-command --tool baseline --platform android --device emulator-5554 --app-id com.example.mobiletest --scenario .zmr/android-smoke.json --app-build <build-id-or-artifact> --runs 20 --trace-root traces/baseline --results traces/bench-comparison/results.jsonl -- <baseline command>
+zmr-compare-benchmarks --results traces/bench-comparison/results.jsonl --candidate zmr --baseline baseline --min-candidate-pass-rate 100 --max-candidate-failures 0 --min-mean-speedup 1.25 --min-p95-speedup 1.25 --out traces/bench-comparison/comparison.md --evidence-out traces/bench-comparison/evidence.jsonl
 ```
 
 Only publish claims when the candidate and baseline exercise equivalent app
-paths under the same device state.
+paths under the same device state. Market-claim evidence must show the same
+benchmark context: `platform`, `device`, `appId`, `scenario`, and `appBuild`.
+It must also include at least 20 candidate rows and at least 20 baseline rows.
+
+## Release Claims
+
+Before saying a release, production rollout, or market comparison is ready,
+evaluate the collected evidence:
+
+```bash
+zmr-release-readiness --json \
+  --evidence traces/release-candidate/<run>/evidence.jsonl \
+  --target dev-preview
+```
+
+Use `satisfied` for proven requirements and `blocked`, `missing`,
+`insufficient`, `failed`, and `planned` for remaining work. Use
+`recommendedWording` for the human-facing status and keep
+`claimLimitations` intact; never upgrade a dev-preview result into a
+production-stable or competitive claim. When blocked, run
+`nextSteps[].commands` in order and use `nextSteps[].covers` to map each
+command back to the blocked requirements it resolves.
 
 ## Safety Rules
 

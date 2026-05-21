@@ -9,9 +9,17 @@ zmr serve --transport stdio --config .zmr/config.json --trace-dir traces/zmr-age
 
 They are intended for AI agents, CI harnesses, and app teams that want typed
 or idiomatic calls without reimplementing JSON-RPC framing.
-Each client includes a semantic snapshot helper for `observe.semanticSnapshot`
+Each client includes `devices()` for `device.list`, including the portable
+`ready` boolean, and a semantic snapshot helper for `observe.semanticSnapshot`
 so agents can work from normalized roles, selectors, bounds, and recommended
 actions instead of raw platform hierarchy classes.
+The TypeScript, Python, Go, and Rust clients expose the same core control
+surface: session lifecycle, app launch/stop/link/state, snapshot and semantic
+snapshot, tap/type/erase/hide-keyboard/swipe/back/scroll, waits, assertions,
+trace event polling, and trace export.
+Use the `assertHealthy`/`assert_healthy` helper after launches, links, and major
+navigation steps to catch native crash overlays and development-client failures
+without hand-maintaining negative selectors in every client.
 
 For install commands across package managers, see
 [docs/client-installation.md](../docs/client-installation.md).
@@ -62,7 +70,10 @@ go get github.com/johnmikel/zig-mobile-runner/clients/go@main
 ```
 
 ```bash
-go run ./clients/go/examples/fake-session --server tests/fake-json-rpc-server.mjs
+go run ./clients/go/examples/fake-session \
+  --zmr ./zig-out/bin/zmr \
+  --adb ./tests/fake-adb.sh \
+  --trace-dir traces/demo-go-client
 ```
 
 ```go
@@ -86,7 +97,10 @@ zmr-client = { path = "vendor/zig-mobile-runner/clients/rust" }
 ```
 
 ```bash
-cargo run --manifest-path clients/rust/Cargo.toml --example fake_session -- --server tests/fake-json-rpc-server.mjs
+cargo run --manifest-path clients/rust/Cargo.toml --example fake_session -- \
+  --zmr ./zig-out/bin/zmr \
+  --adb ./tests/fake-adb.sh \
+  --trace-dir traces/demo-rust-client
 ```
 
 ```rust

@@ -22,6 +22,7 @@ class PythonClientTest(unittest.TestCase):
             capabilities = client.capabilities()
             self.assertEqual(capabilities["protocolVersion"], "2026-04-28")
             self.assertIn("observe.snapshot", capabilities["methods"])
+            self.assertIn("assert.healthy", capabilities["methods"])
             self.assertFalse(capabilities["iosPreview"])
             self.assertEqual(capabilities["platformSupport"]["ios"]["status"], "supported")
             self.assertEqual(capabilities["platformSupport"]["ios"]["deviceTypes"], ["simulator", "physical"])
@@ -30,8 +31,13 @@ class PythonClientTest(unittest.TestCase):
             session = client.create_session()
             self.assertEqual(session["sessionId"], "default")
 
+            devices = client.devices()
+            self.assertEqual(devices[0], {"serial": "fake-device-1", "state": "device", "ready": True})
+            self.assertEqual(devices[1], {"serial": "fake-ios-disconnected", "state": "disconnected", "ready": False})
+
             self.assertTrue(client.open_link("exampleapp://python-client"))
             self.assertTrue(client.wait_until({"text": "Home"}, timeout_ms=1000))
+            self.assertTrue(client.assert_healthy(timeout_ms=1000))
 
             snapshot = client.snapshot()
             self.assertEqual(snapshot["activePackage"], "com.example.mobiletest")

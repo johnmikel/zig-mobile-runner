@@ -10,7 +10,7 @@
     "appInit": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ok", "mode", "dir", "appId", "created", "next"],
+      "required": ["ok", "mode", "dir", "appId", "created", "configPath", "deviceMatrixPath", "agentInstructionsPath", "next", "nextCommands", "smokeCommands"],
       "properties": {
         "ok": { "const": true },
         "mode": { "const": "app" },
@@ -18,16 +18,38 @@
         "appId": { "type": "string", "minLength": 1 },
         "created": {
           "type": "array",
-          "minItems": 3,
+          "minItems": 4,
           "items": { "type": "string", "minLength": 1 }
         },
-        "next": { "type": "string", "minLength": 1 }
+        "configPath": { "type": "string", "minLength": 1 },
+        "androidScenarioPath": { "type": "string", "minLength": 1 },
+        "iosScenarioPath": { "type": "string", "minLength": 1 },
+        "androidDevClientScenarioPath": { "type": "string", "minLength": 1 },
+        "iosDevClientScenarioPath": { "type": "string", "minLength": 1 },
+        "deviceMatrixPath": { "type": "string", "minLength": 1 },
+        "agentInstructionsPath": { "type": "string", "minLength": 1 },
+        "next": { "type": "string", "minLength": 1 },
+        "nextCommands": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "smokeCommands": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "scriptCount": { "type": "integer", "minimum": 0 },
+        "scriptNames": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        }
       }
     },
     "scenarioInit": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["ok", "mode", "appId", "created", "next"],
+      "required": ["ok", "mode", "appId", "created", "next", "nextCommands"],
       "properties": {
         "ok": { "const": true },
         "mode": { "const": "scenario" },
@@ -37,7 +59,12 @@
           "minItems": 1,
           "items": { "type": "string", "minLength": 1 }
         },
-        "next": { "type": "string", "minLength": 1 }
+        "next": { "type": "string", "minLength": 1 },
+        "nextCommands": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1 }
+        }
       }
     }
   }

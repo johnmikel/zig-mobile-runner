@@ -1,5 +1,8 @@
 const std = @import("std");
 const command = @import("command.zig");
+const android_device_info = @import("android_device_info.zig");
+const android_shell = @import("android_shell.zig");
+const android_screen_recording = @import("android_screen_recording.zig");
 const ios_shim = @import("ios_shim.zig");
 const trace = @import("trace.zig");
 const types = @import("types.zig");
@@ -52,7 +55,7 @@ pub const AndroidDevice = struct {
     }
 
     pub fn listDevices(self: *AndroidDevice) ![]types.DeviceInfo {
-        return try listDevicesWithPath(self.allocator, self.adb_path);
+        return try android_device_info.listDevices(self.allocator, self.adb_path);
     }
 
     pub fn install(self: *AndroidDevice, apk_path: []const u8) !void {
@@ -80,9 +83,11 @@ pub const AndroidDevice = struct {
     }
 
     pub fn openLink(self: *AndroidDevice, url: []const u8) !void {
+        var args = try android_shell.openLinkIntent(self.allocator, url, self.app_id);
+        defer args.deinit();
         var attempt: usize = 0;
         while (attempt < open_link_attempts) : (attempt += 1) {
-            const result = try self.runAdb(&.{ "shell", "am", "start", "-a", "android.intent.action.VIEW", "-d", url, self.app_id }, default_max_output);
+            const result = try self.runAdb(args.items(), default_max_output);
             defer result.deinit(self.allocator);
             try result.ensureSuccess();
 
@@ -96,97 +101,60 @@ pub const AndroidDevice = struct {
 
     pub fn tap(self: *AndroidDevice, x: i32, y: i32) !void {
         if (self.shim_path != null) return try self.runShimAction(.{ .kind = .tap, .x = x, .y = y });
-        const sx = try std.fmt.allocPrint(self.allocator, "{d}", .{x});
-        defer self.allocator.free(sx);
-        const sy = try std.fmt.allocPrint(self.allocator, "{d}", .{y});
-        defer self.allocator.free(sy);
-        const result = try self.runAdb(&.{ "shell", "input", "tap", sx, sy }, default_max_output);
+        var args = try android_shell.tap(self.allocator, x, y);
+        defer args.deinit();
+        const result = try self.runAdb(args.items(), default_max_output);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
     }
 
     pub fn typeText(self: *AndroidDevice, text: []const u8) !void {
         if (self.shim_path != null) return try self.runShimAction(.{ .kind = .type_text, .text = text });
-        const escaped = try command.escapeAdbInputText(self.allocator, text);
-        defer self.allocator.free(escaped);
-        const result = try self.runAdb(&.{ "shell", "input", "text", escaped }, default_max_output);
+        var args = try android_shell.typeText(self.allocator, text);
+        defer args.deinit();
+        const result = try self.runAdb(args.items(), default_max_output);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
     }
 
     pub fn eraseText(self: *AndroidDevice, max_chars: u32) !void {
         if (self.shim_path != null) return try self.runShimAction(.{ .kind = .erase_text, .max_chars = max_chars });
-        const script = try std.fmt.allocPrint(
-            self.allocator,
-            "input keyevent KEYCODE_MOVE_END; i=0; while [ $i -lt {d} ]; do input keyevent KEYCODE_DEL; i=$((i+1)); done",
-            .{max_chars},
-        );
-        defer self.allocator.free(script);
-        const result = try self.runAdb(&.{ "shell", "sh", "-c", script }, default_max_output);
+        var args = try android_shell.eraseText(self.allocator, max_chars);
+        defer args.deinit();
+        const result = try self.runAdb(args.items(), default_max_output);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
     }
 
     pub fn hideKeyboard(self: *AndroidDevice) !void {
         if (self.shim_path != null) return try self.runShimAction(.{ .kind = .hide_keyboard });
-        const result = try self.runAdb(&.{ "shell", "input", "keyevent", "BACK" }, default_max_output);
+        var args = try android_shell.pressBack(self.allocator);
+        defer args.deinit();
+        const result = try self.runAdb(args.items(), default_max_output);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
     }
 
     pub fn swipe(self: *AndroidDevice, x1: i32, y1: i32, x2: i32, y2: i32, duration_ms: u32) !void {
         if (self.shim_path != null) return try self.runShimAction(.{ .kind = .swipe, .x1 = x1, .y1 = y1, .x2 = x2, .y2 = y2, .duration_ms = duration_ms });
-        const sx1 = try std.fmt.allocPrint(self.allocator, "{d}", .{x1});
-        defer self.allocator.free(sx1);
-        const sy1 = try std.fmt.allocPrint(self.allocator, "{d}", .{y1});
-        defer self.allocator.free(sy1);
-        const sx2 = try std.fmt.allocPrint(self.allocator, "{d}", .{x2});
-        defer self.allocator.free(sx2);
-        const sy2 = try std.fmt.allocPrint(self.allocator, "{d}", .{y2});
-        defer self.allocator.free(sy2);
-        const sd = try std.fmt.allocPrint(self.allocator, "{d}", .{duration_ms});
-        defer self.allocator.free(sd);
-        const result = try self.runAdb(&.{ "shell", "input", "swipe", sx1, sy1, sx2, sy2, sd }, default_max_output);
+        var args = try android_shell.swipe(self.allocator, x1, y1, x2, y2, duration_ms);
+        defer args.deinit();
+        const result = try self.runAdb(args.items(), default_max_output);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
     }
 
     pub fn pressBack(self: *AndroidDevice) !void {
         if (self.shim_path != null) return try self.runShimAction(.{ .kind = .press_back });
-        const result = try self.runAdb(&.{ "shell", "input", "keyevent", "BACK" }, default_max_output);
+        var args = try android_shell.pressBack(self.allocator);
+        defer args.deinit();
+        const result = try self.runAdb(args.items(), default_max_output);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
     }
 
     pub fn startScreenRecording(self: *AndroidDevice, remote_path: []const u8) !AndroidScreenRecording {
-        const cleanup = self.runAdb(&.{ "shell", "rm", "-f", remote_path }, 4096) catch null;
-        if (cleanup) |result| result.deinit(self.allocator);
-
-        var argv = std.ArrayList([]const u8).empty;
-        defer argv.deinit(self.allocator);
-        try self.appendAdbBase(&argv);
-        try argv.appendSlice(self.allocator, &.{ "shell", "screenrecord", remote_path });
-
-        const owned_adb_path = try self.allocator.dupe(u8, self.adb_path);
-        errdefer self.allocator.free(owned_adb_path);
-        const owned_serial = try types.dupeOptional(self.allocator, self.serial);
-        errdefer if (owned_serial) |value| self.allocator.free(value);
-        const owned_remote_path = try self.allocator.dupe(u8, remote_path);
-        errdefer self.allocator.free(owned_remote_path);
-
-        var child = std.process.Child.init(argv.items, self.allocator);
-        child.stdin_behavior = .Ignore;
-        child.stdout_behavior = .Ignore;
-        child.stderr_behavior = .Ignore;
-        try child.spawn();
-
-        return .{
-            .allocator = self.allocator,
-            .adb_path = owned_adb_path,
-            .serial = owned_serial,
-            .remote_path = owned_remote_path,
-            .child = child,
-        };
+        return try android_screen_recording.start(self.allocator, self.adb_path, self.serial, remote_path);
     }
 
     pub fn settle(self: *AndroidDevice, timeout_ms: u64) !void {
@@ -278,7 +246,7 @@ pub const AndroidDevice = struct {
         const result = try self.runAdb(&.{ "shell", "dumpsys", "window" }, default_max_output);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
-        return try parseActiveWindow(self.allocator, result.stdout);
+        return try android_device_info.parseActiveWindow(self.allocator, result.stdout);
     }
 
     fn isAppForeground(self: *AndroidDevice) !bool {
@@ -292,14 +260,14 @@ pub const AndroidDevice = struct {
         const result = try self.runAdb(&.{ "shell", "wm", "size" }, 4096);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
-        return parseViewport(result.stdout) catch types.Viewport{};
+        return android_device_info.parseViewport(result.stdout) catch types.Viewport{};
     }
 
     fn displayDensityDpi(self: *AndroidDevice) !?u32 {
         const result = try self.runAdb(&.{ "shell", "wm", "density" }, 4096);
         defer result.deinit(self.allocator);
         try result.ensureSuccess();
-        return parseDisplayDensityDpi(result.stdout);
+        return android_device_info.parseDisplayDensityDpi(result.stdout);
     }
 
     fn logDelta(self: *AndroidDevice) !?[]const u8 {
@@ -355,377 +323,22 @@ pub const AndroidDevice = struct {
     }
 };
 
-pub const AndroidScreenRecording = struct {
-    allocator: std.mem.Allocator,
-    adb_path: []const u8,
-    serial: ?[]const u8,
-    remote_path: []const u8,
-    child: std.process.Child,
-    stopped: bool = false,
-
-    pub fn deinit(self: *AndroidScreenRecording) void {
-        self.stopProcess() catch {};
-        self.allocator.free(self.adb_path);
-        if (self.serial) |value| self.allocator.free(value);
-        self.allocator.free(self.remote_path);
-    }
-
-    pub fn stopAndPull(self: *AndroidScreenRecording, writer: *trace.TraceWriter, artifact_name: []const u8) ![]const u8 {
-        try self.stopProcess();
-        const artifact_path = try writer.artifactPath(artifact_name);
-        errdefer self.allocator.free(artifact_path);
-
-        const pull = try self.runAdb(&.{ "pull", self.remote_path, artifact_path }, default_max_output);
-        defer pull.deinit(self.allocator);
-        try pull.ensureSuccess();
-
-        const cleanup = self.runAdb(&.{ "shell", "rm", "-f", self.remote_path }, 4096) catch null;
-        if (cleanup) |result| result.deinit(self.allocator);
-
-        return artifact_path;
-    }
-
-    fn stopProcess(self: *AndroidScreenRecording) !void {
-        if (self.stopped) return;
-        std.posix.kill(self.child.id, std.posix.SIG.INT) catch {};
-        _ = try self.child.wait();
-        self.stopped = true;
-    }
-
-    fn runAdb(self: *AndroidScreenRecording, extra: []const []const u8, max_output_bytes: usize) !command.ExecResult {
-        var argv = std.ArrayList([]const u8).empty;
-        defer argv.deinit(self.allocator);
-        try argv.append(self.allocator, self.adb_path);
-        if (self.serial) |serial| {
-            try argv.append(self.allocator, "-s");
-            try argv.append(self.allocator, serial);
-        }
-        try argv.appendSlice(self.allocator, extra);
-        return try command.runWithTimeout(self.allocator, argv.items, max_output_bytes, default_adb_timeout_ms);
-    }
-};
+pub const AndroidScreenRecording = android_screen_recording.AndroidScreenRecording;
 
 pub fn listDevices(allocator: std.mem.Allocator, adb_path: []const u8) ![]types.DeviceInfo {
-    return try listDevicesWithPath(allocator, adb_path);
+    return try android_device_info.listDevices(allocator, adb_path);
 }
 
-fn listDevicesWithPath(allocator: std.mem.Allocator, adb_path: []const u8) ![]types.DeviceInfo {
-    const result = try command.runWithTimeout(allocator, &.{ adb_path, "devices" }, 1024 * 1024, default_adb_timeout_ms);
-    defer result.deinit(allocator);
-    try result.ensureSuccess();
-
-    var devices = std.ArrayList(types.DeviceInfo).empty;
-    errdefer {
-        for (devices.items) |device| device.deinit(allocator);
-        devices.deinit(allocator);
-    }
-
-    var lines = std.mem.splitScalar(u8, result.stdout, '\n');
-    _ = lines.next();
-    while (lines.next()) |raw_line| {
-        const line = std.mem.trim(u8, raw_line, " \t\r\n");
-        if (line.len == 0) continue;
-        var parts = std.mem.tokenizeAny(u8, line, " \t");
-        const serial = parts.next() orelse continue;
-        const state = parts.next() orelse continue;
-        try devices.append(allocator, .{
-            .serial = try allocator.dupe(u8, serial),
-            .state = try allocator.dupe(u8, state),
-        });
-    }
-
-    return try devices.toOwnedSlice(allocator);
-}
-
-pub const ActiveWindow = struct {
-    package: ?[]const u8 = null,
-    activity: ?[]const u8 = null,
-
-    pub fn deinit(self: ActiveWindow, allocator: std.mem.Allocator) void {
-        if (self.package) |value| allocator.free(value);
-        if (self.activity) |value| allocator.free(value);
-    }
-};
+pub const ActiveWindow = android_device_info.ActiveWindow;
 
 pub fn parseActiveWindow(allocator: std.mem.Allocator, dumpsys: []const u8) !ActiveWindow {
-    const markers = [_][]const u8{ "mCurrentFocus=", "mFocusedApp=", "topResumedActivity=" };
-    for (markers) |marker| {
-        if (std.mem.indexOf(u8, dumpsys, marker)) |pos| {
-            const line_end = std.mem.indexOfScalarPos(u8, dumpsys, pos, '\n') orelse dumpsys.len;
-            const line = dumpsys[pos..line_end];
-            if (parsePackageActivity(allocator, line)) |active| return active else |_| continue;
-        }
-    }
-    return .{};
-}
-
-fn parsePackageActivity(allocator: std.mem.Allocator, line: []const u8) !ActiveWindow {
-    const slash = std.mem.indexOfScalar(u8, line, '/') orelse return error.NoActivity;
-    var pkg_start = slash;
-    while (pkg_start > 0) : (pkg_start -= 1) {
-        const ch = line[pkg_start - 1];
-        if (!(std.ascii.isAlphanumeric(ch) or ch == '_' or ch == '.')) break;
-    }
-    var activity_end = slash + 1;
-    while (activity_end < line.len) : (activity_end += 1) {
-        const ch = line[activity_end];
-        if (!(std.ascii.isAlphanumeric(ch) or ch == '_' or ch == '.' or ch == '$')) break;
-    }
-    if (pkg_start >= slash or activity_end <= slash + 1) return error.NoActivity;
-    return .{
-        .package = try allocator.dupe(u8, line[pkg_start..slash]),
-        .activity = try allocator.dupe(u8, line[slash + 1 .. activity_end]),
-    };
+    return try android_device_info.parseActiveWindow(allocator, dumpsys);
 }
 
 pub fn parseViewport(output: []const u8) !types.Viewport {
-    const marker = "Physical size:";
-    const start = std.mem.indexOf(u8, output, marker) orelse return error.NoViewport;
-    const after = std.mem.trim(u8, output[start + marker.len ..], " \t\r\n");
-    const x = std.mem.indexOfScalar(u8, after, 'x') orelse return error.NoViewport;
-    var end: usize = x + 1;
-    while (end < after.len and std.ascii.isDigit(after[end])) : (end += 1) {}
-    return .{
-        .width = try std.fmt.parseInt(u32, std.mem.trim(u8, after[0..x], " \t"), 10),
-        .height = try std.fmt.parseInt(u32, after[x + 1 .. end], 10),
-    };
+    return try android_device_info.parseViewport(output);
 }
 
 pub fn parseDisplayDensityDpi(output: []const u8) ?u32 {
-    var lines = std.mem.splitScalar(u8, output, '\n');
-    while (lines.next()) |raw_line| {
-        const line = std.mem.trim(u8, raw_line, " \t\r\n");
-        const prefix = "Physical density:";
-        if (!std.mem.startsWith(u8, line, prefix)) continue;
-        const value = std.mem.trim(u8, line[prefix.len..], " \t\r\n");
-        return std.fmt.parseInt(u32, value, 10) catch null;
-    }
-    return null;
-}
-
-fn countOccurrences(haystack: []const u8, needle: []const u8) usize {
-    var count: usize = 0;
-    var index: usize = 0;
-    while (std.mem.indexOfPos(u8, haystack, index, needle)) |found| {
-        count += 1;
-        index = found + needle.len;
-    }
-    return count;
-}
-
-test "parse active window package and activity" {
-    const active = try parseActiveWindow(std.testing.allocator, "mCurrentFocus=Window{123 u0 com.example.mobiletest/.MainActivity}\n");
-    defer active.deinit(std.testing.allocator);
-    try std.testing.expectEqualStrings("com.example.mobiletest", active.package.?);
-    try std.testing.expectEqualStrings(".MainActivity", active.activity.?);
-}
-
-test "parse viewport" {
-    const viewport = try parseViewport("Physical size: 1080x2400\nOverride size: 1080x2200\n");
-    try std.testing.expectEqual(@as(u32, 1080), viewport.width);
-    try std.testing.expectEqual(@as(u32, 2400), viewport.height);
-}
-
-test "parse display density dpi" {
-    try std.testing.expectEqual(@as(?u32, 420), parseDisplayDensityDpi("Physical density: 420\nOverride density: 440\n"));
-    try std.testing.expectEqual(@as(?u32, null), parseDisplayDensityDpi("Override density: 440\n"));
-}
-
-test "android device actions and snapshot work through fake adb" {
-    const allocator = std.testing.allocator;
-    const dir = "zig-cache-test-android-trace";
-    std.fs.cwd().deleteTree(dir) catch {};
-    defer std.fs.cwd().deleteTree(dir) catch {};
-
-    var device = try AndroidDevice.init(allocator, "./tests/fake-adb.sh", "fake-android-1", "com.example.mobiletest");
-    defer device.deinit();
-
-    try device.install("/tmp/app.apk");
-    try device.launch();
-    try device.stop();
-    try device.clearState();
-    try device.openLink("exampleapp://probe");
-    try device.tap(10, 20);
-    try device.typeText("hello world");
-    try device.eraseText(3);
-    try device.hideKeyboard();
-    try device.swipe(1, 2, 3, 4, 5);
-    try device.pressBack();
-
-    var writer = try trace.TraceWriter.init(allocator, dir);
-    defer writer.deinit();
-    var snapshot = try device.snapshot(&writer);
-    defer snapshot.deinit(allocator);
-    try std.testing.expectEqualStrings("com.example.mobiletest", snapshot.active_package.?);
-    try std.testing.expectEqualStrings(".MainActivity", snapshot.active_activity.?);
-    try std.testing.expectEqual(@as(u32, 720), snapshot.viewport.width);
-    try std.testing.expectEqual(@as(u32, 1280), snapshot.viewport.height);
-    try std.testing.expectEqual(@as(?u32, 420), snapshot.display_density_dpi);
-    try std.testing.expect(snapshot.screenshot_artifact != null);
-    try std.testing.expect(snapshot.tree_artifact != null);
-    try std.testing.expect(snapshot.log_delta != null);
-    try std.testing.expect(snapshot.nodes.len > 0);
-
-    const devices = try listDevices(allocator, "./tests/fake-adb.sh");
-    defer {
-        for (devices) |info| info.deinit(allocator);
-        allocator.free(devices);
-    }
-    try std.testing.expectEqual(@as(usize, 1), devices.len);
-    try std.testing.expectEqualStrings("fake-android-1", devices[0].serial);
-    try std.testing.expectEqualStrings("device", devices[0].state);
-}
-
-test "android openLink starts intent without waiting for activity launch completion" {
-    const allocator = std.testing.allocator;
-    const log_path = "zig-cache/test-android-open-link-adb.log";
-    const adb_path = "zig-cache/test-android-open-link-adb.sh";
-    try std.fs.cwd().makePath("zig-cache");
-    std.fs.cwd().deleteFile(log_path) catch {};
-    std.fs.cwd().deleteFile(adb_path) catch {};
-    defer std.fs.cwd().deleteFile(log_path) catch {};
-    defer std.fs.cwd().deleteFile(adb_path) catch {};
-
-    var adb_file = try std.fs.cwd().createFile(adb_path, .{ .truncate = true });
-    try adb_file.writeAll(
-        \\#!/usr/bin/env bash
-        \\set -euo pipefail
-        \\printf '%s\n' "$*" >> zig-cache/test-android-open-link-adb.log
-        \\exec ./tests/fake-adb.sh "$@"
-        \\
-    );
-    try adb_file.chmod(0o755);
-    adb_file.close();
-
-    var device = try AndroidDevice.init(allocator, adb_path, "fake-android-1", "com.example.mobiletest");
-    defer device.deinit();
-
-    try device.openLink("exampleapp://probe");
-
-    const contents = try std.fs.cwd().readFileAlloc(allocator, log_path, 4096);
-    defer allocator.free(contents);
-    try std.testing.expect(std.mem.indexOf(u8, contents, "shell am start ") != null);
-    try std.testing.expect(std.mem.indexOf(u8, contents, " -W ") == null);
-    try std.testing.expect(std.mem.indexOf(u8, contents, "android.intent.action.VIEW") != null);
-    try std.testing.expect(std.mem.indexOf(u8, contents, "exampleapp://probe") != null);
-}
-
-test "android openLink retries when deep link leaves launcher foregrounded" {
-    const allocator = std.testing.allocator;
-    const log_path = "zig-cache/test-android-open-link-retry-adb.log";
-    const state_path = "zig-cache/test-android-open-link-retry-state";
-    const adb_path = "zig-cache/test-android-open-link-retry-adb.sh";
-    try std.fs.cwd().makePath("zig-cache");
-    std.fs.cwd().deleteFile(log_path) catch {};
-    std.fs.cwd().deleteFile(state_path) catch {};
-    std.fs.cwd().deleteFile(adb_path) catch {};
-    defer std.fs.cwd().deleteFile(log_path) catch {};
-    defer std.fs.cwd().deleteFile(state_path) catch {};
-    defer std.fs.cwd().deleteFile(adb_path) catch {};
-
-    var adb_file = try std.fs.cwd().createFile(adb_path, .{ .truncate = true });
-    try adb_file.writeAll(
-        \\#!/usr/bin/env bash
-        \\set -euo pipefail
-        \\printf '%s\n' "$*" >> zig-cache/test-android-open-link-retry-adb.log
-        \\if [[ "${1:-}" == "-s" ]]; then shift 2; fi
-        \\if [[ "${1:-}" == "shell" && "${2:-}" == "dumpsys" ]]; then
-        \\  count="$(cat zig-cache/test-android-open-link-retry-state 2>/dev/null || printf '0')"
-        \\  count=$((count + 1))
-        \\  printf '%s' "$count" > zig-cache/test-android-open-link-retry-state
-        \\  if [[ "$count" -eq 1 ]]; then
-        \\    printf 'mCurrentFocus=Window{123 u0 com.google.android.apps.nexuslauncher/.NexusLauncherActivity}\n'
-        \\  else
-        \\    printf 'mCurrentFocus=Window{123 u0 com.example.mobiletest/.MainActivity}\n'
-        \\  fi
-        \\  exit 0
-        \\fi
-        \\exec ./tests/fake-adb.sh "$@"
-        \\
-    );
-    try adb_file.chmod(0o755);
-    adb_file.close();
-
-    var device = try AndroidDevice.init(allocator, adb_path, "fake-android-1", "com.example.mobiletest");
-    defer device.deinit();
-
-    try device.openLink("exampleapp://probe");
-
-    const contents = try std.fs.cwd().readFileAlloc(allocator, log_path, 8192);
-    defer allocator.free(contents);
-    try std.testing.expectEqual(@as(usize, 2), countOccurrences(contents, "shell am start"));
-}
-
-test "android snapshot honors trace artifact capture controls" {
-    const allocator = std.testing.allocator;
-    const dir = "zig-cache/test-android-trace-capture-controls";
-    std.fs.cwd().deleteTree(dir) catch {};
-    defer std.fs.cwd().deleteTree(dir) catch {};
-
-    var device = try AndroidDevice.init(allocator, "./tests/fake-adb.sh", "fake-android-1", "com.example.mobiletest");
-    defer device.deinit();
-
-    var writer = try trace.TraceWriter.initWithOptions(allocator, dir, .{
-        .capture_screenshots = false,
-        .capture_hierarchy = false,
-        .capture_logs = false,
-    });
-    defer writer.deinit();
-
-    var snapshot = try device.snapshot(&writer);
-    defer snapshot.deinit(allocator);
-
-    try std.testing.expect(snapshot.screenshot_artifact == null);
-    try std.testing.expect(snapshot.tree_artifact == null);
-    try std.testing.expect(snapshot.log_delta == null);
-    try std.testing.expect(snapshot.nodes.len > 0);
-}
-
-test "android screen recording pulls mp4 into trace artifacts" {
-    const allocator = std.testing.allocator;
-    const dir = "zig-cache/test-android-screen-recording";
-    std.fs.cwd().deleteTree(dir) catch {};
-    defer std.fs.cwd().deleteTree(dir) catch {};
-
-    var device = try AndroidDevice.init(allocator, "./tests/fake-adb.sh", "fake-android-1", "com.example.mobiletest");
-    defer device.deinit();
-
-    var writer = try trace.TraceWriter.init(allocator, dir);
-    defer writer.deinit();
-
-    var recording = try device.startScreenRecording("/sdcard/zmr-trace-screenrecord.mp4");
-    defer recording.deinit();
-
-    const artifact_path = try recording.stopAndPull(&writer, "screenrecord.mp4");
-    defer allocator.free(artifact_path);
-
-    const bytes = try std.fs.cwd().readFileAlloc(allocator, artifact_path, 1024);
-    defer allocator.free(bytes);
-    try std.testing.expectEqualStrings("FAKE_MP4\n", bytes);
-}
-
-test "android native shim supplies hierarchy and handles actions" {
-    const allocator = std.testing.allocator;
-    const dir = "zig-cache/test-android-native-shim";
-    std.fs.cwd().deleteTree(dir) catch {};
-    defer std.fs.cwd().deleteTree(dir) catch {};
-
-    var device = try AndroidDevice.initWithShim(allocator, "./tests/fake-adb.sh", "fake-android-1", "com.example.mobiletest", "./tests/fake-android-shim.sh");
-    defer device.deinit();
-
-    var writer = try trace.TraceWriter.init(allocator, dir);
-    defer writer.deinit();
-
-    var snapshot = try device.snapshot(&writer);
-    defer snapshot.deinit(allocator);
-    try std.testing.expectEqual(@as(usize, 1), snapshot.nodes.len);
-    try std.testing.expectEqualStrings("Continue", snapshot.nodes[0].text.?);
-    try std.testing.expectEqualStrings("continue_button", snapshot.nodes[0].resource_id.?);
-
-    try device.tap(60, 42);
-    try device.typeText("hello");
-    try device.eraseText(5);
-    try device.hideKeyboard();
-    try device.swipe(1, 2, 3, 4, 5);
-    try device.pressBack();
+    return android_device_info.parseDisplayDensityDpi(output);
 }

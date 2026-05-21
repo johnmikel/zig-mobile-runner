@@ -20,6 +20,7 @@ Then it sends JSON-RPC methods such as:
 - `ui.tap`
 - `wait.until`
 - `assert.visible`
+- `assert.healthy`
 - `trace.events`
 - `trace.export`
 
@@ -28,6 +29,9 @@ programmatically instead of shelling out for each scenario. For package-manager
 install commands, see [client-installation.md](client-installation.md).
 Prefer the semantic snapshot helper for agent planning; it normalizes native
 Android/iOS classes into roles, selectors, bounds, and recommended actions.
+Use `assert.healthy` after launches, deep links, and high-risk transitions so
+agent-written tests fail on crash overlays and development-client load errors
+even when normal page text is also present.
 
 ## Language Layouts
 
@@ -63,13 +67,19 @@ python3 clients/python/examples/fake_session.py
 Go:
 
 ```bash
-go run ./clients/go/examples/fake-session --server tests/fake-json-rpc-server.mjs
+go run ./clients/go/examples/fake-session \
+  --zmr ./zig-out/bin/zmr \
+  --adb ./tests/fake-adb.sh \
+  --trace-dir traces/demo-go-client
 ```
 
 Rust:
 
 ```bash
-cargo run --manifest-path clients/rust/Cargo.toml --example fake_session -- --server tests/fake-json-rpc-server.mjs
+cargo run --manifest-path clients/rust/Cargo.toml --example fake_session -- \
+  --zmr ./zig-out/bin/zmr \
+  --adb ./tests/fake-adb.sh \
+  --trace-dir traces/demo-rust-client
 ```
 
 Swift:

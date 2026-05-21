@@ -5,6 +5,18 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
+for args in "--app-root" "--test-package" "--runner" "--device" "--android-module" "--gradle-file"; do
+  set +e
+  missing_value_output="$("$ROOT/scripts/install-android-shim.sh" $args 2>&1)"
+  missing_value_status=$?
+  set -e
+  if [[ "$missing_value_status" -ne 2 ]]; then
+    echo "install-android-shim should exit 2 for missing value: $args" >&2
+    exit 1
+  fi
+  grep -q -- "$args requires a value" <<< "$missing_value_output"
+done
+
 mkdir -p "$TMPDIR/app/android/app"
 printf 'plugins { id "com.android.application" }\n' > "$TMPDIR/app/android/app/build.gradle"
 

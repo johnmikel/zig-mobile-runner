@@ -3,13 +3,14 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ZMR="$ROOT/zig-out/bin/zmr"
-PASS_TRACE="$ROOT/traces/test-run-json-pass"
+PASS_TRACE="$ROOT/traces/test-run-json pass"
 FAIL_TRACE="$ROOT/traces/test-run-json-fail"
+PARTIAL_TRACE="$ROOT/traces/test-run-json-partial-ios"
 OMIT_BUNDLE="$ROOT/traces/test-run-json-omit-screenshots.zmrtrace"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
-rm -rf "$PASS_TRACE" "$FAIL_TRACE"
+rm -rf "$PASS_TRACE" "$FAIL_TRACE" "$PARTIAL_TRACE"
 rm -f "$OMIT_BUNDLE"
 
 PASS_OUTPUT="$("$ZMR" run "$ROOT/examples/demo-fake.json" \
@@ -25,6 +26,11 @@ grep -q '"traceDir":' <<< "$PASS_OUTPUT"
 grep -q '"eventsPath":"events.jsonl"' <<< "$PASS_OUTPUT"
 grep -q '"eventCount":' <<< "$PASS_OUTPUT"
 grep -q '"snapshotCount":' <<< "$PASS_OUTPUT"
+if ! grep -q "\"nextCommands\":\[\"zmr report '$PASS_TRACE' --out '$PASS_TRACE/report.html'\",\"zmr explain '$PASS_TRACE' --json\",\"zmr export '$PASS_TRACE' --out '$PASS_TRACE.zmrtrace' --redact\"\]" <<< "$PASS_OUTPUT"; then
+  echo "run --json should include executable trace follow-up commands" >&2
+  echo "$PASS_OUTPUT" >&2
+  exit 1
+fi
 
 "$ZMR" export "$PASS_TRACE" --out "$OMIT_BUNDLE" --redact --omit-screenshots
 if tar -tf "$OMIT_BUNDLE" | grep -q '[.]png$'; then
@@ -53,6 +59,49 @@ grep -q '"status":"failed"' <<< "$FAIL_OUTPUT"
 grep -q '"failedStepIndex":1' <<< "$FAIL_OUTPUT"
 grep -q '"error":"WaitTimeout"' <<< "$FAIL_OUTPUT"
 grep -q '"traceDir":' <<< "$FAIL_OUTPUT"
+
+PARTIAL_SCENARIO="$TMPDIR/ios-partial-snapshot.json"
+PARTIAL_SHIM="$TMPDIR/ios-shim-snapshot-fail.sh"
+cat > "$PARTIAL_SCENARIO" <<'JSON'
+{
+  "name": "iOS partial snapshot smoke",
+  "appId": "com.example.mobiletest",
+  "steps": [{ "action": "snapshot" }]
+}
+JSON
+cat > "$PARTIAL_SHIM" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+request="$(cat)"
+case "$request" in
+  *'"cmd":"snapshot"'*)
+    echo "accessibility hierarchy unavailable" >&2
+    exit 7
+    ;;
+  *) printf '{"status":"ok"}\n' ;;
+esac
+SH
+chmod +x "$PARTIAL_SHIM"
+
+PARTIAL_OUTPUT="$("$ZMR" run "$PARTIAL_SCENARIO" \
+  --platform ios \
+  --device fake-ios-1 \
+  --xcrun "$ROOT/tests/fake-xcrun.sh" \
+  --ios-shim "$PARTIAL_SHIM" \
+  --trace-dir "$PARTIAL_TRACE" \
+  --json)"
+grep -q '"ok":false' <<< "$PARTIAL_OUTPUT"
+grep -q '"status":"partial"' <<< "$PARTIAL_OUTPUT"
+grep -q '"partialFailureCount":1' <<< "$PARTIAL_OUTPUT"
+grep -q '"partialFailure":{"kind":"observe.snapshot.semanticExtraction","status":"failed","artifactStatus":"captured","semanticStatus":"failed"' <<< "$PARTIAL_OUTPUT"
+grep -q '"source":"ios-xctest-shim"' <<< "$PARTIAL_OUTPUT"
+grep -q '"snapshotCount":1' <<< "$PARTIAL_OUTPUT"
+test -f "$PARTIAL_TRACE/artifacts/snapshot-1.png"
+
+PARTIAL_EXPLAIN="$("$ZMR" explain --json "$PARTIAL_TRACE")"
+grep -q '"status":"partial"' <<< "$PARTIAL_EXPLAIN"
+grep -q '"diagnostic":{"kind":"observe.snapshot.semanticExtraction","status":"failed","artifactStatus":"captured","semanticStatus":"failed"' <<< "$PARTIAL_EXPLAIN"
+grep -q '"source":"ios-xctest-shim"' <<< "$PARTIAL_EXPLAIN"
 
 APP_ROOT="$TMPDIR/app"
 mkdir -p "$APP_ROOT/.zmr"

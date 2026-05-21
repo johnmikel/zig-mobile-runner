@@ -23,8 +23,8 @@ zig build
 
 ```bash
 ./scripts/build-release.sh
-tar -xzf dist/zmr-0.1.0-dev.1-aarch64-macos.15.0.tar.gz -C /tmp
-/tmp/zmr-0.1.0-dev.1-aarch64-macos.15.0/zmr version
+tar -xzf dist/zmr-0.1.0-dev.2-aarch64-macos.15.0.tar.gz -C /tmp
+/tmp/zmr-0.1.0-dev.2-aarch64-macos.15.0/zmr version
 ```
 
 Verify checksums:
@@ -127,13 +127,27 @@ Inside a mobile app repo:
 
 ```bash
 npm install --save-dev zig-mobile-runner
-npx zmr-wizard --app-id com.example.mobiletest
-npx zmr doctor
+npx zmr-wizard --app-id com.example.mobiletest --package-json
+npx zmr doctor --strict --json --config .zmr/config.json
+npx zmr-device-matrix --matrix .zmr/device-matrix.json --trace-root traces/zmr-matrix
 ```
 
-The npm package exposes `zmr`, `zmr-init`, `zmr-wizard`, and
-`zmr-benchmark`. See [npm.md](npm.md) for binary resolution and package
-publishing details.
+The npm package exposes the app-facing CLI wrapper, setup wizard, benchmark
+helpers, matrix runner, pilot gate, shim installers, public demo generators,
+release-readiness checker, schemas, examples, reference clients, and the
+packaged agent skill. Common app-local commands are:
+
+```bash
+npx zmr-wizard --app-id com.example.mobiletest --android --ios --package-json
+npx zmr-install-android-shim --app-root . --test-package com.example.mobiletest.test
+npx zmr-install-ios-shim --app-root . --scheme SampleUITests --bundle-id com.example.mobiletest
+npm run zmr:serve
+npm run zmr:mcp
+npx zmr-pilot-gate --android --ios --android-app-root . --android-app-id com.example.mobiletest --android-device emulator-5554 --ios-app-root . --ios-app-path ./build/Debug-iphonesimulator/Sample.app --ios-app-id com.example.mobiletest --ios-device booted --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out traces/zmr-pilots/evidence.jsonl
+```
+
+See [docs/npm.md](npm.md) for the full npm binary list, binary resolution,
+app-local `.zmr/` setup, and package publishing details.
 See [config.md](config.md) for `.zmr/config.json` defaults and CLI override precedence.
 
 ## App Codebase Integration
@@ -164,11 +178,20 @@ See [app-integration.md](app-integration.md) for the expected app-side test surf
 ## iOS Requirements
 
 - Xcode command line tools with `xcrun` on `PATH`.
-- A booted simulator for real iOS runs.
-- A simulator `.app` installed before launch/open-link smoke scenarios.
-- Optional app-provided XCTest/XCUIAutomation shim command for hierarchy and
-  selector actions. Pass it with `--ios-shim <path>` or set
-  `tools.iosShimPath` in `.zmr/config.json`.
+- A booted simulator for real simulator runs, or a paired physical device
+  identifier from `zmr devices --json --platform ios --ios-device-type physical`
+  for physical-device lifecycle and selector runs.
+- `zmr doctor --json` reports simulator readiness as `ios-simulators` and
+  paired-device readiness as `ios-physical-devices`, so setup scripts can fail
+  fast before install or XCTest work starts.
+- A simulator-built `iphonesimulator` `.app` for simulator launch/open-link
+  smoke scenarios. A signed device `.ipa` is not simulator-compatible; run it
+  with `--ios-device-type physical` and a real physical device identifier.
+- Physical-device installs require a signed `.app` or `.ipa` accepted by
+  `xcrun devicectl`.
+- Optional app-provided XCTest/XCUIAutomation shim command for hierarchy,
+  selector actions, and native selector waits. Pass it with `--ios-shim <path>`
+  or set `tools.iosShimPath` in `.zmr/config.json`.
 
 To scaffold the shim command and XCTest source into an app repo:
 
@@ -193,8 +216,18 @@ matching app targets. Use `--project ios/Sample.xcodeproj`
 instead of `--workspace` for still-ambiguous multi-project workspaces or
 project-only apps.
 
+The installer also patches or creates `.zmr/config.json` with
+`tools.iosShimPath: "./.zmr/ios-shim"`, so `zmr run`, `zmr serve`, and
+`zmr doctor` can discover the shim from app-local config without repeating the
+flag on every command.
+
 The generated `.zmr/ios-shim` caches `build-for-testing` output under
 `.zmr/ios-shim-state/` and uses `test-without-building` for selector commands.
 Set `ZMR_IOS_SHIM_FORCE_REBUILD=1` after app-side target changes, or
 `ZMR_IOS_SHIM_ONESHOT=1` for the slower one-command-per-XCTest fallback when
 debugging Xcode wiring.
+
+For reliable real simulator and physical-device runs, execute ZMR from a normal
+terminal or CI worker with access to Xcode, CoreSimulator, and device caches.
+Restricted sandboxes can block Xcode log/cache access and make `xcodebuild` or
+`simctl` report misleading setup errors.

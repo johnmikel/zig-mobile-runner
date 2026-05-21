@@ -10,8 +10,24 @@ git submodule add https://github.com/johnmikel/zig-mobile-runner.git vendor/zig-
 gradle -p vendor/zig-mobile-runner/clients/kotlin build
 ```
 
+Run the package test from the repository root:
+
+```bash
+gradle -p clients/kotlin test
+```
+
+Run the fake-session example from the repository root:
+
+```bash
+gradle -p clients/kotlin runFakeSession \
+  -Pzmr="$PWD/zig-out/bin/zmr" \
+  -Padb="$PWD/tests/fake-adb.sh" \
+  -PtraceDir="$PWD/traces/demo-kotlin-client" \
+  -PtraceOut="$PWD/traces/demo-kotlin-client-redacted.zmrtrace"
+```
+
 ```kotlin
-implementation(files("path/to/zig-mobile-runner/clients/kotlin/build/libs/zmr-client-0.1.0-dev.1.jar"))
+implementation(files("path/to/zig-mobile-runner/clients/kotlin/build/libs/zmr-client-0.1.0-dev.2.jar"))
 ```
 
 The Kotlin client is host-side. It is useful for Android teams that want test

@@ -14,6 +14,9 @@ Commands are newline-delimited JSON objects:
 {"cmd":"pressBack"}
 {"cmd":"settle","durationMs":1000}
 {"cmd":"appState"}
+{"cmd":"acceptSystemAlert","text":"Open"}
+{"cmd":"query","selector":"textContains=Continue"}
+{"cmd":"screenshot"}
 ```
 
 Selector-addressed `tap`, `type`, and `eraseText` support these internal
@@ -27,8 +30,23 @@ selector strings:
 - `value=<exact>` and `valueContains=<substring>`
 - `type=<XCUIElementType...>`
 
-Snapshot responses return XCTest element data in a shape Zig can map into
-`UiNode`:
+`query` is the fast path used by Zig waits/assertions for single-field selectors
+that XCTest can evaluate natively. It returns:
+
+```json
+{"status":"ok","exists":true,"hittable":true}
+```
+
+`screenshot` returns a PNG payload encoded for the local shim transport:
+
+```json
+{"status":"ok","format":"png","base64":"..."}
+```
+
+Snapshot responses return bounded XCTest element data in a shape Zig can map
+into `UiNode`. The shim captures common interactive and readable element
+families and caps the response at 256 nodes so large application trees do not
+turn every snapshot into a full hierarchy crawl:
 
 ```json
 {
@@ -38,6 +56,7 @@ Snapshot responses return XCTest element data in a shape Zig can map into
       "id": "button-continue",
       "type": "XCUIElementTypeButton",
       "label": "Continue",
+      "value": "Continue",
       "identifier": "continue_button",
       "bounds": { "x": 10, "y": 20, "width": 100, "height": 44 },
       "enabled": true,

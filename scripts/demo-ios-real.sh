@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SOURCE" ]]; do
+  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  if [[ "$SOURCE" != /* ]]; then
+    SOURCE="$SOURCE_DIR/$SOURCE"
+  fi
+done
+
+ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
 OUT="/tmp/zmr-ios-demo-$(date +%Y%m%d-%H%M%S)"
 APP_NAME="ZMRDemo"
 APP_ID="com.example.mobiletest"
@@ -9,6 +18,9 @@ DEVICE="booted"
 DEPLOYMENT_TARGET="16.0"
 RUNS="1"
 TRACE_ROOT=""
+XCRUN="${XCRUN:-xcrun}"
+AUTO_BOOT_SIMULATOR=1
+CLEANUP_BUILD_PRODUCTS=0
 DRY_RUN=0
 
 usage() {
@@ -27,6 +39,9 @@ Options:
   --deployment-target <ver>    iOS deployment target. Default: 16.0.
   --runs <n>                   Pilot run count. Default: 1.
   --trace-root <dir>           Trace output directory. Default: <out>/traces/pilot.
+  --xcrun <path>               xcrun path. Default: xcrun.
+  --no-auto-boot-simulator     Require an already booted simulator.
+  --cleanup-build-products     Remove generated DerivedData after pilot traces are written.
   --dry-run                    Print commands without executing them.
   -h, --help                   Show this help.
 USAGE
@@ -35,6 +50,15 @@ USAGE
 die() {
   echo "error: $*" >&2
   exit 2
+}
+
+require_value() {
+  local flag="$1"
+  local value="${2-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    die "$flag requires a value"
+  fi
+  printf '%s\n' "$value"
 }
 
 quote_cmd() {
@@ -53,35 +77,127 @@ run() {
   fi
 }
 
+available_ios_simulators() {
+  "$XCRUN" simctl list devices available --json | python3 -c '
+import json
+import sys
+
+data = json.load(sys.stdin)
+for runtime, devices in data.get("devices", {}).items():
+    if "iOS" not in runtime:
+        continue
+    for device in devices:
+        if device.get("isAvailable", True) and device.get("state") in ("Shutdown", "Booted"):
+            udid = device.get("udid")
+            if udid:
+                print(udid)
+'
+}
+
+simulator_is_booted() {
+  local wanted="${1:-}"
+  local booted_text
+  booted_text="$("$XCRUN" simctl list devices booted 2>/dev/null || true)"
+  if [[ -z "$wanted" || "$wanted" == "booted" ]]; then
+    [[ "$booted_text" == *"(Booted)"* ]]
+    return
+  fi
+  [[ "$booted_text" == *"$wanted"* && "$booted_text" == *"(Booted)"* ]]
+}
+
+ensure_ios_simulator_ready() {
+  if [[ "$AUTO_BOOT_SIMULATOR" -eq 0 ]]; then
+    return 0
+  fi
+
+  run "$XCRUN" simctl list devices booted
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    if [[ "$DEVICE" == "booted" ]]; then
+      echo "+ auto boot first available iOS simulator when no simulator is booted"
+      echo "+ try available iOS simulators until one boots"
+    else
+      echo "+ auto boot iOS simulator $DEVICE when it is not booted"
+    fi
+    run "$XCRUN" simctl bootstatus "$DEVICE" -b
+    return 0
+  fi
+
+  if simulator_is_booted "$DEVICE"; then
+    run "$XCRUN" simctl bootstatus "$DEVICE" -b
+    return 0
+  fi
+
+  local boot_target="$DEVICE"
+  if [[ "$DEVICE" == "booted" ]]; then
+    local candidates=()
+    local listed_candidate
+    while IFS= read -r listed_candidate; do
+      [[ -n "$listed_candidate" ]] && candidates+=("$listed_candidate")
+    done < <(available_ios_simulators)
+    if [[ "${#candidates[@]}" -eq 0 ]]; then
+      die "no available iOS simulator found to boot"
+    fi
+    local candidate status
+    for candidate in "${candidates[@]}"; do
+      echo "+ $(quote_cmd "$XCRUN" simctl boot "$candidate")"
+      set +e
+      "$XCRUN" simctl boot "$candidate"
+      status=$?
+      set -e
+      if [[ "$status" -eq 0 ]]; then
+        run "$XCRUN" simctl bootstatus "$candidate" -b
+        return 0
+      fi
+      echo "warning: failed to boot iOS simulator $candidate; trying next available simulator" >&2
+    done
+    die "no available iOS simulator could be booted"
+  fi
+
+  run "$XCRUN" simctl boot "$boot_target"
+  run "$XCRUN" simctl bootstatus "$boot_target" -b
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out)
-      OUT="${2:-}"
+      OUT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --name)
-      APP_NAME="${2:-}"
+      APP_NAME="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --app-id)
-      APP_ID="${2:-}"
+      APP_ID="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --device)
-      DEVICE="${2:-}"
+      DEVICE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --deployment-target)
-      DEPLOYMENT_TARGET="${2:-}"
+      DEPLOYMENT_TARGET="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --runs)
-      RUNS="${2:-}"
+      RUNS="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --trace-root)
-      TRACE_ROOT="${2:-}"
+      TRACE_ROOT="$(require_value "$1" "${2-}")"
       shift 2
+      ;;
+    --xcrun)
+      XCRUN="$(require_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --no-auto-boot-simulator)
+      AUTO_BOOT_SIMULATOR=0
+      shift
+      ;;
+    --cleanup-build-products)
+      CLEANUP_BUILD_PRODUCTS=1
+      shift
       ;;
     --dry-run)
       DRY_RUN=1
@@ -130,14 +246,21 @@ run xcodebuild \
   -derivedDataPath "$DERIVED_DATA" \
   build
 
+ensure_ios_simulator_ready
+
 run "$ROOT/scripts/run-ios-pilot.sh" \
   --app-root "$OUT" \
   --app-path "$APP_PATH" \
   --device "$DEVICE" \
   --app-id "$APP_ID" \
+  --xcrun "$XCRUN" \
   --ios-shim "$IOS_SHIM" \
   --runs "$RUNS" \
   --trace-root "$TRACE_ROOT"
+
+if [[ "$CLEANUP_BUILD_PRODUCTS" -eq 1 ]]; then
+  run rm -rf "$DERIVED_DATA"
+fi
 
 cat <<EOF
 

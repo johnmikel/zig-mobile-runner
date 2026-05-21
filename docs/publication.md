@@ -34,7 +34,7 @@ artifacts. `.gitignore` excludes `traces/`, `dist/`, `zig-out/`, Zig caches,
 3. Confirm CI runs `./scripts/release-gate.sh`.
 4. Configure branch protection for `main`.
 5. Add `NPM_TOKEN` only when npm publish should be automated.
-6. For the current dev-preview package, create and push tag `v0.1.0-dev.1`.
+6. For the current dev-preview package, create and push tag `v0.1.0-dev.2`.
 
 The release workflow builds release archives, generates checksums, verifies
 packaged binaries, builds the npm tarball with prebuilt binaries, uploads GitHub
@@ -48,7 +48,7 @@ In a separate mobile app checkout:
 ```bash
 npm install --save-dev zig-mobile-runner
 npx zmr-wizard --app-id com.example.mobiletest --package-json
-npx zmr doctor --config .zmr/config.json
+npx zmr doctor --strict --json --config .zmr/config.json
 npm run zmr:android
 npm run zmr:ios
 ```
@@ -61,11 +61,16 @@ npx zmr-pilot-gate \
   --android \
   --ios \
   --android-app-root . \
-  --ios-app-path ./build/Debug-iphonesimulator/Sample.app \
+  --android-app-id com.example.mobiletest \
+  --android-device emulator-5554 \
+  --ios-app-root . --ios-app-path ./build/Debug-iphonesimulator/Sample.app \
+  --ios-app-id com.example.mobiletest \
+  --ios-device booted \
   --ios-shim ./.zmr/ios-shim \
   --runs 20 \
   --min-pass-rate 100 \
-  --max-failures 0
+  --max-failures 0 \
+  --evidence-out traces/zmr-pilots/evidence.jsonl
 ```
 
 Publish reliability claims only from sanitized, app-agnostic summaries. Keep

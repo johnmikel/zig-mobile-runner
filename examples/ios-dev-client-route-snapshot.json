@@ -1,0 +1,24 @@
+{
+  "name": "iOS Expo dev-client route snapshot",
+  "appId": "com.example.mobiletest",
+  "steps": [
+    { "action": "stop" },
+    {
+      "action": "openLink",
+      "url": "exampleapp:///settings?mode=manage&source=zmr"
+    },
+    {
+      "action": "waitAny",
+      "selectors": [
+        { "textContains": "Settings" },
+        { "textContains": "Manage" },
+        { "textContains": "Home" },
+        { "textContains": "Sign in" },
+        { "textContains": "Unable to load" }
+      ],
+      "timeoutMs": 60000
+    },
+    { "action": "assertHealthy" },
+    { "action": "snapshot" }
+  ]
+}

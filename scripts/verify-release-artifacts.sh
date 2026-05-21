@@ -13,10 +13,24 @@ Verifies release archive checksums and required metadata files.
 USAGE
 }
 
+die() {
+  echo "error: $*" >&2
+  exit 2
+}
+
+require_value() {
+  local flag="$1"
+  local value="${2-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    die "$flag requires a value"
+  fi
+  printf '%s\n' "$value"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dist)
-      DIST="${2:-}"
+      DIST="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     -h|--help)

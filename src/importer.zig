@@ -1,107 +1,9 @@
 const std = @import("std");
-const trace = @import("trace.zig");
+const importer_json = @import("importer_json.zig");
+const model = @import("importer_model.zig");
 
-pub const ImportOptions = struct {
-    name: ?[]const u8 = null,
-    app_id: ?[]const u8 = null,
-    force: bool = false,
-};
-
-pub const ImportResult = struct {
-    out_path: []const u8,
-    name: []const u8,
-    app_id: ?[]const u8,
-    step_count: usize,
-
-    pub fn deinit(self: ImportResult, allocator: std.mem.Allocator) void {
-        allocator.free(self.out_path);
-        allocator.free(self.name);
-        if (self.app_id) |value| allocator.free(value);
-    }
-};
-
-const ImportedScenario = struct {
-    name: []const u8,
-    app_id: ?[]const u8 = null,
-    steps: []ImportedStep,
-
-    fn deinit(self: ImportedScenario, allocator: std.mem.Allocator) void {
-        allocator.free(self.name);
-        if (self.app_id) |value| allocator.free(value);
-        for (self.steps) |step| step.deinit(allocator);
-        allocator.free(self.steps);
-    }
-};
-
-const SelectorSpec = struct {
-    id: ?[]const u8 = null,
-    text: ?[]const u8 = null,
-    text_contains: ?[]const u8 = null,
-    content_desc: ?[]const u8 = null,
-
-    fn deinit(self: SelectorSpec, allocator: std.mem.Allocator) void {
-        if (self.id) |value| allocator.free(value);
-        if (self.text) |value| allocator.free(value);
-        if (self.text_contains) |value| allocator.free(value);
-        if (self.content_desc) |value| allocator.free(value);
-    }
-
-    fn hasAny(self: SelectorSpec) bool {
-        return self.id != null or self.text != null or self.text_contains != null or self.content_desc != null;
-    }
-};
-
-const WaitSelector = struct {
-    selector: SelectorSpec,
-    timeout_ms: u64 = 5000,
-
-    fn deinit(self: WaitSelector, allocator: std.mem.Allocator) void {
-        self.selector.deinit(allocator);
-    }
-};
-
-const ScrollStep = struct {
-    selector: SelectorSpec,
-    direction: []const u8 = "down",
-    timeout_ms: u64 = 5000,
-
-    fn deinit(self: ScrollStep, allocator: std.mem.Allocator) void {
-        self.selector.deinit(allocator);
-    }
-};
-
-const ImportedStep = union(enum) {
-    launch,
-    stop,
-    clear_state,
-    snapshot,
-    hide_keyboard,
-    press_back,
-    open_link: []const u8,
-    tap: SelectorSpec,
-    type_text: []const u8,
-    erase_text: u32,
-    assert_visible: SelectorSpec,
-    assert_not_visible: SelectorSpec,
-    wait_visible: WaitSelector,
-    wait_not_visible: WaitSelector,
-    scroll_until_visible: ScrollStep,
-    sleep_ms: u64,
-
-    fn deinit(self: ImportedStep, allocator: std.mem.Allocator) void {
-        switch (self) {
-            .open_link => |value| allocator.free(value),
-            .tap => |value| value.deinit(allocator),
-            .type_text => |value| allocator.free(value),
-            .assert_visible => |value| value.deinit(allocator),
-            .assert_not_visible => |value| value.deinit(allocator),
-            .wait_visible => |value| value.deinit(allocator),
-            .wait_not_visible => |value| value.deinit(allocator),
-            .scroll_until_visible => |value| value.deinit(allocator),
-            else => {},
-        }
-    }
-};
+pub const ImportOptions = model.ImportOptions;
+pub const ImportResult = model.ImportResult;
 
 pub fn importFlowYamlFile(
     allocator: std.mem.Allocator,
@@ -125,7 +27,7 @@ pub fn importFlowYamlFile(
     defer file.close();
     var write_buffer: [8192]u8 = undefined;
     var file_writer = file.writer(&write_buffer);
-    try writeScenarioJson(&file_writer.interface, imported);
+    try importer_json.writeScenarioJson(&file_writer.interface, imported);
     try file_writer.interface.flush();
 
     return .{
@@ -141,13 +43,13 @@ fn fileExists(path: []const u8) bool {
     return true;
 }
 
-fn parseFlowYamlSlice(allocator: std.mem.Allocator, content: []const u8, options: ImportOptions) !ImportedScenario {
+fn parseFlowYamlSlice(allocator: std.mem.Allocator, content: []const u8, options: ImportOptions) !model.ImportedScenario {
     var header_app_id: ?[]const u8 = null;
     defer if (header_app_id) |value| allocator.free(value);
     var header_name: ?[]const u8 = null;
     defer if (header_name) |value| allocator.free(value);
 
-    var steps = std.ArrayList(ImportedStep).empty;
+    var steps = std.ArrayList(model.ImportedStep).empty;
     errdefer {
         for (steps.items) |step| step.deinit(allocator);
         steps.deinit(allocator);
@@ -221,7 +123,7 @@ fn parseFlowYamlSlice(allocator: std.mem.Allocator, content: []const u8, options
     };
 }
 
-fn parseFlowYamlCommand(allocator: std.mem.Allocator, item: []const u8, block: []const []const u8) !ImportedStep {
+fn parseFlowYamlCommand(allocator: std.mem.Allocator, item: []const u8, block: []const []const u8) !model.ImportedStep {
     if (item.len == 0) return error.ImportExpectedCommand;
     if (splitColon(item)) |pair| {
         return try parseFlowYamlCommandWithValue(allocator, pair.key, pair.value, block);
@@ -242,7 +144,7 @@ fn parseFlowYamlCommandWithValue(
     key: []const u8,
     value: []const u8,
     block: []const []const u8,
-) !ImportedStep {
+) !model.ImportedStep {
     if (std.mem.eql(u8, key, "tapOn")) {
         return .{ .tap = try parseSelectorValueOrBlock(allocator, value, block) };
     }
@@ -281,7 +183,7 @@ fn parseFlowYamlCommandWithValue(
         } };
     }
     if (std.mem.eql(u8, key, "scrollUntilVisible")) {
-        var scroll = ScrollStep{
+        var scroll = model.ScrollStep{
             .selector = try parseSelectorValueOrBlock(allocator, value, block),
             .direction = (try parseDirectionFromBlock(block)) orelse "down",
             .timeout_ms = (try parseOptionalU64FromBlock(block, "timeout")) orelse 5000,
@@ -296,15 +198,15 @@ fn parseFlowYamlCommandWithValue(
     return error.UnsupportedImportCommand;
 }
 
-fn parseSelectorValueOrBlock(allocator: std.mem.Allocator, value: []const u8, block: []const []const u8) !SelectorSpec {
+fn parseSelectorValueOrBlock(allocator: std.mem.Allocator, value: []const u8, block: []const []const u8) !model.SelectorSpec {
     if (value.len > 0) return .{ .text = try parseScalarString(allocator, value) };
     const parsed = try parseSelectorBlock(allocator, block);
     if (!parsed.hasAny()) return error.ImportMissingSelector;
     return parsed;
 }
 
-fn parseSelectorBlock(allocator: std.mem.Allocator, block: []const []const u8) !SelectorSpec {
-    var out = SelectorSpec{};
+fn parseSelectorBlock(allocator: std.mem.Allocator, block: []const []const u8) !model.SelectorSpec {
+    var out = model.SelectorSpec{};
     errdefer out.deinit(allocator);
     for (block) |line| {
         const trimmed = trim(line);
@@ -438,134 +340,4 @@ fn equalsIgnoreCase(left: []const u8, right: []const u8) bool {
 fn dupeOptional(allocator: std.mem.Allocator, value: ?[]const u8) !?[]const u8 {
     if (value) |actual| return try allocator.dupe(u8, actual);
     return null;
-}
-
-fn writeScenarioJson(writer: anytype, imported: ImportedScenario) !void {
-    try writer.writeAll("{\n  \"name\": ");
-    try trace.writeJsonString(writer, imported.name);
-    if (imported.app_id) |app_id| {
-        try writer.writeAll(",\n  \"appId\": ");
-        try trace.writeJsonString(writer, app_id);
-    }
-    try writer.writeAll(",\n  \"steps\": [\n");
-    for (imported.steps, 0..) |step, index| {
-        if (index > 0) try writer.writeAll(",\n");
-        try writer.writeAll("    ");
-        try writeStepJson(writer, step);
-    }
-    try writer.writeAll("\n  ]\n}\n");
-}
-
-fn writeStepJson(writer: anytype, step: ImportedStep) !void {
-    switch (step) {
-        .launch => try writer.writeAll("{\"action\":\"launch\"}"),
-        .stop => try writer.writeAll("{\"action\":\"stop\"}"),
-        .clear_state => try writer.writeAll("{\"action\":\"clearState\"}"),
-        .snapshot => try writer.writeAll("{\"action\":\"snapshot\"}"),
-        .hide_keyboard => try writer.writeAll("{\"action\":\"hideKeyboard\"}"),
-        .press_back => try writer.writeAll("{\"action\":\"pressBack\"}"),
-        .open_link => |value| {
-            try writer.writeAll("{\"action\":\"openLink\",\"url\":");
-            try trace.writeJsonString(writer, value);
-            try writer.writeAll("}");
-        },
-        .tap => |wanted| {
-            try writer.writeAll("{\"action\":\"tap\",\"selector\":");
-            try writeSelectorJson(writer, wanted);
-            try writer.writeAll("}");
-        },
-        .type_text => |value| {
-            try writer.writeAll("{\"action\":\"typeText\",\"text\":");
-            try trace.writeJsonString(writer, value);
-            try writer.writeAll("}");
-        },
-        .erase_text => |value| try writer.print("{{\"action\":\"eraseText\",\"maxChars\":{d}}}", .{value}),
-        .assert_visible => |wanted| {
-            try writer.writeAll("{\"action\":\"assertVisible\",\"selector\":");
-            try writeSelectorJson(writer, wanted);
-            try writer.writeAll("}");
-        },
-        .assert_not_visible => |wanted| {
-            try writer.writeAll("{\"action\":\"assertNotVisible\",\"selector\":");
-            try writeSelectorJson(writer, wanted);
-            try writer.writeAll("}");
-        },
-        .wait_visible => |wait| {
-            try writer.writeAll("{\"action\":\"waitVisible\",\"selector\":");
-            try writeSelectorJson(writer, wait.selector);
-            try writer.print(",\"timeoutMs\":{d}}}", .{wait.timeout_ms});
-        },
-        .wait_not_visible => |wait| {
-            try writer.writeAll("{\"action\":\"waitNotVisible\",\"selector\":");
-            try writeSelectorJson(writer, wait.selector);
-            try writer.print(",\"timeoutMs\":{d}}}", .{wait.timeout_ms});
-        },
-        .scroll_until_visible => |scroll| {
-            try writer.writeAll("{\"action\":\"scrollUntilVisible\",\"selector\":");
-            try writeSelectorJson(writer, scroll.selector);
-            try writer.writeAll(",\"direction\":");
-            try trace.writeJsonString(writer, scroll.direction);
-            try writer.print(",\"timeoutMs\":{d}}}", .{scroll.timeout_ms});
-        },
-        .sleep_ms => |value| try writer.print("{{\"action\":\"sleep\",\"ms\":{d}}}", .{value}),
-    }
-}
-
-fn writeSelectorJson(writer: anytype, wanted: SelectorSpec) !void {
-    try writer.writeAll("{");
-    var first = true;
-    if (wanted.id) |value| {
-        try writeSelectorField(writer, "id", value, &first);
-    }
-    if (wanted.text) |value| {
-        try writeSelectorField(writer, "text", value, &first);
-    }
-    if (wanted.text_contains) |value| {
-        try writeSelectorField(writer, "textContains", value, &first);
-    }
-    if (wanted.content_desc) |value| {
-        try writeSelectorField(writer, "contentDesc", value, &first);
-    }
-    try writer.writeAll("}");
-}
-
-fn writeSelectorField(writer: anytype, key: []const u8, value: []const u8, first: *bool) !void {
-    if (!first.*) try writer.writeAll(",");
-    first.* = false;
-    try writer.writeAll("\"");
-    try writer.writeAll(key);
-    try writer.writeAll("\":");
-    try trace.writeJsonString(writer, value);
-}
-
-test "flow-yaml importer translates common commands to zmr scenario json" {
-    const allocator = std.testing.allocator;
-    var imported = try parseFlowYamlSlice(allocator,
-        \\appId: com.example.imported
-        \\name: Imported smoke
-        \\---
-        \\- launchApp
-        \\- tapOn: "Sign in"
-        \\- inputText: "agent@example.com"
-        \\- assertVisible:
-        \\    id: dashboard-title
-        \\- scrollUntilVisible:
-        \\    element:
-        \\      text: "Invite a teammate"
-        \\    direction: DOWN
-        \\    timeout: 7000
-        \\
-    , .{});
-    defer imported.deinit(allocator);
-
-    try std.testing.expectEqualStrings("Imported smoke", imported.name);
-    try std.testing.expectEqualStrings("com.example.imported", imported.app_id.?);
-    try std.testing.expectEqual(@as(usize, 5), imported.steps.len);
-
-    var buffer = std.ArrayList(u8).empty;
-    defer buffer.deinit(allocator);
-    try writeScenarioJson(buffer.writer(allocator), imported);
-    try std.testing.expect(std.mem.indexOf(u8, buffer.items, "\"action\":\"scrollUntilVisible\"") != null);
-    try std.testing.expect(std.mem.indexOf(u8, buffer.items, "\"direction\":\"down\"") != null);
-    try std.testing.expect(std.mem.indexOf(u8, buffer.items, "\"timeoutMs\":7000") != null);
 }

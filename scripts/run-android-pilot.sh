@@ -2,15 +2,25 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CALLER_CWD="$(pwd -P)"
 cd "$ROOT"
+
+# Some sandboxed environments do not allow writing to the default temp directory
+# (/var/folders, /tmp). Use a repo-local TMPDIR so adb/mktemp/heredocs work.
+if [[ -z "${TMPDIR:-}" || ! -w "${TMPDIR:-/nonexistent}" ]]; then
+  TMPDIR="$ROOT/traces/tmp"
+  mkdir -p "$TMPDIR"
+  export TMPDIR
+fi
 
 APP_ROOT="${APP_ROOT:-}"
 DEVICE="${DEVICE:-emulator-5554}"
 AVD="${AVD:-}"
-TRACE_ROOT="${TRACE_ROOT:-$ROOT/traces/android-app-pilot-$(date +%Y%m%d-%H%M%S)}"
-ZMR_BIN="${ZMR_BIN:-$ROOT/zig-out/bin/zmr}"
+TRACE_ROOT="${TRACE_ROOT:-$CALLER_CWD/traces/android-app-pilot-$(date +%Y%m%d-%H%M%S)}"
+ZMR_BIN="${ZMR_BIN:-$(command -v zmr 2>/dev/null || printf '%s' "$ROOT/zig-out/bin/zmr")}"
 ADB="${ADB:-adb}"
 APK="${APK:-}"
+SCENARIO="${SCENARIO:-}"
 APP_ID="${APP_ID:-com.example.mobiletest}"
 RUNS="${RUNS:-1}"
 MIN_PASS_RATE="${MIN_PASS_RATE:-100}"
@@ -47,10 +57,11 @@ Options:
   --app-root <dir>    Sample app repo containing .env.test and the debug APK.
   --app-id <bundle>    Application id. Default: com.example.mobiletest.
   --apk <path>          APK to install. Defaults to android/app/build/outputs/apk/debug/app-debug.apk.
+  --scenario <path>     Optional ZMR scenario JSON to run. Defaults to the built-in Sample App flows.
   --device <serial>     Android serial. Default: emulator-5554.
   --avd <name>          AVD to boot when no device is attached. Defaults to first local AVD.
   --trace-root <dir>    Output directory. Default: traces/android-app-pilot-<timestamp>.
-  --zmr-bin <path>      zmr binary. Default: zig-out/bin/zmr.
+  --zmr-bin <path>      zmr binary. Default: ZMR_BIN, PATH zmr, then zig-out/bin/zmr.
   --adb <path>          adb path. Default: adb.
   --runs <n>            Run each flow n times. n=1 writes trace bundles; n>1 writes benchmark reports.
   --min-pass-rate <pct> Repeated-run gate minimum. Default: 100.
@@ -80,6 +91,68 @@ USAGE
 die() {
   echo "error: $*" >&2
   exit 2
+}
+
+require_value() {
+  local flag="$1"
+  local value="${2-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    die "$flag requires a value"
+  fi
+  printf '%s\n' "$value"
+}
+
+resolve_path_from_cwd() {
+  local value="$1"
+  local absolute dir base probe suffix
+  if [[ -z "$value" ]]; then
+    printf '\n'
+    return 0
+  fi
+  if [[ "$value" == /* ]]; then
+    absolute="$value"
+  else
+    absolute="$CALLER_CWD/$value"
+  fi
+  if [[ -d "$absolute" ]]; then
+    cd "$absolute" && pwd -P
+    return 0
+  fi
+  if [[ -e "$absolute" ]]; then
+    dir="$(dirname "$absolute")"
+    base="$(basename "$absolute")"
+    printf '%s/%s\n' "$(cd "$dir" && pwd -P)" "$base"
+    return 0
+  fi
+  dir="$(dirname "$absolute")"
+  base="$(basename "$absolute")"
+  if [[ -d "$dir" ]]; then
+    printf '%s/%s\n' "$(cd "$dir" && pwd -P)" "$base"
+    return 0
+  fi
+  probe="$absolute"
+  suffix=""
+  while [[ "$probe" != "/" && ! -e "$probe" ]]; do
+    suffix="/$(basename "$probe")$suffix"
+    probe="$(dirname "$probe")"
+  done
+  if [[ -d "$probe" ]]; then
+    printf '%s%s\n' "$(cd "$probe" && pwd -P)" "$suffix"
+    return 0
+  fi
+  while [[ "$absolute" == *"/./"* ]]; do
+    absolute="${absolute//\/.\//\/}"
+  done
+  printf '%s\n' "$absolute"
+}
+
+resolve_command_path_from_cwd() {
+  local value="$1"
+  if [[ -z "$value" || "$value" != */* ]]; then
+    printf '%s\n' "$value"
+  else
+    resolve_path_from_cwd "$value"
+  fi
 }
 
 quote_cmd() {
@@ -207,55 +280,59 @@ preflight_android_device() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --app-root)
-      APP_ROOT="${2:-}"
+      APP_ROOT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --app-id)
-      APP_ID="${2:-}"
+      APP_ID="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --apk)
-      APK="${2:-}"
+      APK="$(require_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --scenario)
+      SCENARIO="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --device)
-      DEVICE="${2:-}"
+      DEVICE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --avd)
-      AVD="${2:-}"
+      AVD="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --trace-root)
-      TRACE_ROOT="${2:-}"
+      TRACE_ROOT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --zmr-bin)
-      ZMR_BIN="${2:-}"
+      ZMR_BIN="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --adb)
-      ADB="${2:-}"
+      ADB="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --runs)
-      RUNS="${2:-}"
+      RUNS="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --min-pass-rate)
-      MIN_PASS_RATE="${2:-}"
+      MIN_PASS_RATE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --max-failures)
-      MAX_FAILURES="${2:-}"
+      MAX_FAILURES="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --max-mean-ms)
-      MAX_MEAN_MS="${2:-}"
+      MAX_MEAN_MS="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --max-p95-ms)
-      MAX_P95_MS="${2:-}"
+      MAX_P95_MS="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --reset-emulator)
@@ -263,7 +340,7 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --restore-snapshot)
-      RESTORE_SNAPSHOT="${2:-}"
+      RESTORE_SNAPSHOT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --screen-record)
@@ -303,9 +380,22 @@ done
 [[ -z "$MAX_MEAN_MS" || "$MAX_MEAN_MS" =~ ^[0-9]+$ ]] || die "--max-mean-ms must be a non-negative integer"
 [[ -z "$MAX_P95_MS" || "$MAX_P95_MS" =~ ^[0-9]+$ ]] || die "--max-p95-ms must be a non-negative integer"
 
+APP_ROOT="$(resolve_path_from_cwd "$APP_ROOT")"
+TRACE_ROOT="$(resolve_path_from_cwd "$TRACE_ROOT")"
+ZMR_BIN="$(resolve_command_path_from_cwd "$ZMR_BIN")"
+ADB="$(resolve_command_path_from_cwd "$ADB")"
+if [[ -n "$APK" ]]; then
+  APK="$(resolve_path_from_cwd "$APK")"
+fi
+if [[ -n "$SCENARIO" ]]; then
+  SCENARIO="$(resolve_path_from_cwd "$SCENARIO")"
+fi
+
 [[ -n "$APP_ROOT" ]] || die "--app-root is required"
 [[ -d "$APP_ROOT" ]] || die "app repo not found: $APP_ROOT"
-[[ -f "$APP_ROOT/.env.test" ]] || die "app test env file not found: $APP_ROOT/.env.test"
+if [[ "$SKIP_METRO" -eq 0 ]]; then
+  [[ -f "$APP_ROOT/.env.test" ]] || die "app test env file not found: $APP_ROOT/.env.test"
+fi
 
 if [[ -z "$APK" ]]; then
   APK="$APP_ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
@@ -318,7 +408,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "DRY RUN: commands will be printed but not executed"
 fi
 
-run mkdir -p "$TRACE_ROOT" "$ROOT/zig-out/bin"
+run mkdir -p "$TRACE_ROOT" "$(dirname "$ZMR_BIN")"
 
 if [[ ! -x "$ZMR_BIN" ]]; then
   target_args=()
@@ -329,8 +419,12 @@ if [[ ! -x "$ZMR_BIN" ]]; then
 fi
 
 run "$ZMR_BIN" version
-run "$ZMR_BIN" validate examples/android-app-auth-probe.json
-run "$ZMR_BIN" validate examples/android-app-login-smoke.json
+if [[ -n "$SCENARIO" ]]; then
+  run "$ZMR_BIN" validate "$SCENARIO"
+else
+  run "$ZMR_BIN" validate examples/android-app-auth-probe.json
+  run "$ZMR_BIN" validate examples/android-app-login-smoke.json
+fi
 
 run_zmr_android_scenario() {
   if [[ "$ADB" == "adb" ]]; then
@@ -407,17 +501,26 @@ fi
 start_screen_recording
 
 if [[ "$RUNS" -eq 1 ]]; then
-  AUTH_TRACE="$TRACE_ROOT/auth"
-  LOGIN_TRACE="$TRACE_ROOT/login-smoke"
-  run rm -rf "$AUTH_TRACE" "$LOGIN_TRACE"
-  run_zmr_android_scenario examples/android-app-auth-probe.json --device "$DEVICE" --app-id "$APP_ID" --trace-dir "$AUTH_TRACE"
-  run "$ZMR_BIN" report "$AUTH_TRACE" --out "$AUTH_TRACE/report.html"
-  run "$ZMR_BIN" export "$AUTH_TRACE" --out "$TRACE_ROOT/auth.zmrtrace"
-  run "$ZMR_BIN" export "$AUTH_TRACE" --out "$TRACE_ROOT/auth-redacted.zmrtrace" --redact
-  run_zmr_android_scenario examples/android-app-login-smoke.json --device "$DEVICE" --app-id "$APP_ID" --trace-dir "$LOGIN_TRACE"
-  run "$ZMR_BIN" report "$LOGIN_TRACE" --out "$LOGIN_TRACE/report.html"
-  run "$ZMR_BIN" export "$LOGIN_TRACE" --out "$TRACE_ROOT/login-smoke.zmrtrace"
-  run "$ZMR_BIN" export "$LOGIN_TRACE" --out "$TRACE_ROOT/login-smoke-redacted.zmrtrace" --redact
+  if [[ -n "$SCENARIO" ]]; then
+    SINGLE_TRACE="$TRACE_ROOT/scenario"
+    run rm -rf "$SINGLE_TRACE"
+    run_zmr_android_scenario "$SCENARIO" --device "$DEVICE" --app-id "$APP_ID" --trace-dir "$SINGLE_TRACE"
+    run "$ZMR_BIN" report "$SINGLE_TRACE" --out "$SINGLE_TRACE/report.html"
+    run "$ZMR_BIN" export "$SINGLE_TRACE" --out "$TRACE_ROOT/scenario.zmrtrace"
+    run "$ZMR_BIN" export "$SINGLE_TRACE" --out "$TRACE_ROOT/scenario-redacted.zmrtrace" --redact
+  else
+    AUTH_TRACE="$TRACE_ROOT/auth"
+    LOGIN_TRACE="$TRACE_ROOT/login-smoke"
+    run rm -rf "$AUTH_TRACE" "$LOGIN_TRACE"
+    run_zmr_android_scenario examples/android-app-auth-probe.json --device "$DEVICE" --app-id "$APP_ID" --trace-dir "$AUTH_TRACE"
+    run "$ZMR_BIN" report "$AUTH_TRACE" --out "$AUTH_TRACE/report.html"
+    run "$ZMR_BIN" export "$AUTH_TRACE" --out "$TRACE_ROOT/auth.zmrtrace"
+    run "$ZMR_BIN" export "$AUTH_TRACE" --out "$TRACE_ROOT/auth-redacted.zmrtrace" --redact
+    run_zmr_android_scenario examples/android-app-login-smoke.json --device "$DEVICE" --app-id "$APP_ID" --trace-dir "$LOGIN_TRACE"
+    run "$ZMR_BIN" report "$LOGIN_TRACE" --out "$LOGIN_TRACE/report.html"
+    run "$ZMR_BIN" export "$LOGIN_TRACE" --out "$TRACE_ROOT/login-smoke.zmrtrace"
+    run "$ZMR_BIN" export "$LOGIN_TRACE" --out "$TRACE_ROOT/login-smoke-redacted.zmrtrace" --redact
+  fi
 else
   benchmark_gate_args=(--min-pass-rate "$MIN_PASS_RATE" --max-failures "$MAX_FAILURES")
   if [[ -n "$MAX_MEAN_MS" ]]; then
@@ -426,10 +529,15 @@ else
   if [[ -n "$MAX_P95_MS" ]]; then
     benchmark_gate_args+=(--max-p95-ms "$MAX_P95_MS")
   fi
-  run_android_benchmark --zmr examples/android-app-auth-probe.json --device "$DEVICE" --app-id "$APP_ID" --runs "$RUNS" --trace-root "$TRACE_ROOT/bench-auth" "${benchmark_gate_args[@]}"
-  run "$ZMR_BIN" report "$TRACE_ROOT/bench-auth" --out "$TRACE_ROOT/bench-auth/report.html"
-  run_android_benchmark --zmr examples/android-app-login-smoke.json --device "$DEVICE" --app-id "$APP_ID" --runs "$RUNS" --trace-root "$TRACE_ROOT/bench-login-smoke" "${benchmark_gate_args[@]}"
-  run "$ZMR_BIN" report "$TRACE_ROOT/bench-login-smoke" --out "$TRACE_ROOT/bench-login-smoke/report.html"
+  if [[ -n "$SCENARIO" ]]; then
+    run_android_benchmark --zmr "$SCENARIO" --device "$DEVICE" --app-id "$APP_ID" --runs "$RUNS" --trace-root "$TRACE_ROOT/bench-scenario" "${benchmark_gate_args[@]}"
+    run "$ZMR_BIN" report "$TRACE_ROOT/bench-scenario" --out "$TRACE_ROOT/bench-scenario/report.html"
+  else
+    run_android_benchmark --zmr examples/android-app-auth-probe.json --device "$DEVICE" --app-id "$APP_ID" --runs "$RUNS" --trace-root "$TRACE_ROOT/bench-auth" "${benchmark_gate_args[@]}"
+    run "$ZMR_BIN" report "$TRACE_ROOT/bench-auth" --out "$TRACE_ROOT/bench-auth/report.html"
+    run_android_benchmark --zmr examples/android-app-login-smoke.json --device "$DEVICE" --app-id "$APP_ID" --runs "$RUNS" --trace-root "$TRACE_ROOT/bench-login-smoke" "${benchmark_gate_args[@]}"
+    run "$ZMR_BIN" report "$TRACE_ROOT/bench-login-smoke" --out "$TRACE_ROOT/bench-login-smoke/report.html"
+  fi
 fi
 
 stop_screen_recording

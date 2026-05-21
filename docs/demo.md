@@ -18,6 +18,8 @@ The script builds `zig-out/bin/zmr`, then runs:
 - `zmr validate examples/android-app-error-state.json`
 - `zmr validate examples/android-shim-smoke.json`
 - `zmr validate examples/ios-smoke.json`
+- `zmr validate examples/ios-dev-client-open-link.json`
+- `zmr validate examples/ios-dev-client-route-snapshot.json`
 - `zmr validate examples/ios-shim-smoke.json`
 - expected-failing `zmr validate --json` output that shows `fieldPath`, `line`,
   and `column` for invalid scenarios covered by `schemas/validate-output.schema.json`
@@ -25,7 +27,8 @@ The script builds `zig-out/bin/zmr`, then runs:
 - `zmr doctor --json` output for a missing Android shim that includes a
   remediation `hint`
 - `zmr doctor --json` output that warns with stable setup `errorCode` values
-  when no Android devices or booted iOS simulators are ready
+  when no Android devices, booted iOS simulators, or paired physical iOS
+  devices are ready
 - expected-failing `zmr doctor --strict --json` output for the same no-device
   setup, showing how CI can fail without parsing the diagnostics itself
 - `zmr doctor --json --config traces/demo-doctor-config.json` output that
@@ -45,17 +48,23 @@ The script builds `zig-out/bin/zmr`, then runs:
 - `zmr import flow-yaml traces/demo-flow-yaml-flow.yaml --out traces/demo-imported-flow.json --json`
   followed by validation of the generated native ZMR scenario
 - `zmr run examples/demo-fake.json --trace-dir traces/demo-fake-android --json`
+- `scripts/device-matrix.sh --matrix traces/demo-device-matrix.json --trace-root traces/demo-device-matrix`
 - `zmr run examples/demo-failure.json --trace-dir traces/demo-failure --json`
 - `zmr explain traces/demo-failure`
 - `zmr explain traces/demo-failure --json`
 - `zmr serve --transport stdio --trace-dir traces/demo-rpc-session`
 - `node clients/typescript/examples/fake-session.mjs`
 - `python3 clients/python/examples/fake_session.py`
-- `go run ./clients/go/examples/fake-session --server tests/fake-json-rpc-server.mjs`
-- `cargo run --manifest-path clients/rust/Cargo.toml --example fake_session -- --server tests/fake-json-rpc-server.mjs`
+- `swift run ZMRFakeSession` from `clients/swift`
+- `gradle -p clients/kotlin runFakeSession`
+- `go run ./clients/go/examples/fake-session --zmr ./zig-out/bin/zmr --adb ./tests/fake-adb.sh --trace-dir traces/demo-go-client`
+- `cargo run --manifest-path clients/rust/Cargo.toml --example fake_session -- --zmr ./zig-out/bin/zmr --adb ./tests/fake-adb.sh --trace-dir traces/demo-rust-client`
 - `zmr run examples/ios-smoke.json --platform ios --trace-dir traces/demo-fake-ios`
 
 The fake Android flow exercises selector matching and wait/assert trace output.
+The fake device-matrix flow exercises Android, iOS simulator, and physical iOS
+matrix rows without requiring local hardware, producing `matrix.jsonl` and
+`summary.json`.
 The fake failure flow exercises failed trace diagnostics and the terminal
 `zmr explain` summary.
 The fake JSON-RPC flow exercises the agent protocol over stdio, live RPC trace
@@ -68,6 +77,8 @@ The TypeScript reference client flow exercises the same protocol through the
 client API external agents would use.
 The Python reference client flow verifies the same agent integration path with
 only the Python standard library.
+The Swift and Kotlin reference client flows verify host-side native-language
+agent/test-harness integration for iOS and Android teams.
 The fake Android shim flow exercises shim-backed hierarchy, wait, tap, type,
 hide-keyboard, and snapshot handling.
 The fake iOS flow exercises simulator lifecycle, deep-link opening, screenshot
@@ -147,17 +158,47 @@ Run repeated benchmark passes:
 
 `<trace-root>/metro.log` may contain sensitive app output from the sample app test environment. Do not publish raw Metro logs.
 
+## Real Android Demo APK
+
+To generate a small public native Android app and matching smoke scenario:
+
+```bash
+npx zmr-demo-android --out /tmp/zmr-android-demo --device emulator-5554 --avd <avd-name>
+```
+
+The wrapper builds a signed debug APK with Android SDK command-line tools
+only, boots the named AVD when the requested device is not ready, installs the
+app, and runs the generated smoke scenario. To inspect or customize the
+generated app before running manually:
+
+```bash
+npx zmr-create-android-demo-app --out /tmp/zmr-android-demo
+adb install -r /tmp/zmr-android-demo/build/app-debug.apk
+zmr run /tmp/zmr-android-demo/.zmr/android-smoke.json \
+  --device emulator-5554 \
+  --app-id com.example.mobiletest \
+  --trace-dir /tmp/zmr-android-demo/traces/android-demo
+```
+
+The scenario launches the app, waits for visible text, taps a button, types
+text into a field, and captures a trace-backed snapshot.
+
 ## Real iOS Simulator Demo
 
 To generate a small public demo app with the ZMR XCTest shim already installed:
 
 ```bash
-npx zmr-demo-ios --out /tmp/zmr-ios-demo --device booted
+npx zmr-demo-ios --out /tmp/zmr-ios-demo --device booted --cleanup-build-products
 ```
 
 That command creates the demo app, builds it, installs it on the requested
 simulator, runs the plain iOS smoke and selector-grade shim smoke, then writes
-reports and redacted `.zmrtrace` bundles.
+reports and redacted `.zmrtrace` bundles. `--cleanup-build-products` removes
+generated Xcode `DerivedData` after the pilot so repeated demo runs keep their
+footprint small. When `--device booted` is used and no
+simulator is running, the command boots an available iOS simulator first. If
+the first available simulator fails to boot because CoreSimulator cannot start
+`launchd_sim`, the script tries the next available iOS simulator before failing.
 
 To inspect or customize the generated app before running the pilot manually:
 
@@ -203,6 +244,16 @@ log capture, trace export, and viewer inspection. With `--ios-shim`, it also
 runs `examples/ios-shim-smoke.json`, which exercises launch, waitVisible, tap,
 selector-scoped typeText, hideKeyboard, and snapshot through the generated
 XCTest/XCUIAutomation shim command.
+
+When an iOS shim is configured, the pilot wrapper prewarms it before scenario
+timing by sending `{"cmd":"appState"}`. That catches Xcode target wiring issues
+early and keeps cold `build-for-testing` cost out of benchmark durations.
+The same app-state check is used as an idempotent launch confirmation when the
+app is already running but `simctl launch` reports a non-zero exit.
+
+Simulator demos require a simulator-built `iphonesimulator` `.app`. A signed
+device `.ipa` is for `--ios-device-type physical` only and is rejected early for
+simulator pilots.
 
 `clearState` on iOS is best-effort app uninstall by bundle id. Repeating it is
 safe: a simulator where the app is already absent is treated as clean.

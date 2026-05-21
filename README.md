@@ -34,15 +34,18 @@ Inside a mobile app repo:
 # Available after the npm registry package is published:
 npm install --save-dev zig-mobile-runner
 npx zmr-wizard --app-id com.example.mobiletest --package-json
-npx zmr doctor --config .zmr/config.json
+npx zmr doctor --strict --json --config .zmr/config.json
 ```
+
+For Expo development builds, add `--expo-dev-client-scheme <scheme>` to the
+wizard command.
 
 Today, install the release tarball from GitHub:
 
 ```bash
-npm install --save-dev https://github.com/johnmikel/zig-mobile-runner/releases/download/v0.1.0-dev.1/zig-mobile-runner-0.1.0-dev.1.tgz
+npm install --save-dev https://github.com/johnmikel/zig-mobile-runner/releases/download/v0.1.0-dev.2/zig-mobile-runner-0.1.0-dev.2.tgz
 npx zmr-wizard --app-id com.example.mobiletest --package-json
-npx zmr doctor --config .zmr/config.json
+npx zmr doctor --strict --json --config .zmr/config.json
 ```
 
 From source:
@@ -55,7 +58,7 @@ zig build-exe src/main.zig -target aarch64-macos.15.0 -O Debug -femit-bin=zig-ou
 ```
 
 Release archives and npm tarballs are attached to GitHub releases. The npm
-registry package is pending publish with a rotated `NPM_TOKEN`.
+registry package is pending publish.
 
 Homebrew is the preferred binary install for teams that do not use JavaScript:
 
@@ -74,32 +77,39 @@ No device required:
 Real iOS simulator demo:
 
 ```bash
-xcrun simctl boot <simulator-udid>
 npx zmr-demo-ios --out /tmp/zmr-ios-demo --device booted
 ```
+
+The demo command boots an available simulator when none is already running.
 
 Android app-local pilot:
 
 ```bash
-./scripts/run-android-pilot.sh \
-  --app-root /path/to/mobile-app \
-  --device emulator-5554 \
+zmr-pilot-gate \
+  --android \
+  --android-app-root /path/to/mobile-app \
+  --android-app-id com.example.mobiletest \
+  --android-device emulator-5554 \
   --runs 20 \
   --min-pass-rate 100 \
-  --max-failures 0
+  --max-failures 0 \
+  --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl
 ```
 
 iOS app-local pilot:
 
 ```bash
-./scripts/run-ios-pilot.sh \
-  --app-root /path/to/mobile-app \
-  --app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app \
-  --device booted \
+zmr-pilot-gate \
+  --ios \
+  --ios-app-root /path/to/mobile-app \
+  --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app \
+  --ios-app-id com.example.mobiletest \
+  --ios-device booted \
   --ios-shim /path/to/mobile-app/.zmr/ios-shim \
   --runs 20 \
   --min-pass-rate 100 \
-  --max-failures 0
+  --max-failures 0 \
+  --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl
 ```
 
 ## Scenario Example
@@ -113,6 +123,7 @@ easy for agents and code generators to emit.
   "appId": "com.example.mobiletest",
   "steps": [
     { "action": "launch" },
+    { "action": "assertHealthy", "timeoutMs": 5000 },
     { "action": "tap", "selector": { "resourceId": "email" } },
     { "action": "typeText", "text": "user@example.com" },
     { "action": "tap", "selector": { "resourceId": "password" } },
@@ -129,7 +140,7 @@ Validate before touching a device:
 zmr version --json
 zmr schemas --json
 zmr devices --json
-zmr init --app com.example.mobiletest --json
+zmr init --app --json --dir . --app-id com.example.mobiletest
 zmr validate --json .zmr/login-smoke.json
 zmr run .zmr/login-smoke.json --json --trace-dir traces/login-smoke
 zmr explain --json traces/login-smoke
@@ -142,8 +153,8 @@ Stable JSON outputs are documented with schemas:
 `capabilities-output.schema.json`, `init-output.schema.json`,
 `devices-output.schema.json`, `validate-output.schema.json`,
 `run-output.schema.json`, `explain-output.schema.json`,
-`semantic-snapshot.schema.json`,
-`release-manifest.schema.json`, and `RELEASE_MANIFEST.json`.
+`semantic-snapshot.schema.json`, `release-manifest.schema.json`,
+`release-readiness-output.schema.json`, and `RELEASE_MANIFEST.json`.
 
 See [docs/dsl.md](docs/dsl.md) for the DSL decision and roadmap.
 
@@ -189,12 +200,12 @@ and [docs/ai-agents.md](docs/ai-agents.md).
 | --- | --- | --- |
 | Android emulator | Supported | ADB/UI Automator, optional Android shim, emulator lifecycle helpers |
 | Android physical device | Supported | Requires ADB connection and app build/install surface |
-| iOS simulator | Supported | `simctl` plus app-local XCTest/XCUIAutomation shim |
-| iOS physical device | Supported | `devicectl` lifecycle plus app-local XCTest/XCUIAutomation shim; screenshot/log capture is simulator-first |
+| iOS simulator | Supported | `simctl` plus app-local XCTest/XCUIAutomation shim for native selector actions, native waits, and bounded snapshots |
+| iOS physical device | Supported, evidence-gated | `devicectl` lifecycle plus app-local XCTest/XCUIAutomation shim; run the physical pilot before claiming device reliability |
 | Cloud device farms | Not yet | Planned after local matrix certification |
 
-Current release: `0.1.0-dev.1` developer preview. Protocol version:
-`2026-04-28`. Latest local coverage run: `93.65%` line coverage.
+Current release: `0.1.0-dev.2` developer preview. Protocol version:
+`2026-04-28`. Latest local coverage run: `94.40%` line coverage.
 
 ## Documentation
 
@@ -209,6 +220,7 @@ Current release: `0.1.0-dev.1` developer preview. Protocol version:
 - [docs/market-positioning.md](docs/market-positioning.md): competitive positioning
 - [docs/adr/](docs/adr/): architecture decision records
 - [docs/shipping.md](docs/shipping.md): release gate and support matrix
+- [docs/release-audit.md](docs/release-audit.md): prompt-to-artifact completion audit
 - [docs/trace-privacy.md](docs/trace-privacy.md): safe trace export
 - [skills/zmr-mobile-testing/SKILL.md](skills/zmr-mobile-testing/SKILL.md): reusable agent skill
 
@@ -226,6 +238,17 @@ npm pack --dry-run
 The release gate runs formatting, shell syntax checks, client tests, public
 safety scans, Zig tests, the no-device demo, coverage, archive generation,
 checksum/manifest verification, host archive smoke, and npm package dry-run.
+
+Release-candidate evidence can be checked explicitly:
+
+```bash
+zmr-release-readiness --evidence traces/release-candidate/<run>/evidence.jsonl \
+  --target dev-preview
+```
+
+Use `--target production` only after repeated real app/device pilots exist, and
+`--target market-claim` only after same-host/device benchmark comparison
+evidence exists.
 
 ## License
 

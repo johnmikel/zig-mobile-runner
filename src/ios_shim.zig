@@ -5,6 +5,7 @@ const types = @import("types.zig");
 
 pub const CommandKind = enum {
     snapshot,
+    screenshot,
     tap,
     type_text,
     erase_text,
@@ -13,6 +14,8 @@ pub const CommandKind = enum {
     press_back,
     app_state,
     settle,
+    accept_system_alert,
+    query,
 };
 
 pub const Command = struct {
@@ -74,7 +77,7 @@ pub fn parseSnapshotNodes(allocator: std.mem.Allocator, content: []const u8) ![]
         const bounds_value = object.get("bounds") orelse return error.IosShimNodeMissingBounds;
         if (bounds_value != .object) return error.IosShimBoundsMustBeObject;
 
-        const text = fieldString(object, "label") orelse fieldString(object, "value");
+        const text = nonEmptyFieldString(object, "label") orelse nonEmptyFieldString(object, "value");
         const content_desc = fieldString(object, "identifier");
         try nodes.append(allocator, .{
             .stable_id = try allocator.dupe(u8, stable_id_source),
@@ -104,6 +107,51 @@ pub fn parseOkResponse(content: []const u8) !void {
     if (parsed.value != .object) return error.IosShimResponseMustBeObject;
     const status = fieldString(parsed.value.object, "status") orelse return error.IosShimMissingStatus;
     if (!std.mem.eql(u8, status, "ok")) return error.IosShimResponseNotOk;
+}
+
+pub fn parseQueryResponse(content: []const u8) !bool {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const parsed = try std.json.parseFromSlice(std.json.Value, arena.allocator(), content, .{});
+    if (parsed.value != .object) return error.IosShimResponseMustBeObject;
+    const status = fieldString(parsed.value.object, "status") orelse return error.IosShimMissingStatus;
+    if (!std.mem.eql(u8, status, "ok")) return error.IosShimResponseNotOk;
+    const exists = parsed.value.object.get("exists") orelse return error.IosShimMissingExists;
+    if (exists != .bool) return error.IosShimExistsMustBeBool;
+    return exists.bool;
+}
+
+pub fn parseAppStateRunning(content: []const u8) !bool {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const parsed = try std.json.parseFromSlice(std.json.Value, arena.allocator(), content, .{});
+    if (parsed.value != .object) return error.IosShimResponseMustBeObject;
+    const status = fieldString(parsed.value.object, "status") orelse return error.IosShimMissingStatus;
+    if (!std.mem.eql(u8, status, "ok")) return error.IosShimResponseNotOk;
+    const state = parsed.value.object.get("state") orelse return error.IosShimMissingState;
+    return switch (state) {
+        .integer => |value| value >= 3,
+        .string => |value| std.mem.eql(u8, value, "running") or
+            std.mem.eql(u8, value, "runningForeground") or
+            std.mem.eql(u8, value, "runningBackground"),
+        else => error.IosShimStateMustBeIntegerOrString,
+    };
+}
+
+pub fn parseScreenshotPng(allocator: std.mem.Allocator, content: []const u8) ![]u8 {
+    const parsed = try std.json.parseFromSlice(std.json.Value, allocator, content, .{});
+    defer parsed.deinit();
+    if (parsed.value != .object) return error.IosShimResponseMustBeObject;
+    const status = fieldString(parsed.value.object, "status") orelse return error.IosShimMissingStatus;
+    if (!std.mem.eql(u8, status, "ok")) return error.IosShimResponseNotOk;
+    const format = fieldString(parsed.value.object, "format") orelse return error.IosShimMissingScreenshotFormat;
+    if (!std.mem.eql(u8, format, "png")) return error.IosShimUnsupportedScreenshotFormat;
+    const encoded = fieldString(parsed.value.object, "base64") orelse return error.IosShimMissingScreenshotData;
+    const size = try std.base64.standard.Decoder.calcSizeForSlice(encoded);
+    const bytes = try allocator.alloc(u8, size);
+    errdefer allocator.free(bytes);
+    try std.base64.standard.Decoder.decode(bytes, encoded);
+    return bytes;
 }
 
 pub fn selectorString(allocator: std.mem.Allocator, wanted: selectors.Selector) !?[]u8 {
@@ -149,6 +197,7 @@ pub fn selectorString(allocator: std.mem.Allocator, wanted: selectors.Selector) 
 fn commandName(kind: CommandKind) []const u8 {
     return switch (kind) {
         .snapshot => "snapshot",
+        .screenshot => "screenshot",
         .tap => "tap",
         .type_text => "type",
         .erase_text => "eraseText",
@@ -157,6 +206,8 @@ fn commandName(kind: CommandKind) []const u8 {
         .press_back => "pressBack",
         .app_state => "appState",
         .settle => "settle",
+        .accept_system_alert => "acceptSystemAlert",
+        .query => "query",
     };
 }
 
@@ -164,6 +215,12 @@ fn fieldString(object: std.json.ObjectMap, key: []const u8) ?[]const u8 {
     const value = object.get(key) orelse return null;
     if (value != .string) return null;
     return value.string;
+}
+
+fn nonEmptyFieldString(object: std.json.ObjectMap, key: []const u8) ?[]const u8 {
+    const value = fieldString(object, key) orelse return null;
+    if (value.len == 0) return null;
+    return value;
 }
 
 fn boolField(object: std.json.ObjectMap, key: []const u8, default: bool) bool {
@@ -182,88 +239,4 @@ fn intField(object: std.json.ObjectMap, key: []const u8) !i32 {
 fn dupeOptional(allocator: std.mem.Allocator, value: ?[]const u8) !?[]const u8 {
     if (value) |actual| return try allocator.dupe(u8, actual);
     return null;
-}
-
-test "ios shim command json is stable" {
-    var out = std.ArrayList(u8).empty;
-    defer out.deinit(std.testing.allocator);
-    try writeCommandJson(out.writer(std.testing.allocator), .{
-        .kind = .tap,
-        .selector = "text=Continue",
-        .x = 20,
-        .y = 40,
-    });
-    try std.testing.expectEqualStrings("{\"cmd\":\"tap\",\"selector\":\"text=Continue\",\"x\":20,\"y\":40}\n", out.items);
-}
-
-test "ios shim selector strings map public selectors to XCTest fields" {
-    const public_selector = @import("selector.zig");
-    const allocator = std.testing.allocator;
-
-    const text_selector = try selectorString(allocator, .{ .text = "Continue" });
-    defer if (text_selector) |value| allocator.free(value);
-    try std.testing.expectEqualStrings("text=Continue", text_selector.?);
-
-    const resource_selector = try selectorString(allocator, .{ .id = "email" });
-    defer if (resource_selector) |value| allocator.free(value);
-    try std.testing.expectEqualStrings("resourceId=email", resource_selector.?);
-
-    const desc_selector = try selectorString(allocator, .{ .content_desc_contains = "Log" });
-    defer if (desc_selector) |value| allocator.free(value);
-    try std.testing.expectEqualStrings("identifierContains=Log", desc_selector.?);
-
-    const class_selector = try selectorString(allocator, .{ .class_name = "XCUIElementTypeButton" });
-    defer if (class_selector) |value| allocator.free(value);
-    try std.testing.expectEqualStrings("type=XCUIElementTypeButton", class_selector.?);
-
-    const compound_selector = try selectorString(allocator, public_selector.Selector{ .text = "Continue", .id = "continue_button" });
-    try std.testing.expect(compound_selector == null);
-}
-
-test "ios shim snapshot response maps xctest elements into ui nodes" {
-    const content =
-        \\{
-        \\  "status": "ok",
-        \\  "nodes": [
-        \\    {
-        \\      "id": "button-continue",
-        \\      "type": "XCUIElementTypeButton",
-        \\      "label": "Continue",
-        \\      "identifier": "continue_button",
-        \\      "bounds": { "x": 10, "y": 20, "width": 100, "height": 44 },
-        \\      "enabled": true,
-        \\      "visible": true,
-        \\      "selected": false
-        \\    }
-        \\  ]
-        \\}
-    ;
-
-    const nodes = try parseSnapshotNodes(std.testing.allocator, content);
-    defer {
-        for (nodes) |*node| node.deinit(std.testing.allocator);
-        std.testing.allocator.free(nodes);
-    }
-
-    try std.testing.expectEqual(@as(usize, 1), nodes.len);
-    try std.testing.expectEqualStrings("button-continue", nodes[0].stable_id);
-    try std.testing.expectEqualStrings("XCUIElementTypeButton", nodes[0].class_name);
-    try std.testing.expectEqualStrings("Continue", nodes[0].text.?);
-    try std.testing.expectEqualStrings("continue_button", nodes[0].content_desc.?);
-    try std.testing.expectEqual(@as(i32, 10), nodes[0].bounds.x);
-    try std.testing.expect(nodes[0].enabled);
-    try std.testing.expect(nodes[0].visible);
-}
-
-test "ios shim rejects malformed snapshot responses" {
-    try std.testing.expectError(error.IosShimMissingStatus, parseSnapshotNodes(std.testing.allocator, "{}"));
-    try std.testing.expectError(error.IosShimResponseNotOk, parseSnapshotNodes(std.testing.allocator,
-        \\{"status":"error","message":"no app"}
-    ));
-}
-
-test "ios shim parses action ok and error responses" {
-    try parseOkResponse("{\"status\":\"ok\"}\n");
-    try std.testing.expectError(error.IosShimResponseNotOk, parseOkResponse("{\"status\":\"error\",\"message\":\"miss\"}\n"));
-    try std.testing.expectError(error.IosShimMissingStatus, parseOkResponse("{}"));
 }

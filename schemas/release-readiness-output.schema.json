@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://zmr.dev/schemas/release-readiness-output.schema.json",
+  "title": "ZMR Release Readiness Output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["ok", "target", "status", "evidence", "evidenceFiles", "passed", "satisfied", "failed", "planned", "missing", "insufficient", "blocked", "requirements", "nextSteps", "recommendedWording", "claimLimitations"],
+  "properties": {
+    "ok": { "type": "boolean" },
+    "target": { "enum": ["dev-preview", "production", "market-claim"] },
+    "status": { "enum": ["ready", "blocked"] },
+    "evidence": { "type": "string", "minLength": 1 },
+    "evidenceFiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "passed": {
+      "type": "array",
+      "description": "Raw evidence row names whose status is passed. A passed row can still be insufficient for a requirement; use satisfied for proven requirements.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "satisfied": {
+      "type": "array",
+      "description": "Requirement names that are fully satisfied after threshold and evidence validation.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "failed": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "planned": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "missing": {
+      "type": "array",
+      "description": "Required evidence rows or evidence files that are absent or unreadable. Passed rows that fail validation are listed in insufficient instead.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "insufficient": {
+      "type": "array",
+      "description": "Requirement names with passed evidence rows that do not satisfy threshold, target, device, app, or benchmark proof requirements.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "blocked": {
+      "type": "array",
+      "description": "Requirement names that are not satisfied, including missing, failed, planned, and insufficient evidence rows.",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "requirements": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "status"],
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "status": { "const": "satisfied" }
+              },
+              "required": ["status"]
+            },
+            "then": {
+              "required": ["evidenceName"]
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "status": { "enum": ["missing", "planned", "failed", "insufficient"] }
+              },
+              "required": ["status"]
+            },
+            "then": {
+              "required": ["reason"]
+            }
+          }
+        ],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "status": {
+            "enum": ["satisfied", "missing", "planned", "failed", "insufficient"]
+          },
+          "evidenceName": { "type": "string" },
+          "reason": { "type": "string" }
+        }
+      }
+    },
+    "nextSteps": {
+      "type": "array",
+      "description": "Shortest executable remediation plan. A next step may cover multiple blocked requirements when one command writes several evidence rows.",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["requirement", "command", "commands", "covers"],
+        "properties": {
+          "requirement": { "type": "string", "minLength": 1 },
+          "command": { "type": "string", "minLength": 1 },
+          "commands": {
+            "type": "array",
+            "description": "Executable command sequence for this next step. command is the shell-joined legacy representation.",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "covers": {
+            "type": "array",
+            "description": "Blocked requirement or evidence issue labels this next step is intended to resolve.",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "recommendedWording": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Safe wording for the checked release claim. Agents should quote or paraphrase this instead of inferring a stronger claim from ok/status alone."
+    },
+    "claimLimitations": {
+      "type": "array",
+      "description": "Claims that remain unsupported by the checked evidence.",
+      "items": { "type": "string", "minLength": 1 }
+    }
+  }
+}

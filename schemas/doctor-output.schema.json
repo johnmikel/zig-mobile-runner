@@ -28,6 +28,7 @@
             "android-smoke-scenario",
             "xcrun",
             "ios-simulators",
+            "ios-physical-devices",
             "ios-shim",
             "ios-smoke-scenario"
           ]
@@ -35,6 +36,13 @@
         "status": { "enum": ["ok", "warning", "missing"] },
         "errorCode": { "type": "string", "minLength": 1 },
         "detail": { "type": "string" },
+        "count": { "type": "integer", "minimum": 0 },
+        "readyCount": { "type": "integer", "minimum": 0 },
+        "scriptCount": { "type": "integer", "minimum": 0 },
+        "scriptNames": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
         "fieldPath": { "type": "string", "minLength": 1 },
         "hint": { "type": "string", "minLength": 1 }
       }

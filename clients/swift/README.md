@@ -16,5 +16,21 @@ git submodule add https://github.com/johnmikel/zig-mobile-runner.git vendor/zig-
 
 Then depend on the `ZMRClient` product from `clients/swift`.
 
+Run the package test from this directory:
+
+```bash
+swift test
+```
+
+Run the fake-session example against a local checkout:
+
+```bash
+swift run ZMRFakeSession \
+  --zmr ../../zig-out/bin/zmr \
+  --adb ../../tests/fake-adb.sh \
+  --trace-dir ../../traces/demo-swift-client \
+  --trace-out ../../traces/demo-swift-client-redacted.zmrtrace
+```
+
 The Swift client is host-side. It is for macOS automation code, not code that
 runs inside the iOS app.

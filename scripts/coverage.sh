@@ -5,6 +5,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 OUT="$ROOT/zig-cache/coverage"
 BIN="$OUT/zmr-tests"
 MIN_COVERAGE="${MIN_COVERAGE:-90}"
+KCOV_TIMEOUT_SECONDS="${ZMR_KCOV_TIMEOUT_SECONDS:-120}"
 
 should_skip_kcov_on_hosted_macos() {
   [[ "${GITHUB_ACTIONS:-}" == "true" && "${RUNNER_OS:-}" == "macOS" && "${ZMR_FORCE_KCOV:-}" != "1" ]]
@@ -19,6 +20,11 @@ if ! should_skip_kcov_on_hosted_macos && ! command -v kcov >/dev/null 2>&1; then
   echo "kcov is required for coverage reports" >&2
   exit 127
 fi
+
+[[ "$KCOV_TIMEOUT_SECONDS" =~ ^[0-9]+$ && "$KCOV_TIMEOUT_SECONDS" -ge 1 ]] || {
+  echo "ZMR_KCOV_TIMEOUT_SECONDS must be a positive integer" >&2
+  exit 2
+}
 
 if [[ -z "${ZIG_TARGET:-}" ]]; then
   if [[ "$(uname -s)" == "Darwin" && "$(uname -m)" == "arm64" ]]; then
@@ -36,7 +42,11 @@ fi
 rm -rf "$OUT"
 mkdir -p "$OUT"
 
-zig test "$ROOT/src/main.zig" "${target_args[@]}" --test-no-exec -femit-bin="$BIN"
+if [[ "$ZIG_TARGET" == "native" ]]; then
+  zig test "$ROOT/src/main.zig" --test-no-exec -femit-bin="$BIN"
+else
+  zig test "$ROOT/src/main.zig" "${target_args[@]}" --test-no-exec -femit-bin="$BIN"
+fi
 
 if should_skip_kcov_on_hosted_macos; then
   "$BIN"
@@ -45,7 +55,33 @@ if should_skip_kcov_on_hosted_macos; then
   exit 0
 fi
 
-kcov --include-path="$ROOT/src" "$OUT/kcov" "$BIN"
+run_kcov_with_timeout() {
+  local kcov_stdout="$OUT/kcov.stdout"
+  local kcov_stderr="$OUT/kcov.stderr"
+  kcov --include-path="$ROOT/src" "$OUT/kcov" "$BIN" >"$kcov_stdout" 2>"$kcov_stderr" &
+  local kcov_pid="$!"
+  (
+    sleep "$KCOV_TIMEOUT_SECONDS"
+    if kill -0 "$kcov_pid" 2>/dev/null; then
+      echo "kcov timed out after $KCOV_TIMEOUT_SECONDS second(s). Set ZMR_KCOV_TIMEOUT_SECONDS to adjust the limit." >&2
+      pkill -TERM -P "$kcov_pid" 2>/dev/null || true
+      kill -TERM "$kcov_pid" 2>/dev/null || true
+      sleep 2
+      pkill -KILL -P "$kcov_pid" 2>/dev/null || true
+      kill -KILL "$kcov_pid" 2>/dev/null || true
+    fi
+  ) &
+  local watchdog_pid="$!"
+  local status=0
+  wait "$kcov_pid" || status="$?"
+  kill "$watchdog_pid" 2>/dev/null || true
+  wait "$watchdog_pid" 2>/dev/null || true
+  cat "$kcov_stdout"
+  cat "$kcov_stderr" >&2
+  return "$status"
+}
+
+run_kcov_with_timeout
 
 report_json="$(find "$OUT/kcov" -path '*/zmr-tests.*/coverage.json' -print -quit)"
 if [[ -z "$report_json" ]]; then

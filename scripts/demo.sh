@@ -38,6 +38,7 @@ echo "== Validate demo scenarios =="
 ./zig-out/bin/zmr validate examples/android-app-error-state.json
 ./zig-out/bin/zmr validate examples/android-shim-smoke.json
 ./zig-out/bin/zmr validate examples/ios-smoke.json
+./zig-out/bin/zmr validate examples/ios-dev-client-open-link.json
 ./zig-out/bin/zmr validate examples/ios-shim-smoke.json
 
 echo
@@ -90,16 +91,25 @@ if [[ "${1:-}" == "simctl" && "${2:-}" == "list" && "${3:-}" == "devices" && "${
   printf '{"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-5":[]}}\n'
   exit 0
 fi
+if [[ "${1:-}" == "devicectl" && "${2:-}" == "list" && "${3:-}" == "devices" ]]; then
+  while [[ $# -gt 0 ]]; do
+    if [[ "${1:-}" == "--json-output" ]]; then
+      printf '{"result":{"devices":[]}}\n' > "${2:-}"
+      exit 0
+    fi
+    shift
+  done
+fi
 exit 2
 SH
 chmod +x "$EMPTY_ADB" "$EMPTY_XCRUN"
 NO_DEVICE_JSON="$(./zig-out/bin/zmr doctor --json --adb "$EMPTY_ADB" --xcrun "$EMPTY_XCRUN")"
 printf '%s\n' "$NO_DEVICE_JSON"
 case "$NO_DEVICE_JSON" in
-  *'"name":"android-devices"'*'"errorCode":"setup.android.no_devices"'*'"name":"ios-simulators"'*'"errorCode":"setup.ios.no_booted_simulators"'*)
+  *'"name":"android-devices"'*'"errorCode":"setup.android.no_devices"'*'"name":"ios-simulators"'*'"errorCode":"setup.ios.no_booted_simulators"'*'"name":"ios-physical-devices"'*'"errorCode":"setup.ios.no_physical_devices"'*)
     ;;
   *)
-    echo "expected doctor --json to warn when no Android devices or iOS simulators are ready" >&2
+    echo "expected doctor --json to warn when no Android, iOS simulator, or physical iOS devices are ready" >&2
     exit 1
     ;;
 esac
@@ -211,9 +221,9 @@ YAML
 ./zig-out/bin/zmr import flow-yaml traces/demo-flow-yaml-flow.yaml --out traces/demo-imported-flow.json --json
 ./zig-out/bin/zmr validate traces/demo-imported-flow.json
 
-rm -rf traces/demo-fake-android traces/demo-config-redaction traces/demo-failure traces/demo-android-shim traces/demo-fake-ios traces/demo-ios-shim traces/demo-rpc-session traces/demo-typescript-client traces/demo-python-client traces/demo-fake-android.zmrtrace traces/demo-fake-android-redacted.zmrtrace
-rm -rf traces/demo-android-shim.zmrtrace traces/demo-android-shim-redacted.zmrtrace traces/demo-fake-ios.zmrtrace traces/demo-fake-ios-redacted.zmrtrace traces/demo-ios-shim.zmrtrace traces/demo-ios-shim-redacted.zmrtrace traces/demo-rpc-session-redacted.zmrtrace traces/demo-typescript-client-redacted.zmrtrace traces/demo-python-client-redacted.zmrtrace traces/demo-go-client-redacted.zmrtrace traces/demo-rust-client-redacted.zmrtrace
-rm -f traces/demo-redaction-config.json traces/demo-doctor-config.json traces/demo-bad-config.json traces/demo-doctor-strict.json traces/demo-invalid-smoke-scenario.json traces/demo-fake-adb-empty.sh traces/demo-fake-xcrun-empty.sh traces/demo-flow-yaml-flow.yaml traces/demo-imported-flow.json
+rm -rf traces/demo-fake-android traces/demo-config-redaction traces/demo-failure traces/demo-device-matrix traces/demo-android-shim traces/demo-fake-ios traces/demo-ios-shim traces/demo-rpc-session traces/demo-typescript-client traces/demo-python-client traces/demo-swift-client traces/demo-kotlin-client traces/demo-go-client traces/demo-rust-client traces/demo-fake-android.zmrtrace traces/demo-fake-android-redacted.zmrtrace
+rm -rf traces/demo-android-shim.zmrtrace traces/demo-android-shim-redacted.zmrtrace traces/demo-fake-ios.zmrtrace traces/demo-fake-ios-redacted.zmrtrace traces/demo-ios-shim.zmrtrace traces/demo-ios-shim-redacted.zmrtrace traces/demo-rpc-session-redacted.zmrtrace traces/demo-typescript-client-redacted.zmrtrace traces/demo-python-client-redacted.zmrtrace traces/demo-swift-client-redacted.zmrtrace traces/demo-kotlin-client-redacted.zmrtrace traces/demo-go-client-redacted.zmrtrace traces/demo-rust-client-redacted.zmrtrace
+rm -f traces/demo-redaction-config.json traces/demo-doctor-config.json traces/demo-bad-config.json traces/demo-doctor-strict.json traces/demo-invalid-smoke-scenario.json traces/demo-device-matrix.json traces/demo-fake-adb-empty.sh traces/demo-fake-xcrun-empty.sh traces/demo-flow-yaml-flow.yaml traces/demo-imported-flow.json
 
 echo
 echo "== Run fake Android auth probe =="
@@ -228,6 +238,48 @@ echo
 echo "== Export fake Android trace bundle =="
 ./zig-out/bin/zmr export traces/demo-fake-android --out traces/demo-fake-android.zmrtrace
 ./zig-out/bin/zmr export traces/demo-fake-android --out traces/demo-fake-android-redacted.zmrtrace --redact
+
+echo
+echo "== Run fake Android/iOS device matrix =="
+cat > traces/demo-device-matrix.json <<'JSON'
+{
+  "runs": 1,
+  "appId": "com.example.mobiletest",
+  "devices": [
+    {
+      "name": "android-fake",
+      "platform": "android",
+      "serial": "fake-android-1",
+      "scenario": "examples/demo-fake.json",
+      "adb": "./tests/fake-adb.sh"
+    },
+    {
+      "name": "ios-simulator-fake",
+      "platform": "ios",
+      "iosDeviceType": "simulator",
+      "serial": "fake-ios-1",
+      "scenario": "examples/ios-smoke.json",
+      "xcrun": "./tests/fake-xcrun.sh",
+      "iosShim": "./tests/fake-ios-shim.sh"
+    },
+    {
+      "name": "ios-physical-fake",
+      "platform": "ios",
+      "iosDeviceType": "physical",
+      "serial": "fake-physical-ios-1",
+      "scenario": "examples/ios-shim-smoke.json",
+      "xcrun": "./tests/fake-xcrun.sh",
+      "iosShim": "./tests/fake-ios-shim.sh"
+    }
+  ]
+}
+JSON
+./scripts/device-matrix.sh \
+  --matrix traces/demo-device-matrix.json \
+  --trace-root traces/demo-device-matrix \
+  --min-pass-rate 100 \
+  --max-failures 0
+cat traces/demo-device-matrix/summary.json
 
 echo
 echo "== Run config-driven trace redaction demo =="
@@ -280,31 +332,58 @@ printf '%s\n' \
 tail -n 5 traces/demo-rpc-session/events.jsonl
 
 echo
-echo "== Run TypeScript reference client against fake ZMR server =="
+echo "== Run TypeScript reference client against zmr serve fake-device backend =="
 node clients/typescript/examples/fake-session.mjs
 tail -n 5 traces/demo-typescript-client/events.jsonl
 
 echo
-echo "== Run Python reference client against fake ZMR server =="
+echo "== Run Python reference client against zmr serve fake-device backend =="
 python3 clients/python/examples/fake_session.py
 tail -n 5 traces/demo-python-client/events.jsonl
 
 echo
-echo "== Run Go reference client against fake ZMR server =="
+echo "== Run Swift reference client against zmr serve fake-device backend =="
+(
+  cd clients/swift
+  swift run ZMRFakeSession \
+    --zmr "$ROOT/zig-out/bin/zmr" \
+    --adb "$ROOT/tests/fake-adb.sh" \
+    --trace-dir "$ROOT/traces/demo-swift-client" \
+    --trace-out "$ROOT/traces/demo-swift-client-redacted.zmrtrace"
+)
+
+echo
+echo "== Run Kotlin reference client against zmr serve fake-device backend =="
+if command -v gradle >/dev/null 2>&1; then
+  gradle -p clients/kotlin runFakeSession \
+    -Pzmr="$ROOT/zig-out/bin/zmr" \
+    -Padb="$ROOT/tests/fake-adb.sh" \
+    -PtraceDir="$ROOT/traces/demo-kotlin-client" \
+    -PtraceOut="$ROOT/traces/demo-kotlin-client-redacted.zmrtrace"
+else
+  echo "skip kotlin demo: gradle not found"
+fi
+
+echo
+echo "== Run Go reference client against zmr serve fake-device backend =="
 (
   cd clients/go
   go run ./examples/fake-session \
-    --server "$ROOT/tests/fake-json-rpc-server.mjs" \
+    --zmr "$ROOT/zig-out/bin/zmr" \
+    --adb "$ROOT/tests/fake-adb.sh" \
+    --trace-dir "$ROOT/traces/demo-go-client" \
     --trace-out "$ROOT/traces/demo-go-client-redacted.zmrtrace"
 )
 
 echo
-echo "== Run Rust reference client against fake ZMR server =="
+echo "== Run Rust reference client against zmr serve fake-device backend =="
 cargo run --quiet \
   --manifest-path clients/rust/Cargo.toml \
   --example fake_session \
   -- \
-  --server "$ROOT/tests/fake-json-rpc-server.mjs" \
+  --zmr "$ROOT/zig-out/bin/zmr" \
+  --adb "$ROOT/tests/fake-adb.sh" \
+  --trace-dir "$ROOT/traces/demo-rust-client" \
   --trace-out "$ROOT/traces/demo-rust-client-redacted.zmrtrace"
 
 echo
@@ -356,12 +435,17 @@ echo "Demo traces:"
 echo "  $ROOT/traces/demo-fake-android"
 echo "  $ROOT/traces/demo-init-app"
 echo "  $ROOT/traces/demo-failure"
+echo "  $ROOT/traces/demo-device-matrix"
 echo "  $ROOT/traces/demo-android-shim"
 echo "  $ROOT/traces/demo-fake-ios"
 echo "  $ROOT/traces/demo-ios-shim"
 echo "  $ROOT/traces/demo-rpc-session"
 echo "  $ROOT/traces/demo-typescript-client"
 echo "  $ROOT/traces/demo-python-client"
+echo "  $ROOT/traces/demo-swift-client"
+echo "  $ROOT/traces/demo-kotlin-client"
+echo "  $ROOT/traces/demo-go-client"
+echo "  $ROOT/traces/demo-rust-client"
 echo "  $ROOT/traces/demo-fake-android.zmrtrace"
 echo "  $ROOT/traces/demo-fake-android-redacted.zmrtrace"
 echo "  $ROOT/traces/demo-android-shim.zmrtrace"
@@ -373,6 +457,8 @@ echo "  $ROOT/traces/demo-ios-shim-redacted.zmrtrace"
 echo "  $ROOT/traces/demo-rpc-session-redacted.zmrtrace"
 echo "  $ROOT/traces/demo-typescript-client-redacted.zmrtrace"
 echo "  $ROOT/traces/demo-python-client-redacted.zmrtrace"
+echo "  $ROOT/traces/demo-swift-client-redacted.zmrtrace"
+echo "  $ROOT/traces/demo-kotlin-client-redacted.zmrtrace"
 echo "  $ROOT/traces/demo-go-client-redacted.zmrtrace"
 echo "  $ROOT/traces/demo-rust-client-redacted.zmrtrace"
 echo "  $ROOT/viewer/index.html"

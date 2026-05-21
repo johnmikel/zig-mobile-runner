@@ -1,5 +1,38 @@
 const std = @import("std");
 
+pub const app_config_file = ".zmr/config.json";
+pub const app_android_smoke_file = ".zmr/android-smoke.json";
+pub const app_ios_smoke_file = ".zmr/ios-smoke.json";
+pub const app_device_matrix_file = ".zmr/device-matrix.json";
+pub const app_agents_file = ".zmr/AGENTS.md";
+
+pub const app_created_files = [_][]const u8{
+    app_config_file,
+    app_android_smoke_file,
+    app_ios_smoke_file,
+    app_device_matrix_file,
+    app_agents_file,
+};
+
+pub const app_script_names = [_][]const u8{
+    "doctor",
+    "schemas",
+    "validate",
+    "android",
+    "androidReport",
+    "androidReliability",
+    "ios",
+    "iosReport",
+    "iosReliability",
+    "matrix",
+    "pilotGate",
+    "readiness",
+    "serve",
+    "mcp",
+    "explain",
+    "exportTrace",
+};
+
 pub fn writeStarterScenario(
     allocator: std.mem.Allocator,
     path: []const u8,
@@ -36,6 +69,7 @@ pub fn writeStarterScenario(
         \\",
         \\  "steps": [
         \\    { "action": "launch" },
+        \\    { "action": "assertHealthy" },
         \\    { "action": "snapshot" }
         \\  ]
         \\}
@@ -55,17 +89,27 @@ pub fn writeAppScaffold(
     defer allocator.free(zmr_dir);
     try std.fs.cwd().makePath(zmr_dir);
 
-    const config_path = try std.fs.path.join(allocator, &.{ zmr_dir, "config.json" });
+    const config_path = try std.fs.path.join(allocator, &.{ zmr_dir, appFileBasename(app_config_file) });
     defer allocator.free(config_path);
-    const android_path = try std.fs.path.join(allocator, &.{ zmr_dir, "android-smoke.json" });
+    const android_path = try std.fs.path.join(allocator, &.{ zmr_dir, appFileBasename(app_android_smoke_file) });
     defer allocator.free(android_path);
-    const ios_path = try std.fs.path.join(allocator, &.{ zmr_dir, "ios-smoke.json" });
+    const ios_path = try std.fs.path.join(allocator, &.{ zmr_dir, appFileBasename(app_ios_smoke_file) });
     defer allocator.free(ios_path);
+    const matrix_path = try std.fs.path.join(allocator, &.{ zmr_dir, appFileBasename(app_device_matrix_file) });
+    defer allocator.free(matrix_path);
+    const agents_path = try std.fs.path.join(allocator, &.{ zmr_dir, appFileBasename(app_agents_file) });
+    defer allocator.free(agents_path);
 
-    try writeAppConfig(config_path, app_id, force);
+    try writeAppConfig(config_path, app_id, true);
     try writePlatformSmoke(android_path, "Android smoke", app_id, force);
     try writePlatformSmoke(ios_path, "iOS smoke", app_id, force);
+    try writeDeviceMatrix(matrix_path, app_id, true);
+    try writeAgentInstructions(agents_path, app_id, true);
     try ensureTraceGitignore(allocator, dir);
+}
+
+fn appFileBasename(path: []const u8) []const u8 {
+    return std.fs.path.basename(path);
 }
 
 fn writeAppConfig(path: []const u8, app_id: []const u8, force: bool) !void {
@@ -102,14 +146,41 @@ fn writeAppConfig(path: []const u8, app_id: []const u8, force: bool) !void {
         \\  },
         \\  "scripts": {
         \\    "doctor": "zmr doctor --strict --json --config .zmr/config.json",
+        \\    "schemas": "zmr schemas --json",
+        \\    "validate": "zmr validate --json .zmr/android-smoke.json && zmr validate --json .zmr/ios-smoke.json",
         \\    "android": "zmr run .zmr/android-smoke.json --device emulator-5554 --trace-dir traces/zmr-android",
-        \\    "ios": "zmr run .zmr/ios-smoke.json --platform ios --device booted --trace-dir traces/zmr-ios",
-        \\    "pilotGate": "zmr-pilot-gate --android --ios --android-app-root . --ios-app-path ./build/Debug-iphonesimulator/Sample.app --runs 20 --min-pass-rate 100 --max-failures 0",
-        \\    "serve": "zmr serve --transport stdio --device emulator-5554 --app-id 
+        \\    "androidReport": "zmr report traces/zmr-android --out traces/zmr-android/report.html",
+        \\    "androidReliability": "export ZMR_BIN=\"${ZMR_BIN:-zmr}\"; zmr-benchmark --zmr .zmr/android-smoke.json --device emulator-5554 --app-id
     );
-    try writeJsonStringContent(writer, app_id);
+    try writer.writeAll(" ");
+    try writeJsonShellArg(writer, app_id);
     try writer.writeAll(
-        \\"
+        \\ --runs 20 --trace-root traces/zmr-android-reliability --min-pass-rate 100 --max-failures 0 --max-p95-ms 30000 && \"$ZMR_BIN\" report traces/zmr-android-reliability --out traces/zmr-android-reliability/report.html",
+        \\    "ios": "zmr run .zmr/ios-smoke.json --platform ios --device booted --trace-dir traces/zmr-ios",
+        \\    "iosReport": "zmr report traces/zmr-ios --out traces/zmr-ios/report.html",
+        \\    "iosReliability": "export ZMR_BIN=\"${ZMR_BIN:-zmr}\"; zmr-benchmark --zmr .zmr/ios-smoke.json --platform ios --device booted --app-id
+    );
+    try writer.writeAll(" ");
+    try writeJsonShellArg(writer, app_id);
+    try writer.writeAll(
+        \\ --xcrun xcrun --runs 20 --trace-root traces/zmr-ios-reliability --min-pass-rate 100 --max-failures 0 --max-p95-ms 45000 && \"$ZMR_BIN\" report traces/zmr-ios-reliability --out traces/zmr-ios-reliability/report.html",
+        \\    "matrix": "ZMR_BIN=${ZMR_BIN:-zmr} zmr-device-matrix --matrix .zmr/device-matrix.json --trace-root traces/zmr-matrix --min-pass-rate 100 --max-failures 0",
+        \\    "pilotGate": "zmr-pilot-gate --android --ios --android-app-root . --android-app-id
+    );
+    try writer.writeAll(" ");
+    try writeJsonShellArg(writer, app_id);
+    try writer.writeAll(
+        \\ --android-device emulator-5554 --ios-app-root . --ios-app-path ./build/Debug-iphonesimulator/Sample.app --ios-app-id
+    );
+    try writer.writeAll(" ");
+    try writeJsonShellArg(writer, app_id);
+    try writer.writeAll(
+        \\ --ios-device booted --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out traces/zmr-pilots/evidence.jsonl",
+        \\    "readiness": "zmr-release-readiness --evidence traces/zmr-pilots/evidence.jsonl --target production --json",
+        \\    "serve": "zmr serve --transport stdio --config .zmr/config.json --trace-dir traces/zmr-agent",
+        \\    "mcp": "zmr mcp --config .zmr/config.json --trace-dir traces/zmr-agent",
+        \\    "explain": "zmr explain traces/zmr-agent --json",
+        \\    "exportTrace": "zmr export traces/zmr-agent --out traces/zmr-agent-redacted.zmrtrace --redact"
         \\  }
         \\}
         \\
@@ -117,7 +188,45 @@ fn writeAppConfig(path: []const u8, app_id: []const u8, force: bool) !void {
     try writer.flush();
 }
 
+fn writeDeviceMatrix(path: []const u8, app_id: []const u8, force: bool) !void {
+    var file = try createOutputFile(path, force);
+    defer file.close();
+    var buffer: [8192]u8 = undefined;
+    var file_writer = file.writer(&buffer);
+    const writer = &file_writer.interface;
+    try writer.writeAll(
+        \\{
+        \\  "runs": 1,
+        \\  "appId": "
+    );
+    try writeJsonStringContent(writer, app_id);
+    try writer.writeAll(
+        \\",
+        \\  "devices": [
+        \\    {
+        \\      "name": "android-emulator",
+        \\      "platform": "android",
+        \\      "serial": "emulator-5554",
+        \\      "scenario": ".zmr/android-smoke.json",
+        \\      "adb": "adb"
+        \\    },
+        \\    {
+        \\      "name": "ios-simulator",
+        \\      "platform": "ios",
+        \\      "iosDeviceType": "simulator",
+        \\      "serial": "booted",
+        \\      "scenario": ".zmr/ios-smoke.json",
+        \\      "xcrun": "xcrun"
+        \\    }
+        \\  ]
+        \\}
+        \\
+    );
+    try writer.flush();
+}
+
 fn writePlatformSmoke(path: []const u8, name: []const u8, app_id: []const u8, force: bool) !void {
+    if (!force and try pathExists(path)) return;
     var file = try createOutputFile(path, force);
     defer file.close();
     var buffer: [4096]u8 = undefined;
@@ -137,9 +246,173 @@ fn writePlatformSmoke(path: []const u8, name: []const u8, app_id: []const u8, fo
         \\",
         \\  "steps": [
         \\    { "action": "launch" },
+        \\    { "action": "assertHealthy" },
         \\    { "action": "snapshot" }
         \\  ]
         \\}
+        \\
+    );
+    try writer.flush();
+}
+
+fn pathExists(path: []const u8) !bool {
+    std.fs.cwd().access(path, .{}) catch |err| switch (err) {
+        error.FileNotFound => return false,
+        else => return err,
+    };
+    return true;
+}
+
+fn writeJsonShellArg(writer: anytype, value: []const u8) !void {
+    if (isShellSafe(value)) {
+        try writeJsonStringContent(writer, value);
+        return;
+    }
+    try writer.writeAll("'");
+    for (value) |ch| {
+        if (ch == '\'') try writeJsonStringContent(writer, "'\\''") else try writeJsonStringContent(writer, &[_]u8{ch});
+    }
+    try writer.writeAll("'");
+}
+
+fn writeShellArg(writer: anytype, value: []const u8) !void {
+    if (isShellSafe(value)) {
+        try writer.writeAll(value);
+        return;
+    }
+    try writer.writeAll("'");
+    for (value) |ch| {
+        if (ch == '\'') try writer.writeAll("'\\''") else try writer.writeAll(&[_]u8{ch});
+    }
+    try writer.writeAll("'");
+}
+
+fn isShellSafe(value: []const u8) bool {
+    if (value.len == 0) return false;
+    for (value) |ch| {
+        switch (ch) {
+            'A'...'Z', 'a'...'z', '0'...'9', '_', '.', '/', ':', '=', '@', '%', '+', ',', '-' => {},
+            else => return false,
+        }
+    }
+    return true;
+}
+
+fn writeAgentInstructions(path: []const u8, app_id: []const u8, force: bool) !void {
+    var file = try createOutputFile(path, force);
+    defer file.close();
+    var buffer: [4096]u8 = undefined;
+    var file_writer = file.writer(&buffer);
+    const writer = &file_writer.interface;
+    try writer.writeAll(
+        \\# ZMR Agent Instructions
+        \\
+        \\App id: `
+    );
+    try writer.writeAll(app_id);
+    try writer.writeAll(
+        \\`
+        \\
+        \\Start from the app checkout. Keep generated scenarios and config under `.zmr/`, and write run output under `traces/`.
+        \\
+        \\## Setup Checks
+        \\
+        \\```bash
+        \\zmr doctor --strict --json --config .zmr/config.json
+        \\zmr schemas --json
+        \\zmr validate --json .zmr/android-smoke.json && zmr validate --json .zmr/ios-smoke.json
+        \\```
+        \\
+        \\## Interactive Agent Session
+        \\
+        \\```bash
+        \\zmr serve --transport stdio --config .zmr/config.json --trace-dir traces/zmr-agent
+        \\zmr mcp --config .zmr/config.json --trace-dir traces/zmr-agent
+        \\```
+        \\
+        \\Use `semantic_snapshot` before choosing tap or type actions. Prefer selectors from accessibility identifiers, resource ids, labels, or exact text before coordinates. Export redacted traces before sharing artifacts.
+        \\
+        \\## Failure Triage
+        \\
+        \\```bash
+        \\zmr explain traces/zmr-agent --json
+        \\```
+        \\
+        \\Use the JSON explanation before editing selectors. It includes the terminal status, partial visual-capture diagnostics, and the last useful failure context.
+        \\
+        \\## Trace Sharing
+        \\
+        \\```bash
+        \\zmr export traces/zmr-agent --out traces/zmr-agent-redacted.zmrtrace --redact
+        \\```
+        \\
+        \\Add `--omit-screenshots` when visual artifacts may contain sensitive data.
+        \\
+        \\## Direct Smoke Runs
+        \\
+        \\```bash
+        \\zmr run .zmr/android-smoke.json --device emulator-5554 --trace-dir traces/zmr-android
+        \\zmr report traces/zmr-android --out traces/zmr-android/report.html
+        \\export ZMR_BIN="${ZMR_BIN:-zmr}"; zmr-benchmark --zmr .zmr/android-smoke.json --device emulator-5554 --app-id
+    );
+    try writer.writeAll(" ");
+    try writeShellArg(writer, app_id);
+    try writer.writeAll(
+        \\ --runs 20 --trace-root traces/zmr-android-reliability --min-pass-rate 100 --max-failures 0 --max-p95-ms 30000 && "$ZMR_BIN" report traces/zmr-android-reliability --out traces/zmr-android-reliability/report.html
+        \\zmr run .zmr/ios-smoke.json --platform ios --device booted --trace-dir traces/zmr-ios
+        \\zmr report traces/zmr-ios --out traces/zmr-ios/report.html
+        \\export ZMR_BIN="${ZMR_BIN:-zmr}"; zmr-benchmark --zmr .zmr/ios-smoke.json --platform ios --device booted --app-id
+    );
+    try writer.writeAll(" ");
+    try writeShellArg(writer, app_id);
+    try writer.writeAll(
+        \\ --xcrun xcrun --runs 20 --trace-root traces/zmr-ios-reliability --min-pass-rate 100 --max-failures 0 --max-p95-ms 45000 && "$ZMR_BIN" report traces/zmr-ios-reliability --out traces/zmr-ios-reliability/report.html
+        \\```
+        \\
+        \\## Release Claims
+        \\
+        \\```bash
+        \\zmr-release-readiness --evidence traces/zmr-pilots/evidence.jsonl --target production --json
+        \\```
+        \\
+        \\Do not claim production readiness from smoke runs alone. Use `satisfied` for proven requirements; do not infer readiness from raw `passed` evidence. Use `recommendedWording` and keep `claimLimitations` intact when summarizing readiness. When readiness is blocked, follow `nextSteps[].commands` in order.
+        \\
+        \\## App Commands
+        \\
+        \\```bash
+        \\zmr doctor --strict --json --config .zmr/config.json
+        \\zmr schemas --json
+        \\zmr validate --json .zmr/android-smoke.json && zmr validate --json .zmr/ios-smoke.json
+        \\zmr run .zmr/android-smoke.json --device emulator-5554 --trace-dir traces/zmr-android
+        \\zmr report traces/zmr-android --out traces/zmr-android/report.html
+        \\export ZMR_BIN="${ZMR_BIN:-zmr}"; zmr-benchmark --zmr .zmr/android-smoke.json --device emulator-5554 --app-id
+    );
+    try writer.writeAll(" ");
+    try writeShellArg(writer, app_id);
+    try writer.writeAll(
+        \\ --runs 20 --trace-root traces/zmr-android-reliability --min-pass-rate 100 --max-failures 0 --max-p95-ms 30000 && "$ZMR_BIN" report traces/zmr-android-reliability --out traces/zmr-android-reliability/report.html
+        \\zmr run .zmr/ios-smoke.json --platform ios --device booted --trace-dir traces/zmr-ios
+        \\zmr report traces/zmr-ios --out traces/zmr-ios/report.html
+        \\export ZMR_BIN="${ZMR_BIN:-zmr}"; zmr-benchmark --zmr .zmr/ios-smoke.json --platform ios --device booted --app-id
+    );
+    try writer.writeAll(" ");
+    try writeShellArg(writer, app_id);
+    try writer.writeAll(
+        \\ --xcrun xcrun --runs 20 --trace-root traces/zmr-ios-reliability --min-pass-rate 100 --max-failures 0 --max-p95-ms 45000 && "$ZMR_BIN" report traces/zmr-ios-reliability --out traces/zmr-ios-reliability/report.html
+        \\ZMR_BIN=${ZMR_BIN:-zmr} zmr-device-matrix --matrix .zmr/device-matrix.json --trace-root traces/zmr-matrix --min-pass-rate 100 --max-failures 0
+    );
+    try writer.writeAll("zmr-pilot-gate --android --ios --android-app-root . --android-app-id ");
+    try writeShellArg(writer, app_id);
+    try writer.writeAll(" --android-device emulator-5554 --ios-app-root . --ios-app-path ./build/Debug-iphonesimulator/Sample.app --ios-app-id ");
+    try writeShellArg(writer, app_id);
+    try writer.writeAll(
+        \\ --ios-device booted --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out traces/zmr-pilots/evidence.jsonl
+        \\zmr-release-readiness --evidence traces/zmr-pilots/evidence.jsonl --target production --json
+        \\zmr serve --transport stdio --config .zmr/config.json --trace-dir traces/zmr-agent
+        \\zmr mcp --config .zmr/config.json --trace-dir traces/zmr-agent
+        \\zmr explain traces/zmr-agent --json
+        \\zmr export traces/zmr-agent --out traces/zmr-agent-redacted.zmrtrace --redact
+        \\```
         \\
     );
     try writer.flush();
@@ -196,65 +469,4 @@ fn writeJsonStringContent(writer: anytype, value: []const u8) !void {
             else => try writer.writeAll(&.{ch}),
         }
     }
-}
-
-test "starter scenario scaffolder writes a valid scenario and protects existing files" {
-    const allocator = std.testing.allocator;
-    const dir = "zig-cache-test-scaffold";
-    std.fs.cwd().deleteTree(dir) catch {};
-    defer std.fs.cwd().deleteTree(dir) catch {};
-    try std.fs.cwd().makePath(dir);
-
-    const path = dir ++ "/scenario.json";
-    try writeStarterScenario(allocator, path, "com.example.mobiletest", false);
-    try std.testing.expectError(error.PathAlreadyExists, writeStarterScenario(allocator, path, "com.example.mobiletest", false));
-    try writeStarterScenario(allocator, path, "com.example.app", true);
-
-    const content = try std.fs.cwd().readFileAlloc(allocator, path, 1024 * 1024);
-    defer allocator.free(content);
-    try std.testing.expect(std.mem.indexOf(u8, content, "\"appId\": \"com.example.app\"") != null);
-    try std.testing.expect(std.mem.indexOf(u8, content, "\"action\": \"launch\"") != null);
-}
-
-test "app scaffold writes config smoke scenarios and gitignore without overwriting" {
-    const allocator = std.testing.allocator;
-    const dir = "zig-cache-test-app-scaffold";
-    std.fs.cwd().deleteTree(dir) catch {};
-    defer std.fs.cwd().deleteTree(dir) catch {};
-    try std.fs.cwd().makePath(dir);
-
-    try writeAppScaffold(allocator, dir, "com.example.mobiletest", false);
-
-    const config_path = dir ++ "/.zmr/config.json";
-    const android_path = dir ++ "/.zmr/android-smoke.json";
-    const ios_path = dir ++ "/.zmr/ios-smoke.json";
-
-    const config = try std.fs.cwd().readFileAlloc(allocator, config_path, 1024 * 1024);
-    defer allocator.free(config);
-    try std.testing.expect(std.mem.indexOf(u8, config, "\"schemaVersion\": 1") != null);
-    try std.testing.expect(std.mem.indexOf(u8, config, "\"appId\": \"com.example.mobiletest\"") != null);
-    try std.testing.expect(std.mem.indexOf(u8, config, "\"doctor\": \"zmr doctor --strict --json --config .zmr/config.json\"") != null);
-    try std.testing.expect(std.mem.indexOf(u8, config, "\"pilotGate\": \"zmr-pilot-gate --android --ios --android-app-root . --ios-app-path ./build/Debug-iphonesimulator/Sample.app --runs 20 --min-pass-rate 100 --max-failures 0\"") != null);
-    try std.testing.expect(std.mem.indexOf(u8, config, "\"serve\": \"zmr serve --transport stdio --device emulator-5554 --app-id com.example.mobiletest\"") != null);
-    try std.testing.expect(std.mem.indexOf(u8, config, "\"smokeScenario\": \".zmr/android-smoke.json\"") != null);
-    try std.testing.expect(std.mem.indexOf(u8, config, "\"smokeScenario\": \".zmr/ios-smoke.json\"") != null);
-
-    const android = try std.fs.cwd().readFileAlloc(allocator, android_path, 1024 * 1024);
-    defer allocator.free(android);
-    try std.testing.expect(std.mem.indexOf(u8, android, "\"name\": \"Android smoke\"") != null);
-
-    const ios = try std.fs.cwd().readFileAlloc(allocator, ios_path, 1024 * 1024);
-    defer allocator.free(ios);
-    try std.testing.expect(std.mem.indexOf(u8, ios, "\"name\": \"iOS smoke\"") != null);
-
-    const gitignore = try std.fs.cwd().readFileAlloc(allocator, dir ++ "/.gitignore", 1024 * 1024);
-    defer allocator.free(gitignore);
-    try std.testing.expect(std.mem.indexOf(u8, gitignore, "traces/") != null);
-
-    try std.testing.expectError(error.PathAlreadyExists, writeAppScaffold(allocator, dir, "com.example.other", false));
-    try writeAppScaffold(allocator, dir, "com.example.other", true);
-
-    const overwritten = try std.fs.cwd().readFileAlloc(allocator, config_path, 1024 * 1024);
-    defer allocator.free(overwritten);
-    try std.testing.expect(std.mem.indexOf(u8, overwritten, "\"appId\": \"com.example.other\"") != null);
 }

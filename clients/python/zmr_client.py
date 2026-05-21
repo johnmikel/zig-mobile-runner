@@ -66,6 +66,9 @@ class ZmrClient:
     def close_session(self):
         return self.request("session.close")
 
+    def devices(self):
+        return self.request("device.list")
+
     def launch(self):
         return self.request("app.launch")
 
@@ -150,6 +153,12 @@ class ZmrClient:
         if timeout_ms is not None:
             params["timeoutMs"] = timeout_ms
         return self.request("assert.notVisible", params)
+
+    def assert_healthy(self, timeout_ms=None):
+        params = {}
+        if timeout_ms is not None:
+            params["timeoutMs"] = timeout_ms
+        return self.request("assert.healthy", params)
 
     def export_trace(self, out, redact=False, omit_screenshots=False):
         return self.request(

@@ -1,7 +1,16 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -h "$SOURCE" ]]; do
+  SOURCE_DIR="$(cd -P "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  if [[ "$SOURCE" != /* ]]; then
+    SOURCE="$SOURCE_DIR/$SOURCE"
+  fi
+done
+
+ROOT="$(cd -P "$(dirname "$SOURCE")/.." && pwd)"
 OUT=""
 APP_NAME="ZMRDemo"
 BUNDLE_ID="com.example.mobiletest"
@@ -36,22 +45,31 @@ die() {
   exit 2
 }
 
+require_value() {
+  local flag="$1"
+  local value="${2-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    die "$flag requires a value"
+  fi
+  printf '%s\n' "$value"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --out)
-      OUT="${2:-}"
+      OUT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --name)
-      APP_NAME="${2:-}"
+      APP_NAME="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --bundle-id)
-      BUNDLE_ID="${2:-}"
+      BUNDLE_ID="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --deployment-target)
-      DEPLOYMENT_TARGET="${2:-}"
+      DEPLOYMENT_TARGET="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     -h|--help)

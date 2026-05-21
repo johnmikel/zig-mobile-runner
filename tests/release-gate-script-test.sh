@@ -17,14 +17,20 @@ required = [
     "bash tests/benchmark-results-test.sh",
     "bash tests/device-matrix-test.sh",
     "bash tests/android-emulator-script-test.sh",
+    "bash tests/android-demo-app-script-test.sh",
+    "bash tests/android-real-demo-script-test.sh",
     "bash tests/android-shim-install-script-test.sh",
     "bash tests/android-pilot-script-test.sh",
     "bash tests/pilot-gate-script-test.sh",
     "bash tests/ios-demo-app-script-test.sh",
     "bash tests/ios-real-demo-script-test.sh",
+    "bash tests/ios-shim-source-test.sh",
     "bash tests/ios-shim-install-script-test.sh",
     "bash tests/ios-shim-target-helper-test.sh",
     "bash tests/ios-pilot-script-test.sh",
+    "bash tests/release-candidate-script-test.sh",
+    "bash tests/release-readiness-script-test.sh",
+    "bash tests/coverage-script-test.sh",
     "bash tests/ci-gate-script-test.sh",
     "bash tests/release-metadata-test.sh",
     "bash tests/release-manifest-test.sh",
@@ -35,9 +41,12 @@ required = [
     "bash tests/docs-readiness-test.sh",
     "bash tests/workflow-readiness-test.sh",
     "bash tests/demo-script-test.sh",
+    "bash tests/mcp-server-test.sh",
     "node --test tests/npm-package.test.mjs",
     "bash tests/go-client-test.sh",
     "bash tests/rust-client-test.sh",
+    "if command -v swift >/dev/null 2>&1; then swift test --package-path clients/swift; else echo 'skip swift test: swift not found'; fi",
+    "if command -v gradle >/dev/null 2>&1; then gradle -p clients/kotlin test; else echo 'skip kotlin test: gradle not found'; fi",
     "bash tests/public-safety-test.sh",
     "node --test tests/viewer-parser.test.mjs",
     "zig test src/main.zig -target aarch64-macos.15.0",
@@ -68,9 +77,10 @@ for command in required:
     assert command in output, command
 
 assert "External pilot gates not run by default" in output
-assert "./scripts/pilot-gate.sh --android --ios --android-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --ios-shim /path/to/mobile-app/.zmr/ios-shim" in output
-assert "./scripts/run-android-pilot.sh --app-root /path/to/mobile-app --device emulator-5554 --runs 20" in output
-assert "./scripts/run-android-pilot.sh --app-root /path/to/mobile-app --device emulator-5554 --runs 20 --min-pass-rate 100 --max-failures 0 --max-p95-ms 30000" in output
-assert "./scripts/run-ios-pilot.sh --app-root /path/to/mobile-app --app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20" in output
-assert "./scripts/run-ios-pilot.sh --app-root /path/to/mobile-app --app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --max-p95-ms 45000" in output
+assert "./scripts/pilot-gate.sh --android --android-app-root /path/to/mobile-app --android-app-id com.example.mobiletest --android-device emulator-5554 --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl" in output
+assert "./scripts/pilot-gate.sh --ios --ios-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --ios-app-id com.example.mobiletest --ios-device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl" in output
+assert "./scripts/pilot-gate.sh --ios --ios-device-type physical --ios-device <physical-device-id> --ios-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Release-iphoneos/Sample.ipa --ios-app-id com.example.mobiletest --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl" in output
+assert "--evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl" in output
+assert "./scripts/run-android-pilot.sh --app-root /path/to/mobile-app" not in output
+assert "./scripts/run-ios-pilot.sh --app-root /path/to/mobile-app" not in output
 PY

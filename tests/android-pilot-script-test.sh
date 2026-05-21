@@ -3,12 +3,28 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMPDIR="$(mktemp -d)"
+TMPDIR="$(cd "$TMPDIR" && pwd -P)"
 trap 'rm -rf "$TMPDIR"' EXIT
+
+for args in "--app-root" "--app-id" "--apk" "--device" "--avd" "--trace-root" "--zmr-bin" "--adb" "--runs" "--min-pass-rate" "--max-failures" "--max-mean-ms" "--max-p95-ms" "--restore-snapshot"; do
+  set +e
+  missing_value_output="$("$ROOT/scripts/run-android-pilot.sh" $args 2>&1)"
+  missing_value_status=$?
+  set -e
+  if [[ "$missing_value_status" -ne 2 ]]; then
+    echo "run-android-pilot should exit 2 for missing value: $args" >&2
+    exit 1
+  fi
+  grep -q -- "$args requires a value" <<< "$missing_value_output"
+done
 
 APP_ROOT="$TMPDIR/android-app"
 mkdir -p "$APP_ROOT/android/app/build/outputs/apk/debug"
 touch "$APP_ROOT/.env.test"
 touch "$APP_ROOT/android/app/build/outputs/apk/debug/app-debug.apk"
+mkdir -p "$TMPDIR/bin"
+touch "$TMPDIR/bin/zmr"
+chmod +x "$TMPDIR/bin/zmr"
 
 EMPTY_ADB="$TMPDIR/fake-adb-empty.sh"
 cat > "$EMPTY_ADB" <<'SH'
@@ -42,7 +58,7 @@ grep -q 'no Android device found: emulator-5554' <<< "$missing_device_output"
 grep -q 'setup.android.no_devices' <<< "$missing_device_output"
 grep -q 'zmr doctor --json' <<< "$missing_device_output"
 
-output="$("$ROOT/scripts/run-android-pilot.sh" \
+output="$(PATH="$TMPDIR/bin:$PATH" "$ROOT/scripts/run-android-pilot.sh" \
   --dry-run \
   --skip-emulator \
   --skip-metro \
@@ -60,6 +76,7 @@ trace_root = sys.argv[3]
 
 assert "DRY RUN" in output
 assert "--adb" not in output
+assert f"{trace_root.rsplit('/pilot', 1)[0]}/bin/zmr validate examples/android-app-auth-probe.json" in output
 assert "zmr validate examples/android-app-auth-probe.json" in output
 assert "zmr validate examples/android-app-login-smoke.json" in output
 assert f"adb -s emulator-5554 install -r {app_root}/android/app/build/outputs/apk/debug/app-debug.apk" in output
@@ -72,6 +89,31 @@ assert "zmr export" in output
 assert "--redact" in output
 assert ".env.test" in output
 assert "dotenv" not in output.lower()
+PY
+
+APP_CWD="$TMPDIR/app-cwd"
+mkdir -p "$APP_CWD/android/app/build/outputs/apk/debug"
+touch "$APP_CWD/.env.test" "$APP_CWD/android/app/build/outputs/apk/debug/app-debug.apk"
+app_cwd_output="$(cd "$APP_CWD" && PATH="$TMPDIR/bin:$PATH" "$ROOT/scripts/run-android-pilot.sh" \
+  --dry-run \
+  --skip-emulator \
+  --skip-metro \
+  --app-root . \
+  --apk ./android/app/build/outputs/apk/debug/app-debug.apk \
+  --trace-root traces/direct-android-pilot 2>&1)"
+
+python3 - "$app_cwd_output" "$APP_CWD" "$TMPDIR" <<'PY'
+import os
+import sys
+
+output = sys.argv[1]
+app = os.path.realpath(sys.argv[2])
+tmp = os.path.realpath(sys.argv[3])
+
+assert f"App test env: {app}/.env.test" in output
+assert f"{tmp}/bin/zmr validate examples/android-app-auth-probe.json" in output
+assert f"adb -s emulator-5554 install -r {app}/android/app/build/outputs/apk/debug/app-debug.apk" in output
+assert f"--trace-dir {app}/traces/direct-android-pilot/auth" in output
 PY
 
 CUSTOM_ADB="$TMPDIR/custom-adb.sh"

@@ -5,6 +5,18 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
+for args in "--out" "--name" "--bundle-id" "--deployment-target"; do
+  set +e
+  missing_value_output="$("$ROOT/scripts/create-ios-demo-app.sh" $args 2>&1)"
+  missing_value_status=$?
+  set -e
+  if [[ "$missing_value_status" -ne 2 ]]; then
+    echo "create-ios-demo-app should exit 2 for missing value: $args" >&2
+    exit 1
+  fi
+  grep -q -- "$args requires a value" <<< "$missing_value_output"
+done
+
 if ! ruby -e 'require "xcodeproj"' >/dev/null 2>&1; then
   echo "skip: xcodeproj gem is not installed"
   exit 0

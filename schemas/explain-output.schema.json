@@ -7,6 +7,7 @@
   "required": ["ok", "scenario", "status"],
   "properties": {
     "ok": { "const": true },
+    "traceDir": { "type": "string", "minLength": 1 },
     "scenario": { "type": "string" },
     "status": { "type": "string", "minLength": 1 },
     "appId": { "type": "string", "minLength": 1 },
@@ -23,6 +24,11 @@
         "kind": { "type": "string", "minLength": 1 },
         "status": { "type": "string", "minLength": 1 },
         "snapshotId": { "type": "string", "minLength": 1 },
+        "artifactStatus": { "type": "string", "minLength": 1 },
+        "semanticStatus": { "type": "string", "minLength": 1 },
+        "error": { "type": "string", "minLength": 1 },
+        "screenshotArtifact": { "type": "string", "minLength": 1 },
+        "source": { "type": "string", "minLength": 1 },
         "activePackage": { "type": "string", "minLength": 1 },
         "activeActivity": { "type": "string", "minLength": 1 },
         "visibleTexts": {
@@ -35,6 +41,11 @@
         }
       }
     },
-    "lastEvent": { "type": "string", "minLength": 1 }
+    "lastEvent": { "type": "string", "minLength": 1 },
+    "nextCommands": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    }
   }
 }

@@ -70,6 +70,12 @@ type Session struct {
 	SessionID string `json:"sessionId"`
 }
 
+type DeviceInfo struct {
+	Serial string `json:"serial"`
+	State  string `json:"state"`
+	Ready  bool   `json:"ready"`
+}
+
 type Snapshot struct {
 	ID             string                 `json:"id"`
 	TimestampMS    int64                  `json:"timestampMs"`
@@ -237,6 +243,36 @@ func (c *Client) CreateSession(ctx context.Context) (Session, error) {
 	return out, err
 }
 
+func (c *Client) CloseSession(ctx context.Context) (bool, error) {
+	var out bool
+	err := c.Request(ctx, "session.close", map[string]interface{}{}, &out)
+	return out, err
+}
+
+func (c *Client) Devices(ctx context.Context) ([]DeviceInfo, error) {
+	var out []DeviceInfo
+	err := c.Request(ctx, "device.list", map[string]interface{}{}, &out)
+	return out, err
+}
+
+func (c *Client) Launch(ctx context.Context) (bool, error) {
+	var out bool
+	err := c.Request(ctx, "app.launch", map[string]interface{}{}, &out)
+	return out, err
+}
+
+func (c *Client) Stop(ctx context.Context) (bool, error) {
+	var out bool
+	err := c.Request(ctx, "app.stop", map[string]interface{}{}, &out)
+	return out, err
+}
+
+func (c *Client) ClearState(ctx context.Context) (bool, error) {
+	var out bool
+	err := c.Request(ctx, "app.clearState", map[string]interface{}{}, &out)
+	return out, err
+}
+
 func (c *Client) OpenLink(ctx context.Context, url string) (bool, error) {
 	var out bool
 	err := c.Request(ctx, "app.openLink", map[string]interface{}{"url": url}, &out)
@@ -255,6 +291,70 @@ func (c *Client) SemanticSnapshot(ctx context.Context) (SemanticSnapshot, error)
 	return out, err
 }
 
+func (c *Client) Tap(ctx context.Context, selector map[string]interface{}) (bool, error) {
+	var out bool
+	err := c.Request(ctx, "ui.tap", map[string]interface{}{"selector": selector}, &out)
+	return out, err
+}
+
+func (c *Client) TypeText(ctx context.Context, text string, selector map[string]interface{}) (bool, error) {
+	var out bool
+	params := map[string]interface{}{"text": text}
+	if selector != nil {
+		params["selector"] = selector
+	}
+	err := c.Request(ctx, "ui.type", params, &out)
+	return out, err
+}
+
+func (c *Client) EraseText(ctx context.Context, selector map[string]interface{}, maxChars int64) (bool, error) {
+	var out bool
+	params := map[string]interface{}{}
+	if selector != nil {
+		params["selector"] = selector
+	}
+	if maxChars > 0 {
+		params["maxChars"] = maxChars
+	}
+	err := c.Request(ctx, "ui.eraseText", params, &out)
+	return out, err
+}
+
+func (c *Client) HideKeyboard(ctx context.Context) (bool, error) {
+	var out bool
+	err := c.Request(ctx, "ui.hideKeyboard", map[string]interface{}{}, &out)
+	return out, err
+}
+
+func (c *Client) Swipe(ctx context.Context, x1 int64, y1 int64, x2 int64, y2 int64, durationMS int64) (bool, error) {
+	var out bool
+	params := map[string]interface{}{"x1": x1, "y1": y1, "x2": x2, "y2": y2}
+	if durationMS > 0 {
+		params["durationMs"] = durationMS
+	}
+	err := c.Request(ctx, "ui.swipe", params, &out)
+	return out, err
+}
+
+func (c *Client) PressBack(ctx context.Context) (bool, error) {
+	var out bool
+	err := c.Request(ctx, "ui.pressBack", map[string]interface{}{}, &out)
+	return out, err
+}
+
+func (c *Client) ScrollUntilVisible(ctx context.Context, selector map[string]interface{}, direction string, timeoutMS int64) (bool, error) {
+	var out bool
+	params := map[string]interface{}{"selector": selector}
+	if direction != "" {
+		params["direction"] = direction
+	}
+	if timeoutMS > 0 {
+		params["timeoutMs"] = timeoutMS
+	}
+	err := c.Request(ctx, "ui.scrollUntilVisible", params, &out)
+	return out, err
+}
+
 func (c *Client) WaitUntil(ctx context.Context, selector map[string]interface{}, timeoutMS int64) (bool, error) {
 	var out bool
 	params := map[string]interface{}{"visible": selector}
@@ -262,6 +362,56 @@ func (c *Client) WaitUntil(ctx context.Context, selector map[string]interface{},
 		params["timeoutMs"] = timeoutMS
 	}
 	err := c.Request(ctx, "wait.until", params, &out)
+	return out, err
+}
+
+func (c *Client) WaitAny(ctx context.Context, selectors []map[string]interface{}, timeoutMS int64) (bool, error) {
+	var out bool
+	params := map[string]interface{}{"selectors": selectors}
+	if timeoutMS > 0 {
+		params["timeoutMs"] = timeoutMS
+	}
+	err := c.Request(ctx, "wait.any", params, &out)
+	return out, err
+}
+
+func (c *Client) WaitGone(ctx context.Context, selector map[string]interface{}, timeoutMS int64) (bool, error) {
+	var out bool
+	params := map[string]interface{}{"selector": selector}
+	if timeoutMS > 0 {
+		params["timeoutMs"] = timeoutMS
+	}
+	err := c.Request(ctx, "wait.gone", params, &out)
+	return out, err
+}
+
+func (c *Client) AssertVisible(ctx context.Context, selector map[string]interface{}, timeoutMS int64) (bool, error) {
+	var out bool
+	params := map[string]interface{}{"selector": selector}
+	if timeoutMS > 0 {
+		params["timeoutMs"] = timeoutMS
+	}
+	err := c.Request(ctx, "assert.visible", params, &out)
+	return out, err
+}
+
+func (c *Client) AssertNotVisible(ctx context.Context, selector map[string]interface{}, timeoutMS int64) (bool, error) {
+	var out bool
+	params := map[string]interface{}{"selector": selector}
+	if timeoutMS > 0 {
+		params["timeoutMs"] = timeoutMS
+	}
+	err := c.Request(ctx, "assert.notVisible", params, &out)
+	return out, err
+}
+
+func (c *Client) AssertHealthy(ctx context.Context, timeoutMS int64) (bool, error) {
+	var out bool
+	params := map[string]interface{}{}
+	if timeoutMS > 0 {
+		params["timeoutMs"] = timeoutMS
+	}
+	err := c.Request(ctx, "assert.healthy", params, &out)
 	return out, err
 }
 

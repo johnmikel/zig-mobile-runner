@@ -11,11 +11,15 @@ zmr explain traces/zmr-android
 ```
 
 `zmr doctor --json` is the first command to run when setup is unclear. It
-reports Zig, ADB, Android device count, `xcrun`, iOS simulator state, and
-configured Android/iOS shim command paths in a machine-readable shape that
-scripts and agents can inspect. Device readiness checks report `warning` when
-ADB sees zero devices or `xcrun` sees zero booted iOS simulators, with stable
-`setup.android.no_devices` and `setup.ios.no_booted_simulators` error codes.
+reports Zig, ADB, Android device count, `xcrun`, iOS simulator state, physical
+iOS device state, and configured Android/iOS shim command paths in a
+machine-readable shape that scripts and agents can inspect. Device readiness
+checks report `warning` when ADB sees zero devices, `xcrun` sees zero booted
+iOS simulators, `devicectl` sees zero paired physical iOS devices, or all
+listed physical devices are disconnected/unavailable, with stable
+`setup.android.no_devices`, `setup.ios.no_booted_simulators`,
+`setup.ios.no_physical_devices`, and
+`setup.ios.no_ready_physical_devices` error codes.
 Missing tool and shim checks also include stable setup codes such as
 `setup.adb.not_found` and `setup.android_shim.not_found`.
 By default `doctor` exits zero after printing diagnostics so interactive setup
@@ -49,8 +53,26 @@ install or benchmark work. `scripts/run-android-pilot.sh --skip-emulator`
 reports `no Android device found: <serial>` plus `setup.android.no_devices`
 when the requested serial is not attached. `scripts/run-ios-pilot.sh` reports
 `no booted iOS simulator found` plus `setup.ios.no_booted_simulators` when
-`--device booted` has no target. In both cases the wrapper also prints the
-matching `zmr doctor --json` output so CI logs contain the next remediation.
+`--device booted` has no target. Physical iOS pilot runs report
+`setup.ios.physical_device_required`, `setup.ios.physical_device_not_found`, or
+`setup.ios.physical_device_not_ready` for invalid or disconnected physical
+device identifiers. Use the `serial` value from `zmr devices --json --platform
+ios --ios-device-type physical`. The not-ready preflight also prints the
+matched device state, such as
+`state: disconnected`, while `zmr doctor --json` reports the broader
+`ios-physical-devices` check with
+`setup.ios.no_physical_devices` when no physical devices are listed, or
+`setup.ios.no_ready_physical_devices` when only disconnected/unavailable
+devices are listed. The no-ready detail includes a state breakdown such as
+`disconnected=1, unavailable=1`. When at least one physical device is ready but
+other devices are listed in unusable states, `doctor` keeps the check `ok` and
+still includes the broader breakdown, for example
+`1 ready physical iOS device(s); 3 listed (disconnected=1, unavailable=1)`.
+In both cases the wrapper also prints the matching `zmr doctor --json` output
+so CI logs contain the next remediation.
+The JSON output also includes numeric `count` and `readyCount` fields on
+device checks, so agents and scripts can branch without parsing the human
+`detail` string.
 
 ## Install Or Binary Issues
 
@@ -136,8 +158,16 @@ zmr doctor --xcrun xcrun
 ```
 
 The simulator `.app` must be built and installed before launch/open-link flows.
+A device `.ipa` is not simulator-compatible; `scripts/run-ios-pilot.sh` rejects
+that mismatch with `setup.ios.simulator_app_required`. Build an
+`iphonesimulator` `.app` for simulator pilots, or pass `--ios-device-type
+physical` with a signed device artifact and a real physical device identifier.
+
 On iOS, `clearState` is best-effort uninstall by bundle id; if the app is
-already missing, ZMR treats the simulator as clean and continues.
+already missing, ZMR treats the simulator as clean and continues. Simulator
+`launch` is also idempotent when an XCTest shim is configured: if `simctl
+launch` reports an error but `{"cmd":"appState"}` shows the app is already
+running, ZMR treats the app as usable instead of failing the scenario.
 
 Selector-grade iOS actions require an XCTest/XCUIAutomation shim command:
 
@@ -157,6 +187,40 @@ project contains `--app-target`, or when `--bundle-id` disambiguates matching
 app targets. Pass `--project` explicitly for still-ambiguous multi-project
 workspaces. Run with `--ios-shim ./.zmr/ios-shim` or set
 `tools.iosShimPath` in `.zmr/config.json`.
+
+If a real iOS run fails with CoreSimulator or Xcode cache errors such as
+`Operation not permitted`, `CoreSimulatorService connection became invalid`, or
+an unexpected workspace/build database error, rerun from a normal terminal or CI
+worker that has access to the user's Xcode, simulator, and DerivedData paths.
+These errors usually mean the host process is sandboxed away from Apple's local
+developer services, not that the scenario JSON is malformed.
+For the generated public iOS demo, `scripts/demo-ios-real.sh --device booted`
+tries available iOS simulators in order when no simulator is already booted.
+This avoids failing the whole demo when one local simulator cannot start
+`launchd_sim`, while still surfacing a setup error if every available simulator
+fails to boot.
+
+If a previous Xcode build was interrupted, remove only the app-local ZMR derived
+data path configured for the shim, then rerun the shim once to prewarm it:
+
+```bash
+rm -rf ios/build/ZMRDerivedData
+printf '{"cmd":"appState"}\n' | ./.zmr/ios-shim
+```
+
+Cold shim builds can take several minutes on large apps. Warm runs should use
+the cached `build-for-testing` output and respond much faster.
+`scripts/run-ios-pilot.sh` performs this prewarm automatically when
+`--ios-shim` is set; pass `--skip-shim-prewarm` only when debugging cold-start
+timing.
+
+If a freshly booted simulator reports `iOS shim server exited before it became
+ready`, `Early unexpected exit`, or `operation never finished bootstrapping`,
+ZMR retries the shim command once because XCTest can miss its first server
+bootstrap immediately after CoreSimulator startup. Persistent failures after
+that retry should be treated as setup failures: run `xcrun simctl bootstatus
+booted -b`, inspect `.zmr/ios-shim-state/xcodebuild.log`, and prewarm the shim
+with the `appState` command above.
 
 ## Trace And Failure Issues
 

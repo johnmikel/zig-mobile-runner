@@ -26,26 +26,40 @@ Run this after scripts/sign-macos-release.sh and before uploading release assets
 USAGE
 }
 
+die() {
+  echo "error: $*" >&2
+  exit 2
+}
+
+require_value() {
+  local flag="$1"
+  local value="${2-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    die "$flag requires a value"
+  fi
+  printf '%s\n' "$value"
+}
+
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --dist)
-      DIST="${2:-}"
+      DIST="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --keychain-profile)
-      KEYCHAIN_PROFILE="${2:-}"
+      KEYCHAIN_PROFILE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --apple-id)
-      APPLE_ID="${2:-}"
+      APPLE_ID="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --team-id)
-      TEAM_ID="${2:-}"
+      TEAM_ID="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --password)
-      PASSWORD="${2:-}"
+      PASSWORD="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --dry-run)

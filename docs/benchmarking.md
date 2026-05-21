@@ -9,12 +9,19 @@ scripts/benchmark.sh \
   --zmr examples/android-app-login-smoke.json \
   --device emulator-5554 \
   --runs 10 \
+  --trace-root traces/zmr-login \
+  --results traces/bench-comparison/results.jsonl \
+  --replace \
   --min-pass-rate 100 \
   --max-failures 0 \
   --max-p95-ms 30000
 ```
 
-The command writes a timestamped directory under `traces/bench-*`.
+The command writes trace artifacts under `--trace-root` and appends normalized
+rows to `--results`. Omit `--results` to use `<trace-root>/results.jsonl`.
+Omitting `--trace-root` writes under `traces/` in the current app directory,
+not inside the installed ZMR package.
+Use `--replace` when starting a fresh shared comparison file.
 When any gate option is present, `scripts/benchmark_gate.py` reads
 `results.jsonl` and exits non-zero if pass rate, failure count, mean duration,
 or p95 duration misses the configured threshold.
@@ -71,6 +78,28 @@ The iOS pilot wrapper supports the same repeated-run gates:
   --max-p95-ms 45000
 ```
 
+For a paired physical iOS device, pass the target type, a concrete device
+identifier from `zmr devices`, and a signed device artifact:
+
+```bash
+./scripts/run-ios-pilot.sh \
+  --app-root /path/to/mobile-app \
+  --app-path /path/to/mobile-app/build/Release-iphoneos/Sample.ipa \
+  --ios-device-type physical \
+  --device <physical-device-id> \
+  --ios-shim /path/to/mobile-app/.zmr/ios-shim \
+  --runs 20 \
+  --min-pass-rate 100 \
+  --max-failures 0 \
+  --max-p95-ms 45000
+```
+
+When `--ios-shim` is set, the iOS pilot prewarms the app-local XCTest shim with
+an `appState` command before timing scenarios. That moves cold
+`xcodebuild build-for-testing` work out of the measured run and fails early when
+the UI test target is miswired. Use `--skip-shim-prewarm` only when measuring
+first-command cold-start behavior.
+
 For release validation on a machine that has both platform builds and targets
 ready, `zmr-pilot-gate` runs the Android and iOS pilot wrappers with one
 external gate command:
@@ -79,7 +108,8 @@ external gate command:
 zmr-pilot-gate \
   --android --ios \
   --android-app-root /path/to/mobile-app \
-  --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app \
+  --ios-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app \
+  --ios-device-type simulator \
   --ios-shim /path/to/mobile-app/.zmr/ios-shim \
   --runs 20 \
   --min-pass-rate 100 \
@@ -107,17 +137,40 @@ Use `zmr-compare-benchmarks` when a private app repo has benchmark rows from
 ZMR and another local runner. The public ZMR repo keeps this generic: rows are
 grouped by the `tool` field and no external runner is hardcoded.
 
-To collect rows from an existing command-line runner, wrap it with
+Collect ZMR rows into the shared comparison file first:
+
+```bash
+zmr-benchmark \
+  --zmr .zmr/android-smoke.json \
+  --platform android \
+  --device emulator-5554 \
+  --app-id com.example.mobiletest \
+  --app-build <build-id-or-artifact> \
+  --runs 20 \
+  --trace-root traces/zmr-login \
+  --results traces/bench-comparison/results.jsonl \
+  --replace \
+  --min-pass-rate 100 \
+  --max-failures 0
+```
+
+Then collect rows from an existing command-line runner by wrapping it with
 `zmr-benchmark-command`. This keeps benchmark collection tool-agnostic while
-still capturing per-run stdout/stderr logs:
+still capturing per-run stdout/stderr logs and appending to the same results
+file:
 
 ```bash
 zmr-benchmark-command \
-  --tool runner-a \
+  --tool baseline \
+  --platform android \
+  --device emulator-5554 \
+  --app-id com.example.mobiletest \
+  --scenario .zmr/android-smoke.json \
+  --app-build <build-id-or-artifact> \
   --runs 20 \
-  --trace-root traces/runner-a-login \
+  --trace-root traces/baseline-login \
   --results traces/bench-comparison/results.jsonl \
-  -- runner-a test .runner-a/login.yaml
+  -- baseline-runner test .baseline/login.yaml
 ```
 
 For another runner or command, only change `--tool` and the command after
@@ -126,6 +179,11 @@ For another runner or command, only change `--tool` and the command after
 ```bash
 zmr-benchmark-command \
   --tool runner-b \
+  --platform ios \
+  --device booted \
+  --app-id com.example.mobiletest \
+  --scenario .zmr/ios-smoke.json \
+  --app-build <build-id-or-artifact> \
   --runs 20 \
   --trace-root traces/runner-b-login \
   --results traces/bench-comparison/results.jsonl \
@@ -137,13 +195,28 @@ zmr-compare-benchmarks \
   --results traces/bench-comparison/results.jsonl \
   --candidate zmr \
   --baseline baseline \
+  --min-candidate-pass-rate 100 \
+  --max-candidate-failures 0 \
+  --min-mean-speedup 1.25 \
+  --min-p95-speedup 1.25 \
   --format markdown \
-  --out traces/bench-comparison/comparison.md
+  --out traces/bench-comparison/comparison.md \
+  --evidence-out traces/bench-comparison/evidence.jsonl
 ```
 
 The report includes pass rate, failure count, mean duration, p95 duration, mean
-speedup, and p95 speedup. Only compare runs collected on the same host, device
-state, app build, and scenario.
+speedup, p95 speedup, candidate/baseline run counts, and whether the rows have
+the same benchmark context. The optional gates make CI fail when ZMR is not
+reliable enough or not faster than the baseline by the required margin. Only
+compare runs collected on the same host, device state, app build, and scenario.
+`--evidence-out` requires `--min-candidate-pass-rate`,
+`--max-candidate-failures`, `--min-mean-speedup`, and `--min-p95-speedup`, so
+market-claim evidence records explicit reliability and speedup thresholds. When
+`--evidence-out` is set, a successful comparison also requires at least 20 candidate rows,
+at least 20 baseline rows, and matching `platform`, `device`,
+`appId`, `scenario`, and `appBuild` metadata across candidate and baseline
+rows, then appends a `competitive benchmark comparison` row that
+`zmr-release-readiness --target market-claim` can consume directly.
 
 ## Device Matrix
 
@@ -176,7 +249,17 @@ Example matrix:
     {
       "name": "ios-18",
       "platform": "ios",
+      "iosDeviceType": "simulator",
       "serial": "booted",
+      "scenario": ".zmr/ios-smoke.json",
+      "xcrun": "xcrun",
+      "iosShim": ".zmr/ios-shim"
+    },
+    {
+      "name": "ios-physical",
+      "platform": "ios",
+      "iosDeviceType": "physical",
+      "serial": "<physical-device-id>",
       "scenario": ".zmr/ios-smoke.json",
       "xcrun": "xcrun",
       "iosShim": ".zmr/ios-shim"
@@ -188,3 +271,5 @@ Example matrix:
 The command writes `matrix.jsonl` and `summary.json` under the trace root.
 Each device/run pair has a normal trace directory, so failures can be inspected
 with `zmr explain`, `zmr report`, or the trace viewer.
+For iOS rows, omit `iosDeviceType` for the default simulator path or set it to
+`physical` to pass `--ios-device-type physical` through to `zmr run`.

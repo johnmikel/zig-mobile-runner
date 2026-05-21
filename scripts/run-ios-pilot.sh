@@ -2,16 +2,27 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+CALLER_CWD="$(pwd -P)"
 cd "$ROOT"
+
+# Some sandboxed environments do not allow writing to the default temp directory
+# (/var/folders, /tmp). Use a repo-local TMPDIR so xcrun/mktemp/heredocs work.
+if [[ -z "${TMPDIR:-}" || ! -w "${TMPDIR:-/nonexistent}" ]]; then
+  TMPDIR="$ROOT/traces/tmp"
+  mkdir -p "$TMPDIR"
+  export TMPDIR
+fi
 
 APP_ROOT="${APP_ROOT:-}"
 APP_PATH="${APP_PATH:-}"
 DEVICE="${DEVICE:-booted}"
-TRACE_ROOT="${TRACE_ROOT:-$ROOT/traces/ios-app-pilot-$(date +%Y%m%d-%H%M%S)}"
-ZMR_BIN="${ZMR_BIN:-$ROOT/zig-out/bin/zmr}"
+IOS_DEVICE_TYPE="${IOS_DEVICE_TYPE:-simulator}"
+TRACE_ROOT="${TRACE_ROOT:-$CALLER_CWD/traces/ios-app-pilot-$(date +%Y%m%d-%H%M%S)}"
+ZMR_BIN="${ZMR_BIN:-$(command -v zmr 2>/dev/null || printf '%s' "$ROOT/zig-out/bin/zmr")}"
 XCRUN="${XCRUN:-xcrun}"
 APP_ID="${APP_ID:-com.example.mobiletest}"
 IOS_SHIM="${IOS_SHIM:-}"
+PREWARM_IOS_SHIM="${PREWARM_IOS_SHIM:-1}"
 RUNS="${RUNS:-1}"
 MIN_PASS_RATE="${MIN_PASS_RATE:-100}"
 MAX_FAILURES="${MAX_FAILURES:-0}"
@@ -22,24 +33,27 @@ DRY_RUN=0
 usage() {
   cat <<'USAGE'
 Usage:
-  scripts/run-ios-pilot.sh --app-path <Sample.app> [options]
+  scripts/run-ios-pilot.sh --app-path <Sample.app|Sample.ipa> [options]
 
-Runs a configurable iOS simulator smoke pilot:
+Runs a configurable iOS smoke pilot:
   1. build/validate zmr
-  2. install a simulator .app
+  2. install a simulator .app or signed physical-device .app/.ipa
   3. launch/open a deep link through examples/ios-smoke.json
   4. capture screenshot/log snapshot artifacts
   5. generate report and normal/redacted .zmrtrace bundles
 
 Options:
   --app-root <dir>     Optional app repo root, used only for output context.
-  --app-path <path>    Built .app for an iOS simulator. Required.
-  --device <udid>      Simulator UDID. Default: booted.
+  --app-path <path>    Built simulator .app, or signed physical-device .app/.ipa. Required.
+  --device <id>        Simulator UDID/booted or physical device identifier. Default: booted.
+  --ios-device-type <simulator|physical>
+                       Target type. Default: simulator.
   --app-id <bundle>    Bundle id. Default: com.example.mobiletest.
   --trace-root <dir>   Output directory. Default: traces/ios-app-pilot-<timestamp>.
-  --zmr-bin <path>     zmr binary. Default: zig-out/bin/zmr.
+  --zmr-bin <path>     zmr binary. Default: ZMR_BIN, PATH zmr, then zig-out/bin/zmr.
   --xcrun <path>       xcrun path. Default: xcrun.
   --ios-shim <path>    Optional XCTest shim command for selector hierarchy/actions.
+  --skip-shim-prewarm  Do not prewarm the XCTest shim before scenario timing.
   --runs <n>           Run each flow n times. n=1 writes trace bundles; n>1 writes benchmark reports.
   --min-pass-rate <pct>
                        Repeated-run gate minimum. Default: 100.
@@ -52,13 +66,78 @@ Options:
 Notes:
   Without --ios-shim, iOS V1 is a simulator smoke path: install, launch,
   deep link, screenshot, logs, and trace export. With --ios-shim, ZMR also
-  uses the shim for hierarchy and selector-grade actions.
+  uses the shim for hierarchy and selector-grade actions. Physical-device
+  runs require --ios-device-type physical, a concrete --device identifier from
+  `zmr devices`, a signed app artifact, and an app-local XCTest shim for
+  selector-grade flows.
 USAGE
 }
 
 die() {
   echo "error: $*" >&2
   exit 2
+}
+
+require_value() {
+  local flag="$1"
+  local value="${2-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    die "$flag requires a value"
+  fi
+  printf '%s\n' "$value"
+}
+
+resolve_path_from_cwd() {
+  local value="$1"
+  local absolute dir base probe suffix
+  if [[ -z "$value" ]]; then
+    printf '\n'
+    return 0
+  fi
+  if [[ "$value" == /* ]]; then
+    absolute="$value"
+  else
+    absolute="$CALLER_CWD/$value"
+  fi
+  if [[ -d "$absolute" ]]; then
+    cd "$absolute" && pwd -P
+    return 0
+  fi
+  if [[ -e "$absolute" ]]; then
+    dir="$(dirname "$absolute")"
+    base="$(basename "$absolute")"
+    printf '%s/%s\n' "$(cd "$dir" && pwd -P)" "$base"
+    return 0
+  fi
+  dir="$(dirname "$absolute")"
+  base="$(basename "$absolute")"
+  if [[ -d "$dir" ]]; then
+    printf '%s/%s\n' "$(cd "$dir" && pwd -P)" "$base"
+    return 0
+  fi
+  probe="$absolute"
+  suffix=""
+  while [[ "$probe" != "/" && ! -e "$probe" ]]; do
+    suffix="/$(basename "$probe")$suffix"
+    probe="$(dirname "$probe")"
+  done
+  if [[ -d "$probe" ]]; then
+    printf '%s%s\n' "$(cd "$probe" && pwd -P)" "$suffix"
+    return 0
+  fi
+  while [[ "$absolute" == *"/./"* ]]; do
+    absolute="${absolute//\/.\//\/}"
+  done
+  printf '%s\n' "$absolute"
+}
+
+resolve_command_path_from_cwd() {
+  local value="$1"
+  if [[ -z "$value" || "$value" != */* ]]; then
+    printf '%s\n' "$value"
+  else
+    resolve_path_from_cwd "$value"
+  fi
 }
 
 quote_cmd() {
@@ -85,7 +164,12 @@ is_retryable_simctl_text() {
     [[ "$text" == *"Connection refused"* ]]
 }
 
-run_simctl_install() {
+run_ios_install() {
+  if [[ "$IOS_DEVICE_TYPE" == "physical" ]]; then
+    run "$XCRUN" devicectl device install app --device "$DEVICE" "$APP_PATH"
+    return 0
+  fi
+
   echo "+ $(quote_cmd "$XCRUN" simctl install "$DEVICE" "$APP_PATH")"
   if [[ "$DRY_RUN" -eq 1 ]]; then
     return 0
@@ -114,13 +198,66 @@ run_simctl_install() {
   done
 }
 
+prewarm_ios_shim() {
+  if [[ -z "$IOS_SHIM" || "$PREWARM_IOS_SHIM" -eq 0 ]]; then
+    return 0
+  fi
+
+  echo "+ printf '{\"cmd\":\"appState\"}\\n' | $(printf '%q' "$IOS_SHIM")"
+  if [[ "$DRY_RUN" -eq 1 ]]; then
+    return 0
+  fi
+
+  if ! printf '{"cmd":"appState"}\n' | "$IOS_SHIM" >/dev/null; then
+    echo "error: iOS XCTest shim prewarm failed" >&2
+    echo "hint: run the printed appState command directly, inspect .zmr/ios-shim-state/xcodebuild.build.log, and rerun with ZMR_IOS_SHIM_FORCE_REBUILD=1 after changing Xcode targets." >&2
+    exit 1
+  fi
+}
+
+physical_device_state_from_json() {
+  local devices_json="$1"
+  local serial="$2"
+  local state
+  for state in connected available disconnected unavailable paired; do
+    if [[ "$devices_json" == *'"serial":"'"$serial"'","state":"'"$state"'"'* ]]; then
+      printf '%s\n' "$state"
+      return 0
+    fi
+  done
+  printf 'unknown\n'
+}
+
 preflight_ios_device() {
   if [[ "$DRY_RUN" -eq 1 ]]; then
     return 0
   fi
 
   local devices_json
-  devices_json="$("$ZMR_BIN" devices --json --platform ios --xcrun "$XCRUN" 2>/dev/null || true)"
+  devices_json="$("$ZMR_BIN" devices --json --platform ios --ios-device-type "$IOS_DEVICE_TYPE" --xcrun "$XCRUN" 2>/dev/null || true)"
+  if [[ "$IOS_DEVICE_TYPE" == "physical" ]]; then
+    if [[ "$DEVICE" == "booted" ]]; then
+      echo "error: --device must be a physical iOS identifier when --ios-device-type physical is used" >&2
+      echo "errorCode: setup.ios.physical_device_required" >&2
+      exit 2
+    fi
+    if [[ "$devices_json" != *'"serial":"'"$DEVICE"'"'* ]]; then
+      echo "error: physical iOS device not found: $DEVICE" >&2
+      echo "errorCode: setup.ios.physical_device_not_found" >&2
+      echo "hint: connect and trust the device, enable Developer Mode, then run zmr devices --json --platform ios --ios-device-type physical --xcrun $(printf '%q' "$XCRUN")." >&2
+      exit 2
+    fi
+    if [[ "$devices_json" != *'"serial":"'"$DEVICE"'","state":"connected"'* && "$devices_json" != *'"serial":"'"$DEVICE"'","state":"available"'* ]]; then
+      local device_state
+      device_state="$(physical_device_state_from_json "$devices_json" "$DEVICE")"
+      echo "error: physical iOS device is not ready: $DEVICE" >&2
+      echo "state: $device_state" >&2
+      echo "errorCode: setup.ios.physical_device_not_ready" >&2
+      echo "hint: connect and trust the device, enable Developer Mode, confirm zmr devices reports state connected or available, then retry." >&2
+      exit 2
+    fi
+    return 0
+  fi
   if [[ "$DEVICE" == "booted" ]]; then
     if [[ "$devices_json" == *'"count":0'* || -z "$devices_json" ]]; then
       if simctl_has_booted_device ""; then
@@ -177,55 +314,63 @@ simctl_has_booted_device() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --app-root)
-      APP_ROOT="${2:-}"
+      APP_ROOT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --app-path)
-      APP_PATH="${2:-}"
+      APP_PATH="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --device)
-      DEVICE="${2:-}"
+      DEVICE="$(require_value "$1" "${2-}")"
+      shift 2
+      ;;
+    --ios-device-type)
+      IOS_DEVICE_TYPE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --app-id)
-      APP_ID="${2:-}"
+      APP_ID="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --trace-root)
-      TRACE_ROOT="${2:-}"
+      TRACE_ROOT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --zmr-bin)
-      ZMR_BIN="${2:-}"
+      ZMR_BIN="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --xcrun)
-      XCRUN="${2:-}"
+      XCRUN="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --ios-shim)
-      IOS_SHIM="${2:-}"
+      IOS_SHIM="$(require_value "$1" "${2-}")"
       shift 2
       ;;
+    --skip-shim-prewarm)
+      PREWARM_IOS_SHIM=0
+      shift
+      ;;
     --runs)
-      RUNS="${2:-}"
+      RUNS="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --min-pass-rate)
-      MIN_PASS_RATE="${2:-}"
+      MIN_PASS_RATE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --max-failures)
-      MAX_FAILURES="${2:-}"
+      MAX_FAILURES="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --max-mean-ms)
-      MAX_MEAN_MS="${2:-}"
+      MAX_MEAN_MS="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --max-p95-ms)
-      MAX_P95_MS="${2:-}"
+      MAX_P95_MS="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --dry-run)
@@ -244,12 +389,32 @@ done
 
 [[ -n "$APP_PATH" ]] || die "--app-path is required"
 [[ "$RUNS" =~ ^[0-9]+$ && "$RUNS" -ge 1 ]] || die "--runs must be a positive integer"
+[[ "$IOS_DEVICE_TYPE" == "simulator" || "$IOS_DEVICE_TYPE" == "physical" ]] || die "--ios-device-type must be simulator or physical"
 [[ "$MIN_PASS_RATE" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "--min-pass-rate must be a non-negative number"
 [[ "$MAX_FAILURES" =~ ^[0-9]+$ ]] || die "--max-failures must be a non-negative integer"
 [[ -z "$MAX_MEAN_MS" || "$MAX_MEAN_MS" =~ ^[0-9]+$ ]] || die "--max-mean-ms must be a non-negative integer"
 [[ -z "$MAX_P95_MS" || "$MAX_P95_MS" =~ ^[0-9]+$ ]] || die "--max-p95-ms must be a non-negative integer"
+
+APP_PATH="$(resolve_path_from_cwd "$APP_PATH")"
+TRACE_ROOT="$(resolve_path_from_cwd "$TRACE_ROOT")"
+ZMR_BIN="$(resolve_command_path_from_cwd "$ZMR_BIN")"
+XCRUN="$(resolve_command_path_from_cwd "$XCRUN")"
+if [[ -n "$APP_ROOT" ]]; then
+  APP_ROOT="$(resolve_path_from_cwd "$APP_ROOT")"
+fi
+if [[ -n "$IOS_SHIM" ]]; then
+  IOS_SHIM="$(resolve_command_path_from_cwd "$IOS_SHIM")"
+fi
+
 if [[ "$DRY_RUN" -eq 0 ]]; then
-  [[ -d "$APP_PATH" ]] || die "iOS simulator app not found: $APP_PATH"
+  if [[ "$IOS_DEVICE_TYPE" == "physical" ]]; then
+    [[ -e "$APP_PATH" ]] || die "iOS physical app artifact not found: $APP_PATH"
+  else
+    if [[ "${APP_PATH##*.}" == "ipa" ]]; then
+      die "setup.ios.simulator_app_required: simulator runs require an iphonesimulator .app directory, but got an .ipa. Use a simulator-compatible .app build, or run a device IPA with --ios-device-type physical."
+    fi
+    [[ -d "$APP_PATH" ]] || die "setup.ios.simulator_app_required: simulator runs require an iphonesimulator .app directory: $APP_PATH"
+  fi
   if [[ -n "$APP_ROOT" ]]; then
     [[ -d "$APP_ROOT" ]] || die "app repo not found: $APP_ROOT"
   fi
@@ -263,7 +428,7 @@ if [[ "$DRY_RUN" -eq 1 ]]; then
   echo "DRY RUN: commands will be printed but not executed"
 fi
 
-run mkdir -p "$TRACE_ROOT" "$ROOT/zig-out/bin"
+run mkdir -p "$TRACE_ROOT" "$(dirname "$ZMR_BIN")"
 
 if [[ ! -x "$ZMR_BIN" ]]; then
   target_args=()
@@ -279,15 +444,16 @@ if [[ -n "$IOS_SHIM" ]]; then
   run "$ZMR_BIN" validate examples/ios-shim-smoke.json
 fi
 preflight_ios_device
-run_simctl_install
+run_ios_install
+prewarm_ios_shim
 
 if [[ "$RUNS" -eq 1 ]]; then
   TRACE_DIR="$TRACE_ROOT/ios-smoke"
   run rm -rf "$TRACE_DIR"
   if [[ -n "$IOS_SHIM" ]]; then
-    run "$ZMR_BIN" run examples/ios-smoke.json --platform ios --device "$DEVICE" --app-id "$APP_ID" --xcrun "$XCRUN" --ios-shim "$IOS_SHIM" --trace-dir "$TRACE_DIR"
+    run "$ZMR_BIN" run examples/ios-smoke.json --platform ios --ios-device-type "$IOS_DEVICE_TYPE" --device "$DEVICE" --app-id "$APP_ID" --xcrun "$XCRUN" --ios-shim "$IOS_SHIM" --trace-dir "$TRACE_DIR"
   else
-    run "$ZMR_BIN" run examples/ios-smoke.json --platform ios --device "$DEVICE" --app-id "$APP_ID" --xcrun "$XCRUN" --trace-dir "$TRACE_DIR"
+    run "$ZMR_BIN" run examples/ios-smoke.json --platform ios --ios-device-type "$IOS_DEVICE_TYPE" --device "$DEVICE" --app-id "$APP_ID" --xcrun "$XCRUN" --trace-dir "$TRACE_DIR"
   fi
   run "$ZMR_BIN" report "$TRACE_DIR" --out "$TRACE_DIR/report.html"
   run "$ZMR_BIN" export "$TRACE_DIR" --out "$TRACE_ROOT/ios-smoke.zmrtrace"
@@ -296,7 +462,7 @@ if [[ "$RUNS" -eq 1 ]]; then
   if [[ -n "$IOS_SHIM" ]]; then
     SHIM_TRACE_DIR="$TRACE_ROOT/ios-shim-smoke"
     run rm -rf "$SHIM_TRACE_DIR"
-    run "$ZMR_BIN" run examples/ios-shim-smoke.json --platform ios --device "$DEVICE" --app-id "$APP_ID" --xcrun "$XCRUN" --ios-shim "$IOS_SHIM" --trace-dir "$SHIM_TRACE_DIR"
+    run "$ZMR_BIN" run examples/ios-shim-smoke.json --platform ios --ios-device-type "$IOS_DEVICE_TYPE" --device "$DEVICE" --app-id "$APP_ID" --xcrun "$XCRUN" --ios-shim "$IOS_SHIM" --trace-dir "$SHIM_TRACE_DIR"
     run "$ZMR_BIN" report "$SHIM_TRACE_DIR" --out "$SHIM_TRACE_DIR/report.html"
     run "$ZMR_BIN" export "$SHIM_TRACE_DIR" --out "$TRACE_ROOT/ios-shim-smoke.zmrtrace"
     run "$ZMR_BIN" export "$SHIM_TRACE_DIR" --out "$TRACE_ROOT/ios-shim-smoke-redacted.zmrtrace" --redact
@@ -311,25 +477,33 @@ else
   fi
 
   if [[ -n "$IOS_SHIM" ]]; then
-    ZMR_BIN="$ZMR_BIN" run "$ROOT/scripts/benchmark.sh" --zmr examples/ios-smoke.json --device "$DEVICE" --platform ios --app-id "$APP_ID" --xcrun "$XCRUN" --ios-shim "$IOS_SHIM" --runs "$RUNS" --trace-root "$TRACE_ROOT/ios-smoke-benchmark" "${benchmark_gate_args[@]}"
+    ZMR_BIN="$ZMR_BIN" run "$ROOT/scripts/benchmark.sh" --zmr examples/ios-smoke.json --device "$DEVICE" --platform ios --ios-device-type "$IOS_DEVICE_TYPE" --app-id "$APP_ID" --xcrun "$XCRUN" --ios-shim "$IOS_SHIM" --runs "$RUNS" --trace-root "$TRACE_ROOT/ios-smoke-benchmark" "${benchmark_gate_args[@]}"
   else
-    ZMR_BIN="$ZMR_BIN" run "$ROOT/scripts/benchmark.sh" --zmr examples/ios-smoke.json --device "$DEVICE" --platform ios --app-id "$APP_ID" --xcrun "$XCRUN" --runs "$RUNS" --trace-root "$TRACE_ROOT/ios-smoke-benchmark" "${benchmark_gate_args[@]}"
+    ZMR_BIN="$ZMR_BIN" run "$ROOT/scripts/benchmark.sh" --zmr examples/ios-smoke.json --device "$DEVICE" --platform ios --ios-device-type "$IOS_DEVICE_TYPE" --app-id "$APP_ID" --xcrun "$XCRUN" --runs "$RUNS" --trace-root "$TRACE_ROOT/ios-smoke-benchmark" "${benchmark_gate_args[@]}"
   fi
   run "$ZMR_BIN" report "$TRACE_ROOT/ios-smoke-benchmark" --out "$TRACE_ROOT/ios-smoke-benchmark/report.html"
 
   if [[ -n "$IOS_SHIM" ]]; then
-    ZMR_BIN="$ZMR_BIN" run "$ROOT/scripts/benchmark.sh" --zmr examples/ios-shim-smoke.json --device "$DEVICE" --platform ios --app-id "$APP_ID" --xcrun "$XCRUN" --ios-shim "$IOS_SHIM" --runs "$RUNS" --trace-root "$TRACE_ROOT/ios-shim-smoke-benchmark" "${benchmark_gate_args[@]}"
+    ZMR_BIN="$ZMR_BIN" run "$ROOT/scripts/benchmark.sh" --zmr examples/ios-shim-smoke.json --device "$DEVICE" --platform ios --ios-device-type "$IOS_DEVICE_TYPE" --app-id "$APP_ID" --xcrun "$XCRUN" --ios-shim "$IOS_SHIM" --runs "$RUNS" --trace-root "$TRACE_ROOT/ios-shim-smoke-benchmark" "${benchmark_gate_args[@]}"
     run "$ZMR_BIN" report "$TRACE_ROOT/ios-shim-smoke-benchmark" --out "$TRACE_ROOT/ios-shim-smoke-benchmark/report.html"
   fi
 fi
 
-cat <<EOF
-
-iOS pilot complete.
-Output directory: $TRACE_ROOT
-Shareable bundle:
-  $TRACE_ROOT/ios-smoke-redacted.zmrtrace
-  $([[ -n "$IOS_SHIM" ]] && printf '%s/ios-shim-smoke-redacted.zmrtrace' "$TRACE_ROOT")
-Viewer:
-  $ROOT/viewer/index.html
-EOF
+echo
+echo "iOS pilot complete."
+echo "Output directory: $TRACE_ROOT"
+if [[ "$RUNS" -eq 1 ]]; then
+  echo "Shareable bundle:"
+  echo "  $TRACE_ROOT/ios-smoke-redacted.zmrtrace"
+  if [[ -n "$IOS_SHIM" ]]; then
+    echo "  $TRACE_ROOT/ios-shim-smoke-redacted.zmrtrace"
+  fi
+else
+  echo "Benchmark reports:"
+  echo "  $TRACE_ROOT/ios-smoke-benchmark/report.html"
+  if [[ -n "$IOS_SHIM" ]]; then
+    echo "  $TRACE_ROOT/ios-shim-smoke-benchmark/report.html"
+  fi
+fi
+echo "Viewer:"
+echo "  $ROOT/viewer/index.html"

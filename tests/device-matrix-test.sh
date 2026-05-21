@@ -5,10 +5,23 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 TMPDIR="$(mktemp -d)"
 trap 'rm -rf "$TMPDIR"' EXIT
 
+for args in "--matrix" "--trace-root" "--min-pass-rate" "--max-failures"; do
+  set +e
+  missing_value_output="$("$ROOT/scripts/device-matrix.sh" $args 2>&1)"
+  missing_value_status=$?
+  set -e
+  if [[ "$missing_value_status" -ne 2 ]]; then
+    echo "device-matrix should exit 2 for missing value: $args" >&2
+    exit 1
+  fi
+  grep -q -- "$args requires a value" <<< "$missing_value_output"
+done
+
 cat > "$TMPDIR/fake-zmr" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
 platform="android"
+ios_device_type=""
 device=""
 trace_dir=""
 scenario=""
@@ -27,6 +40,10 @@ while [[ $# -gt 0 ]]; do
       device="${2:-}"
       shift 2
       ;;
+    --ios-device-type)
+      ios_device_type="${2:-}"
+      shift 2
+      ;;
     --trace-dir)
       trace_dir="${2:-}"
       shift 2
@@ -41,6 +58,13 @@ case "$device" in
   failing-device)
     printf '{"seq":1,"kind":"scenario.end","payload":{"status":"failed","error":"WaitTimeout"}}\n' > "$trace_dir/events.jsonl"
     exit 1
+    ;;
+  fake-physical-ios-1)
+    if [[ "$ios_device_type" != "physical" ]]; then
+      echo "physical iOS matrix run missing --ios-device-type physical" >&2
+      exit 9
+    fi
+    printf '{"seq":1,"kind":"scenario.end","payload":{"status":"passed","platform":"%s","scenario":"%s","iosDeviceType":"%s"}}\n' "$platform" "$scenario" "$ios_device_type" > "$trace_dir/events.jsonl"
     ;;
   *)
     printf '{"seq":1,"kind":"scenario.end","payload":{"status":"passed","platform":"%s","scenario":"%s"}}\n' "$platform" "$scenario" > "$trace_dir/events.jsonl"
@@ -69,6 +93,15 @@ cat > "$TMPDIR/matrix.json" <<JSON
       "scenario": "$TMPDIR/ios-smoke.json",
       "xcrun": "./tests/fake-xcrun.sh",
       "iosShim": "./tests/fake-ios-shim.sh"
+    },
+    {
+      "name": "ios-physical",
+      "platform": "ios",
+      "iosDeviceType": "physical",
+      "serial": "fake-physical-ios-1",
+      "scenario": "$TMPDIR/ios-smoke.json",
+      "xcrun": "./tests/fake-xcrun.sh",
+      "iosShim": "./tests/fake-ios-shim.sh"
     }
   ]
 }
@@ -80,7 +113,7 @@ ZMR_BIN="$TMPDIR/fake-zmr" "$ROOT/scripts/device-matrix.sh" \
   --min-pass-rate 100 \
   --max-failures 0 > "$TMPDIR/matrix-pass.out"
 
-grep -q 'matrix: runs=4 passRate=100.00% failures=0' "$TMPDIR/matrix-pass.out"
+grep -q 'matrix: runs=6 passRate=100.00% failures=0' "$TMPDIR/matrix-pass.out"
 test -f "$TMPDIR/matrix-pass/matrix.jsonl"
 test -f "$TMPDIR/matrix-pass/summary.json"
 
@@ -92,14 +125,39 @@ import sys
 root = pathlib.Path(sys.argv[1])
 rows = [json.loads(line) for line in (root / "matrix.jsonl").read_text().splitlines()]
 summary = json.loads((root / "summary.json").read_text())
-assert len(rows) == 4
-assert {row["deviceName"] for row in rows} == {"android-api-35", "ios-18"}
+assert len(rows) == 6
+assert {row["deviceName"] for row in rows} == {"android-api-35", "ios-18", "ios-physical"}
 assert {row["platform"] for row in rows} == {"android", "ios"}
-assert summary["totalRuns"] == 4
-assert summary["passed"] == 4
+assert summary["totalRuns"] == 6
+assert summary["passed"] == 6
 assert summary["failed"] == 0
 assert summary["passRate"] == 100.0
 PY
+
+APP_MATRIX_DIR="$TMPDIR/app-matrix-defaults"
+mkdir -p "$APP_MATRIX_DIR"
+APP_MATRIX_DIR="$(cd "$APP_MATRIX_DIR" && pwd -P)"
+cat > "$APP_MATRIX_DIR/matrix.json" <<JSON
+{
+  "runs": 1,
+  "devices": [
+    {
+      "name": "app-default-device",
+      "platform": "android",
+      "serial": "emulator-5554",
+      "scenario": "$TMPDIR/android-smoke.json"
+    }
+  ]
+}
+JSON
+pushd "$APP_MATRIX_DIR" >/dev/null
+ZMR_BIN="$TMPDIR/fake-zmr" "$ROOT/scripts/device-matrix.sh" --matrix matrix.json > "$TMPDIR/matrix-default.out"
+popd >/dev/null
+matrix_summaries=("$APP_MATRIX_DIR"/traces/matrix-*/summary.json)
+if [[ ! -f "${matrix_summaries[0]}" ]]; then
+  echo "device-matrix.sh should default trace output to the caller app directory, not the package root" >&2
+  exit 1
+fi
 
 cat > "$TMPDIR/matrix-fail.json" <<JSON
 {

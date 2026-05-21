@@ -23,6 +23,7 @@ override config defaults.
 - `.zmr/config.json`
 - `.zmr/android-smoke.json`
 - `.zmr/ios-smoke.json`
+- `.zmr/AGENTS.md`
 - optional shim commands and source files
 - app package script suggestions
 - `traces/` ignored by default
@@ -33,6 +34,6 @@ override config defaults.
   the public ZMR repo.
 - npm, source, and release-archive installs share one integration model.
 - Agents can discover the same setup state humans use through `zmr doctor`,
-  `zmr schemas`, and `.zmr/config.json`.
+  `zmr schemas`, `.zmr/config.json`, and `.zmr/AGENTS.md`.
 - Generated files need backwards-compatible schema handling and clear
   diagnostics because app repositories may pin older versions.

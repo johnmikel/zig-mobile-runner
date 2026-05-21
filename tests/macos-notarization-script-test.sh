@@ -31,7 +31,7 @@ chmod +x "$TMPDIR/bin/xcrun"
 
 make_archive() {
   local target="$1"
-  local dir="$DIST/zmr-0.1.0-dev.1-$target"
+  local dir="$DIST/zmr-0.1.0-dev.2-$target"
   mkdir -p "$dir"
   printf 'signed binary for %s\n' "$target" > "$dir/zmr"
   tar -C "$DIST" -czf "$dir.tar.gz" "$(basename "$dir")"
@@ -45,7 +45,7 @@ make_archive "aarch64-linux-gnu"
 printf '{"spdxVersion":"SPDX-2.3"}\n' > "$DIST/SBOM.spdx.json"
 printf '# Notices\n' > "$DIST/THIRD_PARTY_NOTICES.md"
 printf 'class Zmr < Formula\nend\n' > "$DIST/homebrew/zmr.rb"
-node "$ROOT/scripts/generate-release-manifest.mjs" --dist "$DIST" --version "0.1.0-dev.1" --out "$DIST/RELEASE_MANIFEST.json" >/dev/null
+node "$ROOT/scripts/generate-release-manifest.mjs" --dist "$DIST" --version "0.1.0-dev.2" --out "$DIST/RELEASE_MANIFEST.json" >/dev/null
 (
   cd "$DIST"
   shasum -a 256 ./*.tar.gz SBOM.spdx.json THIRD_PARTY_NOTICES.md homebrew/zmr.rb RELEASE_MANIFEST.json > SHA256SUMS
@@ -68,19 +68,19 @@ if grep -q 'linux-gnu' "$TMPDIR/xcrun.log"; then
   exit 1
 fi
 
-test -s "$DIST/notarization/zmr-0.1.0-dev.1-aarch64-macos.15.0.notary.json"
-grep -q '"status":"Accepted"' "$DIST/notarization/zmr-0.1.0-dev.1-aarch64-macos.15.0.notary.json"
+test -s "$DIST/notarization/zmr-0.1.0-dev.2-aarch64-macos.15.0.notary.json"
+grep -q '"status":"Accepted"' "$DIST/notarization/zmr-0.1.0-dev.2-aarch64-macos.15.0.notary.json"
 node - "$DIST/RELEASE_MANIFEST.json" <<'NODE'
 const fs = require("node:fs");
 const manifest = JSON.parse(fs.readFileSync(process.argv[2], "utf8"));
 const paths = new Set(manifest.artifacts.map((artifact) => artifact.path));
-if (!paths.has("notarization/zmr-0.1.0-dev.1-aarch64-macos.15.0.notary.json")) {
+if (!paths.has("notarization/zmr-0.1.0-dev.2-aarch64-macos.15.0.notary.json")) {
   throw new Error("release manifest should include notarization receipt");
 }
 NODE
 "$ROOT/scripts/verify-release-artifacts.sh" --dist "$DIST" > "$TMPDIR/verify.out"
 grep -q 'verified release artifacts' "$TMPDIR/verify.out"
-grep -q 'notarization/zmr-0.1.0-dev.1-aarch64-macos.15.0.notary.json' "$DIST/SHA256SUMS"
+grep -q 'notarization/zmr-0.1.0-dev.2-aarch64-macos.15.0.notary.json' "$DIST/SHA256SUMS"
 
 rm -f "$TMPDIR/xcrun.log" "$TMPDIR/ditto.log"
 ZMR_FAKE_DITTO_LOG="$TMPDIR/ditto.log" \
@@ -98,3 +98,15 @@ if "$ROOT/scripts/notarize-macos-release.sh" --dist "$DIST" > "$TMPDIR/missing-c
   exit 1
 fi
 grep -q 'notarization credentials are required' "$TMPDIR/missing-credentials.out"
+
+for args in "--dist" "--keychain-profile" "--apple-id" "--team-id" "--password"; do
+  set +e
+  missing_value_output="$("$ROOT/scripts/notarize-macos-release.sh" $args --dry-run 2>&1)"
+  missing_value_status=$?
+  set -e
+  if [[ "$missing_value_status" -ne 2 ]]; then
+    echo "macOS notarization helper should exit 2 for missing value: $args" >&2
+    exit 1
+  fi
+  grep -q -- "$args requires a value" <<< "$missing_value_output"
+done

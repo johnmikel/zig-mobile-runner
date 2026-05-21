@@ -22,12 +22,12 @@ iOS support uses three layers:
 - `xcrun devicectl` for physical-device discovery, install, launch, deep-link
   launch, clear-state uninstall, and best-effort stop.
 - An app-local XCTest/XCUIAutomation shim for hierarchy snapshots, element
-  queries, tap, type, erase text, keyboard control, swipe, and app state on
-  simulators and physical devices.
+  queries, screenshots, tap, type, erase text, keyboard control, swipe, and app
+  state on simulators and physical devices.
 
 V1 iOS clear-state semantics are best-effort app uninstall by bundle id.
-Physical-device screenshot and log capture remain limited until the shim grows
-an explicit capture channel.
+Physical-device log capture remains limited until a supported capture channel is
+available.
 
 ## Consequences
 

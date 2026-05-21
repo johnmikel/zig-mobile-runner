@@ -16,7 +16,8 @@ test -f "$ROOT/clients/go/examples/fake-session/main.go"
 (
   cd "$ROOT/clients/go"
   go run ./examples/fake-session \
-    --server "$ROOT/tests/fake-json-rpc-server.mjs" \
-    --node "$(command -v node)" \
+    --zmr "$ROOT/zig-out/bin/zmr" \
+    --adb "$ROOT/tests/fake-adb.sh" \
+    --trace-dir "$ROOT/traces/demo-go-client" \
     --trace-out "$ROOT/traces/demo-go-client-redacted.zmrtrace"
 )

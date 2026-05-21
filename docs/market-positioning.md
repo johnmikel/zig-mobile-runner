@@ -57,9 +57,9 @@ ZMR should lead with:
 | Area | Gap |
 | --- | --- |
 | npm distribution | Tarball exists in GitHub release, registry publish still pending |
-| Android proof | Needs repeated public generic Android demo and app-local pilots |
+| Android proof | Public generic Android demo wrapper exists; repeated emulator proof and app-local pilots still need published release evidence |
 | iOS scale | Simulator demo passes, but repeated-run evidence should be published |
-| Physical iOS | Initial local support exists through `devicectl` plus the XCTest shim; screenshot/log capture still needs hardening |
+| Physical iOS | Local lifecycle and selector support exist through `devicectl` plus the XCTest shim; screenshots use the shim, physical log capture still needs hardening |
 | Cloud | Not supported yet |
 | Human DSL | JSON is reliable for agents; a friendlier authoring layer should compile to JSON |
 | Brand surface | README is now concise; a docs/landing site should follow after npm publish |

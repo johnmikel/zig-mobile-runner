@@ -32,6 +32,15 @@ if [[ "${1:-}" == "simctl" && "${2:-}" == "list" && "${3:-}" == "devices" && "${
   printf '{"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-18-5":[]}}\n'
   exit 0
 fi
+if [[ "${1:-}" == "devicectl" && "${2:-}" == "list" && "${3:-}" == "devices" ]]; then
+  while [[ $# -gt 0 ]]; do
+    if [[ "${1:-}" == "--json-output" ]]; then
+      printf '{"result":{"devices":[]}}\n' > "${2:-}"
+      exit 0
+    fi
+    shift
+  done
+fi
 exit 2
 SH
 
@@ -41,6 +50,7 @@ JSON_OUTPUT="$("$ZMR" doctor --json --adb "$EMPTY_ADB" --xcrun "$EMPTY_XCRUN")"
 grep -q '"ok":false' <<< "$JSON_OUTPUT"
 grep -q '"errorCode":"setup.android.no_devices"' <<< "$JSON_OUTPUT"
 grep -q '"errorCode":"setup.ios.no_booted_simulators"' <<< "$JSON_OUTPUT"
+grep -q '"errorCode":"setup.ios.no_physical_devices"' <<< "$JSON_OUTPUT"
 
 if "$ZMR" doctor --strict --json --adb "$EMPTY_ADB" --xcrun "$EMPTY_XCRUN" > "$TMPDIR/strict.json"; then
   echo "expected doctor --strict to exit non-zero for warning checks" >&2

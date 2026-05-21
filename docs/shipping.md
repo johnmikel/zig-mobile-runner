@@ -4,6 +4,15 @@ This checklist defines the current shippable unit. It is intentionally narrower 
 
 For the maintainer-facing GitHub upload and npm publication sequence, see
 [docs/publication.md](publication.md).
+For the artifact-by-artifact proof checklist behind release and benchmark
+claims, see [docs/release-evidence.md](release-evidence.md).
+For the release-candidate command that writes `evidence.jsonl` and
+`summary.md`, see [docs/release-candidate.md](release-candidate.md).
+Use `zmr-release-readiness --evidence <evidence.jsonl> --target dev-preview`
+to verify the generated evidence supports a dev-preview release. Use
+`--target production` or `--target market-claim` only when the corresponding
+real-device pilot and benchmark evidence exists. Pass `--evidence` more than
+once when production evidence lives in a private app repository.
 
 ## Included
 
@@ -64,6 +73,9 @@ For the maintainer-facing GitHub upload and npm publication sequence, see
 - App-local `.zmr/config.json` schema and CLI default loading.
 - Internal iOS/Android shim protocol scaffolds under `shims/`.
 - Security, contribution, trace privacy, and protocol versioning docs.
+- Release evidence checklist in `docs/release-evidence.md`.
+- Release candidate evidence gate in `docs/release-candidate.md` and
+  `scripts/release-candidate.sh`.
 - Feature catalog in `FEATURES.md`.
 - Architecture decision records under `docs/adr/`.
 - AI agent integration guide in `docs/ai-agents.md`.
@@ -93,24 +105,29 @@ packaged binary smoke, and `npm pack --dry-run`.
 The fake-tool validation uses `zmr doctor --strict` so warning or missing setup
 checks fail the local release gate instead of requiring callers to parse JSON.
 
-For Android pilot validation, run against a booted emulator with the test app installed and Metro pointed at the hosted TEST API:
+For Android and iOS simulator pilot validation, run the app-facing pilot gate
+against a booted Android emulator, a booted iOS simulator, and the built
+simulator `.app`:
 
 ```bash
-./scripts/run-android-pilot.sh --app-root /path/to/mobile-app --device emulator-5554 --runs 20 --min-pass-rate 100 --max-failures 0 --max-p95-ms 30000
+zmr-pilot-gate --android --ios --android-app-root /path/to/mobile-app --android-app-id com.example.mobiletest --android-device emulator-5554 --ios-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --ios-app-id com.example.mobiletest --ios-device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl
 ```
 
-For iOS pilot validation, build a simulator `.app`, boot a simulator, then run:
+For physical iOS pilot validation, use a physical device identifier from
+`zmr devices --json --platform ios --ios-device-type physical` and a signed
+device artifact:
 
 ```bash
-./scripts/run-ios-pilot.sh --app-root /path/to/mobile-app --app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --device booted --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --max-p95-ms 45000
+zmr-pilot-gate --ios --ios-device-type physical --ios-device <physical-device-id> --ios-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Release-iphoneos/Sample.ipa --ios-app-id com.example.mobiletest --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0 --evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl
 ```
 
-When both app builds are ready on the same machine, use the external pilot gate
-wrapper:
+Pass `--zmr-bin /path/to/zmr` when the pilot should use an explicit runner
+binary; the wrapper forwards it to Android, iOS, and physical iOS readiness
+checks.
 
-```bash
-zmr-pilot-gate --android --ios --android-app-root /path/to/mobile-app --ios-app-path /path/to/mobile-app/build/Debug-iphonesimulator/Sample.app --ios-shim /path/to/mobile-app/.zmr/ios-shim --runs 20 --min-pass-rate 100 --max-failures 0
-```
+Add `--evidence-out /path/to/mobile-app/traces/zmr-pilots/evidence.jsonl` to
+write production-readiness rows that can be passed to
+`zmr-release-readiness` alongside the public release-candidate evidence.
 
 Run the pilot gates before publishing reliability or performance claims.
 
@@ -119,9 +136,9 @@ Run the pilot gates before publishing reliability or performance claims.
 - Automatic iOS workspace resolution when multiple workspace projects contain
   the same requested app target and bundle id. In that case, callers must pass
   `--project`.
-- Full physical iOS artifact parity. Physical iOS lifecycle and XCTest shim
-  interaction are supported locally, but screenshot/log capture still needs a
-  physical-device capture channel.
+- Full physical iOS artifact parity. Physical iOS lifecycle, screenshots, and
+  XCTest shim interaction are supported locally, but physical-device log capture
+  still needs a supported capture channel.
 - Pixel-level screenshot or video masking. Redacted bundles at present replace
   PNG screenshots with placeholder frames or omit screenshots entirely, and
   omit screen recordings instead of attempting visual masking.
@@ -134,7 +151,7 @@ Run the pilot gates before publishing reliability or performance claims.
 2. Run the Android and iOS pilot scenarios if emulator/simulator app builds are available.
 3. If publishing signed macOS archives, run `./scripts/sign-macos-release.sh --identity "<Developer ID Application identity>"` after `./scripts/build-release.sh`.
 4. If publishing notarized macOS archives, run `./scripts/notarize-macos-release.sh --keychain-profile "<notarytool profile>"`, then rerun `./scripts/verify-release-artifacts.sh`.
-5. Create the tag `v0.1.0-dev.1` for the current package version. Bump
+5. Create the tag `v0.1.0-dev.2` for the current package version. Bump
    `src/version.zig` and `package.json` before using a different tag.
 6. Push the tag; `.github/workflows/release.yml` builds archives, smokes the host-compatible packaged binary, builds `dist/zig-mobile-runner-*.tgz`, publishes GitHub artifact attestation, and uploads checksums, SBOM, third-party notices, `RELEASE_MANIFEST.json`, the npm tarball, and the generated Homebrew formula.
 7. If `NPM_TOKEN` is configured, the release workflow publishes the npm tarball with `npm publish dist/zig-mobile-runner-*.tgz --provenance --access public`. Without that secret, the workflow skips npm publish but still uploads the tarball for manual inspection.

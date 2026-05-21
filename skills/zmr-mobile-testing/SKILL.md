@@ -92,6 +92,27 @@ zmr export traces/zmr-<scenario> --out traces/zmr-<scenario>-redacted.zmrtrace -
 
 Add `--omit-screenshots` if visual artifacts may contain sensitive data.
 
+## Release And Claim Guard
+
+Before reporting that ZMR is ready for a release, production use, or a market
+comparison, ask the runner to evaluate evidence instead of inferring from test
+passes:
+
+```bash
+zmr-release-readiness --json \
+  --evidence traces/release-candidate/<run>/evidence.jsonl \
+  --target dev-preview
+```
+
+For production or market claims, include app-local pilot and benchmark evidence
+with additional `--evidence` arguments. Read `satisfied` for proven requirements
+and `blocked`, `missing`, `insufficient`, `failed`, and `planned` for remaining
+work. Use `recommendedWording` as the release summary and respect
+`claimLimitations`; do not infer stronger claims from `passed` alone or upgrade
+a dev-preview result into a production-stable or competitive claim. When
+blocked, execute `nextSteps[].commands` in order and use `nextSteps[].covers`
+to understand which blocked requirements each step resolves.
+
 ## Benchmarks
 
 Use ZMR repeated runs:

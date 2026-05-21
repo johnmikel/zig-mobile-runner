@@ -87,6 +87,17 @@ public final class ZMRClient {
         return result
     }
 
+    public func assertHealthy(timeoutMs: Int? = nil) throws -> Bool {
+        var params: [String: Any] = [:]
+        if let timeoutMs {
+            params["timeoutMs"] = timeoutMs
+        }
+        guard let result = try call("assert.healthy", params: params) as? Bool else {
+            throw ZMRError.invalidResponse
+        }
+        return result
+    }
+
     private func readLineData() throws -> Data {
         var data = Data()
         while true {

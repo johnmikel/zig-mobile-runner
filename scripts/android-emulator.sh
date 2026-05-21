@@ -47,6 +47,15 @@ die() {
   exit 2
 }
 
+require_value() {
+  local flag="$1"
+  local value="${2-}"
+  if [[ -z "$value" || "$value" == --* ]]; then
+    die "$flag requires a value"
+  fi
+  printf '%s\n' "$value"
+}
+
 [[ $# -gt 0 ]] || {
   usage >&2
   exit 2
@@ -58,15 +67,15 @@ shift
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --avd)
-      AVD="${2:-}"
+      AVD="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --device)
-      DEVICE="${2:-}"
+      DEVICE="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --name)
-      SNAPSHOT="${2:-}"
+      SNAPSHOT="$(require_value "$1" "${2-}")"
       shift 2
       ;;
     --dry-run)
@@ -115,4 +124,3 @@ case "$COMMAND" in
     die "unknown command: $COMMAND"
     ;;
 esac
-
