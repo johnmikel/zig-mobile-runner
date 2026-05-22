@@ -35,7 +35,7 @@ SH
 chmod +x "$TMPDIR/kcov"
 
 set +e
-output="$(PATH="$TMPDIR:$PATH" ZIG_TARGET=native ZMR_KCOV_TIMEOUT_SECONDS=1 "$ROOT/scripts/coverage.sh" 2>&1)"
+output="$(PATH="$TMPDIR:$PATH" ZIG_TARGET=native ZMR_KCOV_TIMEOUT_SECONDS=1 ZMR_FORCE_KCOV=1 "$ROOT/scripts/coverage.sh" 2>&1)"
 status=$?
 set -e
 
